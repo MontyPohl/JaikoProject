@@ -10,15 +10,23 @@ class RoommateRequest(db.Model):
     target_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     group_id = db.Column(db.Integer, db.ForeignKey("groups.id"), nullable=True)
     listing_id = db.Column(db.Integer, db.ForeignKey("listings.id"), nullable=True)
-    type = db.Column(db.String(30), default="roommate")  # roommate | group_invite | listing
+    type = db.Column(
+        db.String(30), default="roommate"
+    )  # roommate | group_invite | listing
     status = db.Column(db.String(20), default="pending")
     # pending | accepted | rejected | cancelled
     message = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
-    sender = db.relationship("User", foreign_keys=[sender_user_id], back_populates="sent_requests")
-    target = db.relationship("User", foreign_keys=[target_user_id], back_populates="received_requests")
+    sender = db.relationship(
+        "User", foreign_keys=[sender_user_id], back_populates="sent_requests"
+    )
+    target = db.relationship(
+        "User", foreign_keys=[target_user_id], back_populates="received_requests"
+    )
 
     def to_dict(self) -> dict:
         return {
@@ -43,7 +51,7 @@ class Notification(db.Model):
     # match_request | group_invite | message | listing_request | review | report | system
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=True)
-    data = db.Column(db.JSON, nullable=True)            # extra payload (ids, links, etc.)
+    data = db.Column(db.JSON, nullable=True)  # extra payload (ids, links, etc.)
     read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -68,12 +76,16 @@ class Review(db.Model):
     reviewer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     target_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     listing_id = db.Column(db.Integer, db.ForeignKey("listings.id"), nullable=True)
-    rating = db.Column(db.Integer, nullable=False)      # 1-5
+    rating = db.Column(db.Integer, nullable=False)  # 1-5
     comment = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    reviewer = db.relationship("User", foreign_keys=[reviewer_id], back_populates="reviews_given")
-    target_user = db.relationship("User", foreign_keys=[target_user_id], back_populates="reviews_received")
+    reviewer = db.relationship(
+        "User", foreign_keys=[reviewer_id], back_populates="reviews_given"
+    )
+    target_user = db.relationship(
+        "User", foreign_keys=[target_user_id], back_populates="reviews_received"
+    )
     listing = db.relationship("Listing", back_populates="reviews")
 
     def to_dict(self) -> dict:
@@ -82,7 +94,9 @@ class Review(db.Model):
             "id": self.id,
             "reviewer_id": self.reviewer_id,
             "reviewer_name": reviewer_profile.name if reviewer_profile else None,
-            "reviewer_photo": reviewer_profile.profile_photo_url if reviewer_profile else None,
+            "reviewer_photo": (
+                reviewer_profile.profile_photo_url if reviewer_profile else None
+            ),
             "target_user_id": self.target_user_id,
             "listing_id": self.listing_id,
             "rating": self.rating,
@@ -97,16 +111,24 @@ class Report(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     reporter_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     reported_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    reported_listing_id = db.Column(db.Integer, db.ForeignKey("listings.id"), nullable=True)
+    reported_listing_id = db.Column(
+        db.Integer, db.ForeignKey("listings.id"), nullable=True
+    )
     reason = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(20), default="open")   # open | reviewed | resolved | dismissed
+    status = db.Column(
+        db.String(20), default="open"
+    )  # open | reviewed | resolved | dismissed
     admin_note = db.Column(db.Text, nullable=True)
     reviewed_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
-    reporter = db.relationship("User", foreign_keys=[reporter_id], back_populates="reports_filed")
+    reporter = db.relationship(
+        "User", foreign_keys=[reporter_id], back_populates="reports_filed"
+    )
     reported_user = db.relationship("User", foreign_keys=[reported_user_id])
     reviewer = db.relationship("User", foreign_keys=[reviewed_by])
 
@@ -128,7 +150,9 @@ class VerificationRequest(db.Model):
     __tablename__ = "verification_requests"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False
+    )
     selfie_url = db.Column(db.String(500), nullable=True)
     verification_code = db.Column(db.String(20), nullable=False)
     status = db.Column(db.String(30), default="pending_verification")
@@ -136,10 +160,16 @@ class VerificationRequest(db.Model):
     reviewed_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     rejection_reason = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
-    user = db.relationship("User", foreign_keys=[user_id], back_populates="verification_request")
-    reviewer = db.relationship("User", foreign_keys=[reviewed_by])
+    user = db.relationship(
+        "User",
+        foreign_keys="VerificationRequest.user_id",
+        back_populates="verification_request",
+    )
+    reviewer = db.relationship("User", foreign_keys="VerificationRequest.reviewed_by")
 
     def to_dict(self) -> dict:
         return {
