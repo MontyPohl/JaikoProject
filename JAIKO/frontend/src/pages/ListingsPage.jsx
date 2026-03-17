@@ -127,14 +127,16 @@ export default function ListingsPage() {
         </div>
         <div>
           <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">Precio min (₲)</label>
-          <input type="number" className="input w-36 h-11"
+          <input type="text" inputMode="numeric" pattern="[0-9]*" className="input w-36 h-11"
             value={filters.min_price} placeholder="0"
+            onKeyDown={e => ['-', '+', 'e', '.'].includes(e.key) && e.preventDefault()}
             onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFilters(f => ({ ...f, min_price: v })) }} />
         </div>
         <div>
           <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">Precio max (₲)</label>
-          <input type="number" className="input w-36 h-11"
+          <input type="text" inputMode="numeric" pattern="[0-9]*" className="input w-36 h-11"
             value={filters.max_price} placeholder="Sin límite"
+            onKeyDown={e => ['-', '+', 'e', '.'].includes(e.key) && e.preventDefault()}
             onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFilters(f => ({ ...f, max_price: v })) }} />
         </div>
         <div className="flex gap-2">
