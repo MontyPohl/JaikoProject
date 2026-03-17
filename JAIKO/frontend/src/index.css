@@ -69,4 +69,15 @@
 /* Leaflet overrides */
 .leaflet-container {
   @apply rounded-2xl font-body;
+  z-index: 0;
+}
+
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 0;
+}
+
+.leaflet-control {
+  z-index: 1;
 }
