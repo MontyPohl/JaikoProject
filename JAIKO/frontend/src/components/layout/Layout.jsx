@@ -26,17 +26,18 @@ export default function Layout() {
   };
 
   return (
-    <div className="min-h-dvh flex flex-col font-main">
+    <div className="min-h-screen flex flex-col font-main">
       {/* ── Navbar ── */}
-      <nav className="sticky top-0 z-50 bg-[#2563C8] text-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
-          {/* Logo */}
-          <NavLink to="/">
-            <img src={logo} alt="JAIKO!" className="h-10 w-auto" />
-          </NavLink>
+      <nav className="sticky top-0 z-50 bg-[#2563C8]/90 backdrop-blur-md shadow-xl">
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16 relative">
+          
+          {/* Logo principal grande (no interactivo, sin shadow) */}
+          <div className="flex-shrink-0">
+            <img src={logo} alt="JAIKO!" className="h-16 w-auto" />
+          </div>
 
-          {/* Desktop nav links */}
-          <div className="hidden md:flex items-center gap-2">
+          {/* Links principales centrados con hover glow */}
+          <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 gap-8">
             {NAV.filter(n => !n.auth || isAuthenticated()).map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -44,50 +45,49 @@ export default function Layout() {
                 end={to === '/'}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all',
-                    isActive ? 'bg-[#FBBF24] text-[#2563C8]' : 'text-white hover:bg-white/10'
+                    'flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-white transition-all duration-300',
+                    isActive 
+                      ? 'bg-[#FBBF24] text-[#2563C8] shadow-md'
+                      : 'hover:bg-white/20 hover:text-[#FBBF24] hover:scale-105'
                   )
                 }
               >
-                <Icon size={15} /> {label}
+                <Icon size={16} /> {label}
               </NavLink>
             ))}
           </div>
 
-          {/* Right side */}
-          <div className="flex items-center gap-2">
-            {isAuthenticated() ? (
+          {/* Right side: avatar y notificaciones */}
+          <div className="ml-auto flex items-center gap-3">
+            {isAuthenticated() && (
               <>
-                {/* Notifications bell */}
                 <NavLink
                   to="/notifications"
-                  className="relative p-2 rounded-xl hover:bg-white/10 text-white transition-all"
+                  className="relative p-2 rounded-lg hover:bg-white/20 transition duration-300 hover:scale-110"
                 >
-                  <Bell size={20} />
+                  <Bell size={22} />
                   {unread > 0 && (
-                    <span className="absolute top-1 right-1 w-4 h-4 bg-[#FBBF24] text-[#2563C8] text-[10px] font-bold rounded-full flex items-center justify-center">
+                    <span className="absolute top-0 right-0 w-5 h-5 bg-[#FBBF24] text-[#2563C8] text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
                       {unread > 9 ? '9+' : unread}
                     </span>
                   )}
                 </NavLink>
 
-                {/* Admin link */}
                 {isAdmin() && (
-                  <NavLink to="/admin" className="p-2 rounded-xl hover:bg-white/10 text-white transition-all">
-                    <ShieldCheck size={20} />
+                  <NavLink to="/admin" className="p-2 rounded-lg hover:bg-white/20 transition duration-300 hover:scale-110">
+                    <ShieldCheck size={22} />
                   </NavLink>
                 )}
 
-                {/* Avatar */}
-                <NavLink to="/profile" className="flex items-center gap-2 pl-2">
+                <NavLink to="/profile" className="flex items-center gap-2 pl-2 hover:scale-105 transition duration-300">
                   {profile?.profile_photo_url ? (
                     <img
                       src={profile.profile_photo_url}
                       alt={profile.name}
-                      className="w-8 h-8 rounded-full object-cover border-2 border-[#FBBF24]"
+                      className="w-10 h-10 rounded-full object-cover border-2 border-[#FBBF24]"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-[#FBBF24] flex items-center justify-center font-bold text-sm text-[#2563C8]">
+                    <div className="w-10 h-10 rounded-full bg-[#FBBF24] flex items-center justify-center font-bold text-sm text-[#2563C8]">
                       {profile?.name?.[0]?.toUpperCase() || '?'}
                     </div>
                   )}
@@ -96,24 +96,17 @@ export default function Layout() {
 
                 <button
                   onClick={handleLogout}
-                  className="p-2 rounded-xl hover:bg-white/10 text-white transition-all"
+                  className="p-2 rounded-lg hover:bg-white/20 transition duration-300 hover:scale-110"
                   title="Cerrar sesión"
                 >
                   <LogOut size={18} />
                 </button>
               </>
-            ) : (
-              <NavLink
-                to="/login"
-                className="btn-primary text-sm py-2 px-4 bg-[#FBBF24] text-[#2563C8] font-bold rounded-lg hover:bg-[#D4891A] transition-all"
-              >
-                Entrar
-              </NavLink>
             )}
 
             {/* Mobile menu toggle */}
             <button
-              className="md:hidden p-2 rounded-xl hover:bg-white/10 text-white"
+              className="md:hidden p-2 rounded-lg hover:bg-white/20 text-white transition duration-300 hover:scale-110"
               onClick={() => setMobileOpen(o => !o)}
             >
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}
@@ -123,7 +116,7 @@ export default function Layout() {
 
         {/* Mobile menu */}
         {mobileOpen && (
-          <div className="md:hidden bg-[#2563C8] px-4 pb-4 flex flex-col gap-1">
+          <div className="md:hidden bg-[#2563C8]/95 px-4 pb-4 flex flex-col gap-2 animate-fade-in rounded-b-lg shadow-lg">
             {NAV.filter(n => !n.auth || isAuthenticated()).map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -132,8 +125,8 @@ export default function Layout() {
                 onClick={() => setMobileOpen(false)}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all',
-                    isActive ? 'bg-[#FBBF24] text-[#2563C8]' : 'text-white hover:bg-white/10'
+                    'flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition duration-300',
+                    isActive ? 'bg-[#FBBF24] text-[#2563C8] shadow-md' : 'text-white hover:bg-white/20 hover:scale-105'
                   )
                 }
               >
@@ -144,15 +137,12 @@ export default function Layout() {
         )}
       </nav>
 
-      {/* ── Page content ── */}
       <main className="flex-1">
         <Outlet />
       </main>
 
-      {/* ── Footer ── */}
       <footer className="bg-[#2563C8] text-white text-center py-5 text-sm font-body">
-        <span className="font-alt font-bold text-[#FBBF24]">JAIKO!</span> – Encontrá tu roomie ideal en Paraguay ·{' '}
-        {new Date().getFullYear()}
+        <span className="font-alt font-bold text-[#FBBF24]">JAIKO!</span> – Encontrá tu roomie ideal en Paraguay · {new Date().getFullYear()}
       </footer>
     </div>
   );

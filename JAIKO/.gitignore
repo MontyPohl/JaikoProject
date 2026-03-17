@@ -13,7 +13,7 @@ build/
 .pytest_cache/
 
 # Environment
-.env
+
 .env.local
 .env.*.local
 
