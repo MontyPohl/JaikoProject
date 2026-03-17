@@ -10,6 +10,7 @@ import AdminRoute from './components/layout/AdminRoute'
 
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'      // ← NUEVO
 import SearchPage from './pages/SearchPage'
 import ProfilePage from './pages/ProfilePage'
 import EditProfilePage from './pages/EditProfilePage'
@@ -28,8 +29,6 @@ export default function App() {
   const { token, fetchMe } = useAuthStore()
   const { fetch: fetchNotifs, addRealtime } = useNotifStore()
 
-  console.log("DEBUG: La URL del backend es:", import.meta.env.VITE_API_URL);
-
   useEffect(() => {
     if (token) {
       fetchMe()
@@ -37,7 +36,6 @@ export default function App() {
     }
   }, [token])
 
-  // Listen for real-time notifications
   useEffect(() => {
     const socket = getSocket()
     if (!socket) return
@@ -48,6 +46,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />  {/* ← NUEVO */}
 
       <Route element={<Layout />}>
         <Route path="/" element={<HomePage />} />
