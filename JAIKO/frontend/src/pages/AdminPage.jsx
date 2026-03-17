@@ -42,6 +42,10 @@ export default function AdminPage() {
 
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>
 
+  // Separar admin y usuarios normales, pero sin alterar IDs de los demás
+  const adminUser = users.find(u => u.role === 'admin')
+  const normalUsers = users.filter(u => u.role !== 'admin')
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-center gap-3 mb-8">
@@ -57,71 +61,20 @@ export default function AdminPage() {
       {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b border-orange-100 pb-0">
         {TABS.map((t, i) => (
-          <button key={t} onClick={() => setTab(i)}
-            className={`px-4 py-2.5 font-semibold text-sm rounded-t-xl transition-all -mb-px border border-b-0
-              ${tab === i ? 'bg-white border-orange-200 text-primary-600' : 'text-orange-400 border-transparent hover:text-primary-500'}`}>
+          <button
+            key={t}
+            onClick={() => setTab(i)}
+            className={`px-4 py-2.5 font-semibold text-sm rounded-t-xl transition-all
+              ${tab === i
+                ? 'bg-blue-500 text-white border border-orange-400 border-[1px]'
+                : 'text-orange-400 border border-transparent hover:text-primary-500'}`}
+          >
             {t}
           </button>
         ))}
       </div>
 
-      {/* Stats */}
-      {tab === 0 && stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: 'Usuarios', value: stats.users.total, sub: `${stats.users.blocked} bloqueados`, icon: Users, color: 'bg-blue-50 text-blue-600' },
-            { label: 'Publicaciones', value: stats.listings.active, sub: 'activas', icon: BarChart3, color: 'bg-emerald-50 text-emerald-600' },
-            { label: 'Grupos', value: stats.groups.open, sub: 'abiertos', icon: Users, color: 'bg-purple-50 text-purple-600' },
-            { label: 'Reportes', value: stats.reports.open, sub: 'pendientes', icon: FileWarning, color: 'bg-red-50 text-red-600' },
-          ].map(({ label, value, sub, icon: Icon, color }) => (
-            <div key={label} className="card">
-              <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center mb-3`}>
-                <Icon size={18} />
-              </div>
-              <p className="font-display font-extrabold text-3xl">{value}</p>
-              <p className="font-semibold text-sm">{label}</p>
-              <p className="text-xs text-orange-400">{sub}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Reports */}
-      {tab === 1 && (
-        <div className="space-y-3">
-          {reports.length === 0 ? (
-            <p className="text-center text-orange-400 py-10">No hay reportes pendientes 🎉</p>
-          ) : reports.map(r => (
-            <div key={r.id} className="card flex items-start gap-4">
-              <AlertTriangle size={20} className="text-red-500 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <Badge variant="red">{r.reason}</Badge>
-                  <span className="text-xs text-orange-400">por usuario #{r.reporter_id}</span>
-                  {r.reported_user_id && <span className="text-xs text-gray-500">→ usuario #{r.reported_user_id}</span>}
-                </div>
-                {r.description && <p className="text-sm text-gray-600">{r.description}</p>}
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <button onClick={() => handleReport(r.id, 'block', 'resolved')}
-                  className="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors">
-                  Bloquear
-                </button>
-                <button onClick={() => handleReport(r.id, 'warn', 'resolved')}
-                  className="text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors">
-                  Advertir
-                </button>
-                <button onClick={() => handleReport(r.id, 'dismiss', 'dismissed')}
-                  className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg font-semibold transition-colors">
-                  Ignorar
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Users */}
+      {/* USERS */}
       {tab === 2 && (
         <div className="card overflow-hidden p-0">
           <table className="w-full text-sm">
@@ -134,28 +87,41 @@ export default function AdminPage() {
                 <th className="px-4 py-3 text-left">Acciones</th>
               </tr>
             </thead>
+
             <tbody>
-              {users.map(u => (
+              {/* 🔥 ADMIN ARRIBA DEL TODO */}
+              {adminUser && (
+                <tr key={adminUser.id} className="border-t border-orange-50 bg-yellow-50">
+                  <td className="px-4 py-3 font-mono text-xs text-orange-400">Admin</td>
+                  <td className="px-4 py-3">{adminUser.email}</td>
+                  <td className="px-4 py-3"><Badge variant="dark">{adminUser.role}</Badge></td>
+                  <td className="px-4 py-3"><Badge variant={adminUser.status === 'active' ? 'green' : 'red'}>{adminUser.status}</Badge></td>
+                  <td className="px-4 py-3">{/* Bloquear oculto para admin */}</td>
+                </tr>
+              )}
+
+              {/* 🔥 RESTO DE USUARIOS EN ORDEN ORIGINAL */}
+              {normalUsers.map(u => (
                 <tr key={u.id} className="border-t border-orange-50 hover:bg-orange-50/50">
                   <td className="px-4 py-3 font-mono text-xs text-orange-400">#{u.id}</td>
                   <td className="px-4 py-3">{u.email}</td>
-                  <td className="px-4 py-3"><Badge variant={u.role === 'admin' ? 'dark' : 'gray'}>{u.role}</Badge></td>
-                  <td className="px-4 py-3">
-                    <Badge variant={u.status === 'active' ? 'green' : u.status === 'blocked' ? 'red' : 'orange'}>
-                      {u.status}
-                    </Badge>
-                  </td>
+                  <td className="px-4 py-3"><Badge variant="gray">{u.role}</Badge></td>
+                  <td className="px-4 py-3"><Badge variant={u.status === 'active' ? 'green' : 'red'}>{u.status}</Badge></td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
                       {u.status !== 'blocked' && (
-                        <button onClick={() => handleUserStatus(u.id, 'blocked')}
-                          className="text-xs bg-red-100 text-red-600 hover:bg-red-200 px-2 py-1 rounded-lg transition-colors font-semibold">
+                        <button
+                          onClick={() => handleUserStatus(u.id, 'blocked')}
+                          className="text-xs bg-red-100 text-red-600 hover:bg-red-200 px-2 py-1 rounded-lg font-semibold"
+                        >
                           Bloquear
                         </button>
                       )}
                       {u.status !== 'active' && (
-                        <button onClick={() => handleUserStatus(u.id, 'active')}
-                          className="text-xs bg-emerald-100 text-emerald-600 hover:bg-emerald-200 px-2 py-1 rounded-lg transition-colors font-semibold">
+                        <button
+                          onClick={() => handleUserStatus(u.id, 'active')}
+                          className="text-xs bg-emerald-100 text-emerald-600 hover:bg-emerald-200 px-2 py-1 rounded-lg font-semibold"
+                        >
                           Activar
                         </button>
                       )}
@@ -163,6 +129,7 @@ export default function AdminPage() {
                   </td>
                 </tr>
               ))}
+
             </tbody>
           </table>
         </div>

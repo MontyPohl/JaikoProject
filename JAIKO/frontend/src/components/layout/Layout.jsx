@@ -91,7 +91,10 @@ export default function Layout() {
                       {profile?.name?.[0]?.toUpperCase() || '?'}
                     </div>
                   )}
-                  <span className="hidden md:block text-sm font-semibold text-white">{profile?.name}</span>
+                  {/* Solo mostrar primer nombre */}
+                  <span className="hidden md:block text-sm font-semibold text-white">
+                    {profile?.name?.split(' ')[0]}
+                  </span>
                 </NavLink>
 
                 <button
