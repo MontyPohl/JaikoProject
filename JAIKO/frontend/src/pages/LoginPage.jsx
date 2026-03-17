@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Loader2 } from "lucide-react"
+import { GoogleLogin } from "@react-oauth/google"   // ← NUEVO
 import api from "../services/api"
 import { toast } from "react-hot-toast"
+import useAuthStore from "../context/authStore"      // ← NUEVO
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { loginWithGoogle } = useAuthStore()         // ← NUEVO
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -13,14 +16,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get("token")
     if (token) {
-      localStorage.setItem("token", token);
-      toast.success("¡Bienvenido a Jaiko!");
-      navigate("/profile");
+      localStorage.setItem("token", token)
+      toast.success("¡Bienvenido a Jaiko!")
+      navigate("/profile")
     }
-  }, [navigate]);
+  }, [navigate])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -45,16 +48,23 @@ export default function LoginPage() {
     }
   }
 
-  const handleGoogleLogin = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-    window.location.href = `${apiUrl}/auth/google`;
+  // ─── HANDLER GOOGLE CORREGIDO ────────────────────────────────────────────
+  // credential es el id_token que el backend verifica con google.oauth2
+  const handleGoogleSuccess = async (credentialResponse) => {
+    const result = await loginWithGoogle(credentialResponse.credential)
+    if (result.success) {
+      toast.success("¡Bienvenido a Jaiko!")
+      navigate(result.isNewUser ? "/edit-profile" : "/profile")
+    } else {
+      toast.error(result.error || "Error al iniciar sesión con Google")
+    }
   }
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F4F7FF] px-4 font-sans">
       <div className="w-full max-w-[460px]">
-        
-        {/* Logo: Jaiko! */}
+        {/* Logo */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-extrabold text-[#2563C8] tracking-tight">
             Jaik<span className="text-[#F5A623]">o!</span>
@@ -65,7 +75,6 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white p-10 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#E2E8F0]">
-          
           <div className="flex bg-[#F4F7FF] rounded-[14px] p-1 mb-8">
             <button className="flex-1 py-2.5 text-sm font-bold bg-white text-[#2563C8] rounded-[10px] shadow-sm">
               Ingresar
@@ -113,7 +122,9 @@ export default function LoginPage() {
                   onChange={() => setRemember(!remember)}
                   className="accent-[#2563C8] w-4 h-4 rounded border-[#E2E8F0]"
                 />
-                <span className="group-hover:text-[#1E293B] transition-colors">Recordar sesión</span>
+                <span className="group-hover:text-[#1E293B] transition-colors">
+                  Recordar sesión
+                </span>
               </label>
               <button type="button" className="text-[#2563C8] font-bold hover:text-[#1E4EA6]">
                 ¿Olvidaste tu contraseña?
@@ -145,18 +156,20 @@ export default function LoginPage() {
             </span>
           </div>
 
-          <button
-            onClick={handleGoogleLogin}
-            type="button"
-            className="w-full border-2 border-[#E2E8F0] py-3.5 rounded-[14px] hover:bg-[#F8FAFC] font-bold text-[#1E293B] flex items-center justify-center gap-3 transition-all hover:border-[#F5A623]/60"
-          >
-            <img
-              src="https://www.svgrepo.com/show/475656/google-color.svg"
-              className="w-5"
-              alt="Google"
+          {/* ─── BOTÓN GOOGLE CORREGIDO ──────────────────────────────────────── */}
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => toast.error("Error al iniciar sesión con Google")}
+              useOneTap
+              theme="outline"
+              size="large"
+              width="400"
+              text="continue_with"
+              locale="es"
             />
-            Continuar con Google
-          </button>
+          </div>
+          {/* ─────────────────────────────────────────────────────────────────── */}
 
           <p className="text-center text-[13px] text-[#64748B] mt-8">
             ¿No tenés cuenta?{" "}

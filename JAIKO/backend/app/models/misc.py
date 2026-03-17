@@ -10,11 +10,8 @@ class RoommateRequest(db.Model):
     target_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     group_id = db.Column(db.Integer, db.ForeignKey("groups.id"), nullable=True)
     listing_id = db.Column(db.Integer, db.ForeignKey("listings.id"), nullable=True)
-    type = db.Column(
-        db.String(30), default="roommate"
-    )  # roommate | group_invite | listing
+    type = db.Column(db.String(30), default="roommate")
     status = db.Column(db.String(20), default="pending")
-    # pending | accepted | rejected | cancelled
     message = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
@@ -22,10 +19,14 @@ class RoommateRequest(db.Model):
     )
 
     sender = db.relationship(
-        "User", foreign_keys=[sender_user_id], back_populates="sent_requests"
+        "User",
+        foreign_keys="RoommateRequest.sender_user_id",
+        back_populates="sent_requests",
     )
     target = db.relationship(
-        "User", foreign_keys=[target_user_id], back_populates="received_requests"
+        "User",
+        foreign_keys="RoommateRequest.target_user_id",
+        back_populates="received_requests",
     )
 
     def to_dict(self) -> dict:
@@ -48,10 +49,9 @@ class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     type = db.Column(db.String(50), nullable=False)
-    # match_request | group_invite | message | listing_request | review | report | system
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=True)
-    data = db.Column(db.JSON, nullable=True)  # extra payload (ids, links, etc.)
+    data = db.Column(db.JSON, nullable=True)
     read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -76,15 +76,15 @@ class Review(db.Model):
     reviewer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     target_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     listing_id = db.Column(db.Integer, db.ForeignKey("listings.id"), nullable=True)
-    rating = db.Column(db.Integer, nullable=False)  # 1-5
+    rating = db.Column(db.Integer, nullable=False)
     comment = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     reviewer = db.relationship(
-        "User", foreign_keys=[reviewer_id], back_populates="reviews_given"
+        "User", foreign_keys="Review.reviewer_id", back_populates="reviews_given"
     )
     target_user = db.relationship(
-        "User", foreign_keys=[target_user_id], back_populates="reviews_received"
+        "User", foreign_keys="Review.target_user_id", back_populates="reviews_received"
     )
     listing = db.relationship("Listing", back_populates="reviews")
 
@@ -116,9 +116,7 @@ class Report(db.Model):
     )
     reason = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    status = db.Column(
-        db.String(20), default="open"
-    )  # open | reviewed | resolved | dismissed
+    status = db.Column(db.String(20), default="open")
     admin_note = db.Column(db.Text, nullable=True)
     reviewed_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -127,10 +125,10 @@ class Report(db.Model):
     )
 
     reporter = db.relationship(
-        "User", foreign_keys=[reporter_id], back_populates="reports_filed"
+        "User", foreign_keys="Report.reporter_id", back_populates="reports_filed"
     )
-    reported_user = db.relationship("User", foreign_keys=[reported_user_id])
-    reviewer = db.relationship("User", foreign_keys=[reviewed_by])
+    reported_user = db.relationship("User", foreign_keys="Report.reported_user_id")
+    reviewer = db.relationship("User", foreign_keys="Report.reviewed_by")
 
     def to_dict(self) -> dict:
         return {
@@ -156,7 +154,6 @@ class VerificationRequest(db.Model):
     selfie_url = db.Column(db.String(500), nullable=True)
     verification_code = db.Column(db.String(20), nullable=False)
     status = db.Column(db.String(30), default="pending_verification")
-    # pending_verification | verified | rejected
     reviewed_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     rejection_reason = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

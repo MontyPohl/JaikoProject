@@ -45,7 +45,7 @@ class User(db.Model):
     reviews_received = db.relationship(
         "Review",
         foreign_keys="Review.target_user_id",
-        back_populates="target",
+        back_populates="target_user",
         cascade="all, delete-orphan"
     )
     reports_filed = db.relationship(
@@ -58,7 +58,7 @@ class User(db.Model):
     verification_request = db.relationship(
         "VerificationRequest",
         back_populates="user",
-        foreign_keys="[VerificationRequest.user_id]",
+        foreign_keys="VerificationRequest.user_id",
         uselist=False
     )
 

@@ -28,6 +28,8 @@ export default function App() {
   const { token, fetchMe } = useAuthStore()
   const { fetch: fetchNotifs, addRealtime } = useNotifStore()
 
+  console.log("DEBUG: La URL del backend es:", import.meta.env.VITE_API_URL);
+
   useEffect(() => {
     if (token) {
       fetchMe()
