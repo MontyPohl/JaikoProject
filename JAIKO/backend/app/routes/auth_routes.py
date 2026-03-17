@@ -27,12 +27,16 @@ def register():
         new_profile = Profile()
         new_profile.user_id = new_user.id
         new_profile.name = data.get("name", "Nuevo Usuario")
-        
+
         db.session.add(new_profile)
         db.session.commit()
 
         access_token = create_access_token(identity=str(new_user.id))
-        return jsonify({"access_token": access_token, "user": new_user.to_dict()}), 201
+        return jsonify({
+            "access_token": access_token,
+            "user": new_user.to_dict(),
+            "profile": new_profile.to_dict()
+        }), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
@@ -49,24 +53,27 @@ def login():
 
         user.last_login = datetime.utcnow()
         db.session.commit()
+
         access_token = create_access_token(identity=str(user.id))
-        return jsonify({"access_token": access_token, "user": user.to_dict()}), 200
+        return jsonify({
+            "access_token": access_token,           # ← consistente con Google login
+            "user": user.to_dict(),
+            "profile": user.profile.to_dict() if user.profile else None
+        }), 200
 
     return jsonify({"error": "Credenciales inválidas"}), 401
 
-# --- LOGIN CON GOOGLE (Optimizado para React) ---
+# --- LOGIN CON GOOGLE ---
 @auth_bp.route("/google", methods=["POST"])
 def google_login():
     data = request.get_json()
     token = data.get("token") or data.get("id_token")
-    
+
     if not token:
         return jsonify({"error": "Token de Google requerido"}), 400
 
     try:
-        # Aquí current_app funciona porque estamos DENTRO de una ruta
         client_id = current_app.config["GOOGLE_CLIENT_ID"]
-        
         id_info = id_token.verify_oauth2_token(
             token,
             google_requests.Request(),
@@ -76,17 +83,17 @@ def google_login():
         return jsonify({"error": f"Token inválido: {str(e)}"}), 401
 
     email = id_info["email"]
-    google_id = id_info["sub"] # El ID único de Google
+    google_id = id_info["sub"]
 
     user = User.query.filter_by(email=email).first()
+    is_new_user = False
 
     if not user:
-        # Crear usuario nuevo
+        is_new_user = True
         user = User(email=email, google_id=google_id)
         db.session.add(user)
         db.session.flush()
 
-        # Crear perfil
         profile = Profile()
         profile.user_id = user.id
         profile.name = id_info.get("name", "Usuario Google")
@@ -100,9 +107,10 @@ def google_login():
 
     access_token = create_access_token(identity=str(user.id))
     return jsonify({
-        "access_token": access_token, 
+        "access_token": access_token,
         "user": user.to_dict(),
-        "profile": user.profile.to_dict() if user.profile else None
+        "profile": user.profile.to_dict() if user.profile else None,
+        "is_new_user": is_new_user
     }), 200
 
 # --- OBTENER MI PERFIL ---
@@ -113,7 +121,7 @@ def get_me():
     user = User.query.get(user_id)
     if not user:
         return jsonify({"error": "Usuario no encontrado"}), 404
-        
+
     return jsonify({
         "user": user.to_dict(),
         "profile": user.profile.to_dict(include_private=True) if user.profile else None

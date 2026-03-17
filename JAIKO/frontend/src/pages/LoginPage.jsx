@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Loader2 } from "lucide-react"
-import { GoogleLogin } from "@react-oauth/google"   // ← NUEVO
-import api from "../services/api"
+import { GoogleLogin } from "@react-oauth/google"
 import { toast } from "react-hot-toast"
-import useAuthStore from "../context/authStore"      // ← NUEVO
+import useAuthStore from "../context/authStore"
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { loginWithGoogle } = useAuthStore()         // ← NUEVO
+  const { login, loginWithGoogle } = useAuthStore()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -19,11 +18,20 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search)
     const token = params.get("token")
     if (token) {
-      localStorage.setItem("token", token)
+      localStorage.setItem("jaiko_token", token)
       toast.success("¡Bienvenido a Jaiko!")
       navigate("/profile")
     }
   }, [navigate])
+
+  // Redirige según rol del usuario
+  const redirectByRole = (role) => {
+    if (role === "admin" || role === "verifier") {
+      navigate("/admin")
+    } else {
+      navigate("/profile")
+    }
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -31,45 +39,41 @@ export default function LoginPage() {
       toast.error("Completa todos los campos")
       return
     }
-    try {
-      setLoading(true)
-      const { data } = await api.post("/auth/login", { email, password })
-      if (remember) {
-        localStorage.setItem("token", data.token)
-      } else {
-        sessionStorage.setItem("token", data.token)
-      }
+    setLoading(true)
+    const result = await login({ email, password })
+    setLoading(false)
+
+    if (result.success) {
       toast.success("¡Bienvenido de vuelta!")
-      navigate("/profile")
-    } catch (err) {
-      toast.error(err.response?.data?.error || "Credenciales incorrectas")
-    } finally {
-      setLoading(false)
+      redirectByRole(result.role)
+    } else {
+      toast.error(result.error || "Credenciales incorrectas")
     }
   }
 
-  // ─── HANDLER GOOGLE CORREGIDO ────────────────────────────────────────────
-  // credential es el id_token que el backend verifica con google.oauth2
   const handleGoogleSuccess = async (credentialResponse) => {
     const result = await loginWithGoogle(credentialResponse.credential)
     if (result.success) {
       toast.success("¡Bienvenido a Jaiko!")
-      navigate(result.isNewUser ? "/edit-profile" : "/profile")
+      if (result.isNewUser) {
+        navigate("/profile/edit")
+      } else {
+        redirectByRole(result.role)
+      }
     } else {
       toast.error(result.error || "Error al iniciar sesión con Google")
     }
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F4F7FF] px-4 font-sans">
+    <div className="min-h-screen flex items-center justify-center bg-[#F4F7FF] px-4 font-['Nunito']">
       <div className="w-full max-w-[460px]">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-extrabold text-[#2563C8] tracking-tight">
+          <h1 className="text-4xl font-extrabold text-[#2563C8] font-['Poppins'] tracking-tight">
             Jaik<span className="text-[#F5A623]">o!</span>
           </h1>
-          <p className="text-[#64748B] text-sm font-semibold mt-1">
+          <p className="text-[#64748B] text-sm mt-1 font-semibold">
             Conecta con tu roomie ideal
           </p>
         </div>
@@ -156,7 +160,6 @@ export default function LoginPage() {
             </span>
           </div>
 
-          {/* ─── BOTÓN GOOGLE CORREGIDO ──────────────────────────────────────── */}
           <div className="flex justify-center">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
@@ -169,7 +172,6 @@ export default function LoginPage() {
               locale="es"
             />
           </div>
-          {/* ─────────────────────────────────────────────────────────────────── */}
 
           <p className="text-center text-[13px] text-[#64748B] mt-8">
             ¿No tenés cuenta?{" "}

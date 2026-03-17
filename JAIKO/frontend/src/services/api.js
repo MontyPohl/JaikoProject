@@ -54,4 +54,18 @@ export async function getRoomies() {
   }
 }
 
+/**
+ * Actualiza el perfil del usuario autenticado
+ * data debe incluir los campos del formulario, incluyendo city/ubicación
+ */
+export async function updateProfile(data) {
+  try {
+    const response = await api.put('/profiles/me', data)
+    return response.data
+  } catch (err) {
+    console.error('Error al actualizar perfil:', err)
+    throw err
+  }
+}
+
 export default api
