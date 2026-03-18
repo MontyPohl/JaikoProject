@@ -2,10 +2,9 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from functools import wraps
 from ..extensions import db
-from ..models import User, Report, Notification
+from ..models import User, Report, Notification, Listing, Group
 
 admin_bp = Blueprint("admin", __name__)
-
 
 def admin_required(fn):
     @wraps(fn)
@@ -98,7 +97,7 @@ def update_user_status(user_id):
 @admin_bp.route("/stats", methods=["GET"])
 @admin_required
 def get_stats():
-    from ..models import Listing, Group
+    total_income = db.session.query(db.func.coalesce(db.func.sum(Listing.total_price), 0)).scalar()
     return jsonify({
         "users": {
             "total": User.query.count(),
@@ -108,6 +107,7 @@ def get_stats():
         "listings": {
             "total": Listing.query.count(),
             "active": Listing.query.filter_by(status="active").count(),
+            "total_income": total_income
         },
         "groups": {
             "total": Group.query.count(),
@@ -115,6 +115,7 @@ def get_stats():
         },
         "reports": {
             "open": Report.query.filter_by(status="open").count(),
+            "reviewed": Report.query.filter(Report.status=="reviewed").count(),
             "total": Report.query.count(),
         },
     }), 200
