@@ -55,6 +55,11 @@ export default function ChatPage() {
 
     const handleMsg = (msg) => {
       // Usamos activeChatIdRef que se actualiza sincrónicamente
+      console.log('MSG chat_id:', msg.chat_id, typeof msg.chat_id)
+      console.log('REF valor:', activeChatIdRef.current, typeof activeChatIdRef.current)
+
+
+
       if (msg.chat_id === activeChatIdRef.current) {
         setMessages(m => {
           if (m.some(ex => ex.id === msg.id)) return m
