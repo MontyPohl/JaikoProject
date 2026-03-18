@@ -41,29 +41,42 @@ export default function EditProfilePage() {
   const defaultLng = -57.64700
 
   const [form, setForm] = useState({
-    name:       profile?.name || '',
-    age:        profile?.age || '',
-    gender:     profile?.gender || '',
-    profession: profile?.profession || '',
-    bio:        profile?.bio || '',
-    budget_min: profile?.budget_min || '',
-    budget_max: profile?.budget_max || '',
-    pets:       profile?.pets ?? false,
-    smoker:     profile?.smoker ?? false,
-    schedule:   profile?.schedule || '',
-    city:       profile?.city || 'Asunción',
-    lat:        profile?.lat ?? null,
-    lng:        profile?.lng ?? null,
-    is_looking: profile?.is_looking ?? true,
+    name: '',
+    age: '',
+    gender: '',
+    profession: '',
+    bio: '',
+    budget_min: '',
+    budget_max: '',
+    pets: false,
+    smoker: false,
+    schedule: '',
+    city: 'Asunción',
+    lat: defaultLat,
+    lng: defaultLng,
+    is_looking: true,
   })
 
-  // Solo setea valores predeterminados si no hay lat/lng guardados
+  // Inicializar form cuando profile esté disponible
   useEffect(() => {
-    if (form.lat === null || form.lng === null) {
-      const coords = CITY_COORDS[form.city] || [defaultLat, defaultLng]
-      setForm(f => ({ ...f, lat: coords[0], lng: coords[1] }))
-    }
-  }, [form.city])
+    if (!profile) return
+    setForm({
+      name: profile.name || '',
+      age: profile.age || '',
+      gender: profile.gender || '',
+      profession: profile.profession || '',
+      bio: profile.bio || '',
+      budget_min: profile.budget_min || '',
+      budget_max: profile.budget_max || '',
+      pets: profile.pets ?? false,
+      smoker: profile.smoker ?? false,
+      schedule: profile.schedule || '',
+      city: profile.city || 'Asunción',
+      lat: profile.lat ?? CITY_COORDS[profile.city]?.[0] ?? defaultLat,
+      lng: profile.lng ?? CITY_COORDS[profile.city]?.[1] ?? defaultLng,
+      is_looking: profile.is_looking ?? true,
+    })
+  }, [profile])
 
   const [photoPreview, setPhotoPreview]   = useState(profile?.profile_photo_url || null)
   const [photoFile, setPhotoFile]         = useState(null)
@@ -76,7 +89,10 @@ export default function EditProfilePage() {
   const handlePhotoSelect = (e) => {
     const file = e.target.files[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { toast.error('La imagen no puede superar 5MB'); return }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no puede superar 5MB')
+      return
+    }
     setPhotoFile(file)
     setPhotoPreview(URL.createObjectURL(file))
   }
@@ -84,7 +100,10 @@ export default function EditProfilePage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.name.trim()) { toast.error('El nombre es obligatorio'); return }
-    if (form.budget_min < 0 || form.budget_max < 0) { toast.error('El presupuesto no puede ser negativo'); return }
+    if (form.budget_min < 0 || form.budget_max < 0) {
+      toast.error('El presupuesto no puede ser negativo')
+      return
+    }
 
     setLoading(true)
     try {
@@ -98,7 +117,7 @@ export default function EditProfilePage() {
 
       const payload = {
         ...form,
-        age:        form.age        ? parseInt(form.age)        : null,
+        age:        form.age ? parseInt(form.age) : null,
         budget_min: form.budget_min ? parseInt(form.budget_min) : null,
         budget_max: form.budget_max ? parseInt(form.budget_max) : null,
       }
@@ -145,7 +164,6 @@ export default function EditProfilePage() {
 
       <form onSubmit={handleSubmit} className="card space-y-6">
 
-        {/* Foto de perfil */}
         <div className="flex flex-col items-center gap-3">
           <Label>Foto de perfil</Label>
           <div className="relative">
@@ -173,9 +191,13 @@ export default function EditProfilePage() {
             className="hidden"
             onChange={handlePhotoSelect}
           />
+          {photoFile && (
+            <p className="text-xs text-orange-400">
+              Nueva foto seleccionada: {photoFile.name} — se subirá al guardar
+            </p>
+          )}
         </div>
 
-        {/* Info básica */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div><Label>Nombre completo *</Label><input className={inputClass} value={form.name} onChange={setField('name')} required /></div>
           <div><Label>Edad</Label><input className={inputClass} type="number" min={18} max={80} value={form.age} onChange={setField('age')} /></div>
@@ -202,20 +224,17 @@ export default function EditProfilePage() {
           </div>
         </div>
 
-        {/* Mapa */}
         <div>
           <Label>Ubicación en el mapa</Label>
-          <MapContainer center={[form.lat ?? defaultLat, form.lng ?? defaultLng]} zoom={13} style={{ height: '300px', width: '100%', borderRadius: '8px' }}>
+          <MapContainer center={[form.lat, form.lng]} zoom={13} style={{ height: '300px', width: '100%', borderRadius: '8px' }}>
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <FlyToMarker lat={form.lat} lng={form.lng} />
             <LocationMarker />
           </MapContainer>
         </div>
 
-        {/* Bio */}
         <div><Label>Bio</Label><textarea className={`${inputClass} h-28 resize-none`} value={form.bio} onChange={setField('bio')} /></div>
 
-        {/* Presupuesto */}
         <div>
           <Label>Presupuesto mensual (₲)</Label>
           <div className="grid grid-cols-2 gap-4">
@@ -224,13 +243,13 @@ export default function EditProfilePage() {
           </div>
         </div>
 
-        {/* Toggles */}
         <div>
           <Label>Preferencias</Label>
           <div className="flex flex-wrap gap-3 mt-2">
-            {[{ key: 'pets', label: '🐾 Tengo/acepto mascotas' },
-              { key: 'smoker', label: '🚬 Soy fumador' },
-              { key: 'is_looking', label: '🔍 Estoy buscando activamente' }].map(({ key, label }) => (
+            {[ { key: 'pets',       label: '🐾 Tengo/acepto mascotas' },
+               { key: 'smoker',     label: '🚬 Soy fumador' },
+               { key: 'is_looking', label: '🔍 Estoy buscando activamente' },
+            ].map(({ key, label }) => (
               <button key={key} type="button" onClick={toggle(key)}
                 className={`px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${form[key] ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-orange-200 text-orange-400 hover:border-orange-300'}`}>
                 {label}
@@ -239,7 +258,6 @@ export default function EditProfilePage() {
           </div>
         </div>
 
-        {/* Submit */}
         <div className="flex gap-3 justify-end pt-2 border-t border-orange-100">
           <button type="button" onClick={() => navigate('/profile')} className="btn-ghost">Cancelar</button>
           <button type="submit" disabled={loading} className="btn-primary">

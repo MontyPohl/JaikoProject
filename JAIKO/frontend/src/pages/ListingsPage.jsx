@@ -11,7 +11,6 @@ const CITIES = [
   'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este',
 ]
 
-// Centro por ciudad (fallback cuando el listing no tiene coordenadas)
 const CITY_CENTERS = {
   'Asunción': [-25.2867, -57.647],
   'San Lorenzo': [-25.3355, -57.5178],
@@ -40,23 +39,20 @@ export default function ListingsPage() {
     smoking_allowed: '',
   })
 
-  // ── Cargar listings según filtros ────────────────────────────────────────
+  // ── Cargar listings (solo departamentos) ────────────────────────────────
   useEffect(() => {
-    const params = new URLSearchParams({
-      page: 1,
-      per_page: 24,
-      city: filters.city,
-    })
+    const params = new URLSearchParams({ page: 1, per_page: 24, city: filters.city })
     if (filters.min_price) params.set('min_price', filters.min_price)
     if (filters.max_price) params.set('max_price', filters.max_price)
     if (filters.pets_allowed) params.set('pets_allowed', filters.pets_allowed)
     if (filters.smoking_allowed) params.set('smoking_allowed', filters.smoking_allowed)
 
     setLoading(true)
-    api
-      .get(`/listings/?${params}`)
+    api.get(`/listings/?${params}`)
       .then(({ data }) => {
-        setListings(data.listings || [])
+        // ✅ Solo departamentos
+        const onlyListings = (data.listings || []).filter(l => l.type === 'listing')
+        setListings(onlyListings)
       })
       .catch(() => setListings([]))
       .finally(() => setLoading(false))
@@ -65,19 +61,13 @@ export default function ListingsPage() {
   // ── Lazy-load JaikoMap solo cuando se necesita ───────────────────────────
   useEffect(() => {
     if (view === 'map' && !JaikoMap) {
-      import('../components/map/JaikoMap').then((m) =>
-        setJaikoMap(() => m.default)
-      )
+      import('../components/map/JaikoMap').then((m) => setJaikoMap(() => m.default))
     }
   }, [view, JaikoMap])
 
-  // ── Cargar roomies para el mapa (solo si está autenticado) ───────────────
-  // FIX: verificar auth antes de llamar getRoomies para evitar 401 → redirect
-  // FIX: pasar filters.city para traer roomies de la ciudad seleccionada
-  // FIX: re-cargar cuando cambia la ciudad (no solo cuando cambia view)
+  // ── Cargar roomies solo para el mapa ────────────────────────────────────
   useEffect(() => {
-    if (view !== 'map') return
-    if (!isAuthenticated()) {
+    if (view !== 'map' || !isAuthenticated()) {
       setRoomies([])
       return
     }
@@ -87,19 +77,12 @@ export default function ListingsPage() {
       .then(setRoomies)
       .catch(() => setRoomies([]))
       .finally(() => setRoomiesLoading(false))
-  }, [view, filters.city]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [view, filters.city, isAuthenticated])
 
-  // ── Marcadores de departamentos para el mapa ─────────────────────────────
-  // FIX: mapMarkers ahora SÍ se pasa al mapa (antes se calculaba pero nunca se usaba)
+  // ── Marcadores departamentos ────────────────────────────────────────────
   const listingMarkers = listings
-    .filter(
-      (l) =>
-        l.latitude != null &&
-        l.longitude != null &&
-        isFinite(l.latitude) &&
-        isFinite(l.longitude)
-    )
-    .map((l) => ({
+    .filter(l => l.latitude != null && l.longitude != null && isFinite(l.latitude) && isFinite(l.longitude))
+    .map(l => ({
       lat: l.latitude,
       lng: l.longitude,
       id: l.id,
@@ -108,19 +91,10 @@ export default function ListingsPage() {
       neighborhood: l.neighborhood,
     }))
 
-  // ── Marcadores de roomies para el mapa (filtrados y validados) ───────────
-  // FIX: doble filtro de seguridad aquí también (getRoomies ya filtra, pero por si acaso)
-  const roomiMarkers = roomies.filter(
-    (r) =>
-      r &&
-      r.lat != null &&
-      r.lng != null &&
-      isFinite(r.lat) &&
-      isFinite(r.lng) &&
-      r.profile
-  )
+  // ── Marcadores roomies ─────────────────────────────────────────────────
+  const roomiMarkers = roomies
+    .filter(r => r && r.lat != null && r.lng != null && isFinite(r.lat) && isFinite(r.lng) && r.profile)
 
-  // Centro del mapa según ciudad seleccionada
   const mapCenter = CITY_CENTERS[filters.city] || [-25.2867, -57.647]
 
   return (
@@ -129,12 +103,10 @@ export default function ListingsPage() {
       <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
         <div>
           <h1 className="font-display font-extrabold text-3xl">Departamentos</h1>
-          <p className="text-[#F5A623] text-sm mt-1">
-            {listings.length} publicaciones disponibles
-          </p>
+          <p className="text-[#F5A623] text-sm mt-1">{listings.length} publicaciones disponibles</p>
         </div>
+
         <div className="flex items-center gap-3">
-          {/* Toggle grid / mapa */}
           <div className="flex rounded-xl border border-[#E2E8F0] overflow-hidden">
             <button
               onClick={() => setView('grid')}
@@ -156,10 +128,7 @@ export default function ListingsPage() {
             </button>
           </div>
           {isAuthenticated() && (
-            <Link
-              to="/listings/new"
-              className="btn-primary flex items-center gap-1.5 text-sm"
-            >
+            <Link to="/listings/new" className="btn-primary flex items-center gap-1.5 text-sm">
               <Plus size={15} /> Publicar
             </Link>
           )}
@@ -168,88 +137,46 @@ export default function ListingsPage() {
 
       {/* Filtros */}
       <div className="card mb-6 flex flex-wrap gap-4 items-end">
+        {/* Ciudad y precios */}
         <div>
-          <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">
-            Ciudad
-          </label>
+          <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">Ciudad</label>
           <select
             className="input w-44 h-11 appearance-none pr-8"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748B' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 12px center',
-            }}
             value={filters.city}
             onChange={(e) => setFilters((f) => ({ ...f, city: e.target.value }))}
           >
-            {CITIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">
-            Precio min (₲)
-          </label>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
+          <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">Precio min (₲)</label>
+          <input type="text" inputMode="numeric" pattern="[0-9]*"
             className="input w-36 h-11"
-            value={filters.min_price}
             placeholder="0"
-            onKeyDown={(e) =>
-              ['-', '+', 'e', '.'].includes(e.key) && e.preventDefault()
-            }
-            onChange={(e) => {
-              const v = e.target.value.replace(/[^0-9]/g, '')
-              setFilters((f) => ({ ...f, min_price: v }))
-            }}
+            value={filters.min_price}
+            onChange={e => setFilters(f => ({ ...f, min_price: e.target.value.replace(/[^0-9]/g,'') }))}
           />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">
-            Precio max (₲)
-          </label>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
+          <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">Precio max (₲)</label>
+          <input type="text" inputMode="numeric" pattern="[0-9]*"
             className="input w-36 h-11"
-            value={filters.max_price}
             placeholder="Sin límite"
-            onKeyDown={(e) =>
-              ['-', '+', 'e', '.'].includes(e.key) && e.preventDefault()
-            }
-            onChange={(e) => {
-              const v = e.target.value.replace(/[^0-9]/g, '')
-              setFilters((f) => ({ ...f, max_price: v }))
-            }}
+            value={filters.max_price}
+            onChange={e => setFilters(f => ({ ...f, max_price: e.target.value.replace(/[^0-9]/g,'') }))}
           />
         </div>
 
         <div className="flex gap-2">
-          {[
-            ['pets_allowed', '🐾 Mascotas'],
-            ['smoking_allowed', '🚬 Fumadores'],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() =>
-                setFilters((f) => ({
-                  ...f,
-                  [key]: f[key] === 'true' ? '' : 'true',
-                }))
-              }
-              className={`px-3 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${filters[key] === 'true'
-                  ? 'border-[#2563C8] bg-[#EFF6FF] text-[#2563C8]'
-                  : 'border-[#E2E8F0] text-[#64748B] hover:border-[#BFDBFE]'
-                }`}
+          {[['pets_allowed','🐾 Mascotas'], ['smoking_allowed','🚬 Fumadores']].map(([key,label]) => (
+            <button key={key} type="button"
+              onClick={() => setFilters(f => ({ ...f, [key]: f[key] === 'true' ? '' : 'true' }))}
+              className={`px-3 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${filters[key]==='true'
+                ? 'border-[#2563C8] bg-[#EFF6FF] text-[#2563C8]'
+                : 'border-[#E2E8F0] text-[#64748B] hover:border-[#BFDBFE]'
+              }`}
             >
               {label}
             </button>
@@ -259,11 +186,8 @@ export default function ListingsPage() {
 
       {/* Contenido */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Spinner size="lg" />
-        </div>
+        <div className="flex justify-center py-20"><Spinner size="lg" /></div>
       ) : view === 'map' ? (
-        // ── Vista mapa ─────────────────────────────────────────────────────
         <div className="space-y-3">
           {/* Leyenda */}
           <div className="flex items-center gap-4 text-sm text-gray-500">
@@ -277,16 +201,10 @@ export default function ListingsPage() {
                 {roomiesLoading ? 'cargando roomies...' : `${roomiMarkers.length} roomies compatibles`}
               </span>
             )}
-            {!isAuthenticated() && (
-              <span className="text-xs text-orange-400 italic">
-                Iniciá sesión para ver roomies compatibles en el mapa
-              </span>
-            )}
           </div>
 
           <div className="h-[600px]">
             {JaikoMap ? (
-              // FIX: pasar AMBOS: listingMarkers (departamentos) Y roomiMarkers (roomies)
               <JaikoMap
                 center={mapCenter}
                 markers={roomiMarkers}
@@ -294,9 +212,7 @@ export default function ListingsPage() {
                 height="600px"
               />
             ) : (
-              <div className="flex justify-center items-center h-full">
-                <Spinner />
-              </div>
+              <div className="flex justify-center items-center h-full"><Spinner /></div>
             )}
           </div>
 
@@ -313,11 +229,9 @@ export default function ListingsPage() {
           description="Sé el primero en publicar en esta ciudad."
         />
       ) : (
-        // ── Vista grid ─────────────────────────────────────────────────────
+        // ── Grid solo con departamentos
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {listings.map((l) => (
-            <ListingCard key={l.id} listing={l} />
-          ))}
+          {listings.map(l => <ListingCard key={l.id} listing={l} />)}
         </div>
       )}
     </div>
