@@ -18,11 +18,15 @@ def update_my_profile():
         db.session.add(profile)
 
     data = request.get_json()
+    # --- Cambios realizados por Aaron Barrios ---
+    # Agrego las preferencias de edad a los campos permitidos para guardar en el perfil
     allowed = [
         "name", "age", "gender", "profession", "bio",
         "budget_min", "budget_max", "pets", "smoker",
         "schedule", "diseases", "city", "is_looking",
+        "pref_min_age", "pref_max_age", # Columnas para la reciprocidad
     ]
+    # --------------------------------------------
     for field in allowed:
         if field in data:
             setattr(profile, field, data[field])
@@ -43,7 +47,7 @@ def get_profile(user_id):
 @profile_bp.route("/search", methods=["GET"])
 @jwt_required()
 def search_profiles():
-    """Return profiles with >= 80% compatibility."""
+    """Return profiles with >= 80% compatibility and reciprocal age filtering."""
     current_user_id = int(get_jwt_identity())
     current_user = User.query.get_or_404(current_user_id)
     my_profile = current_user.profile
@@ -52,6 +56,13 @@ def search_profiles():
     page = int(request.args.get("page", 1))
     per_page = int(request.args.get("per_page", 20))
 
+    # --- Cambios realizados por Aaron Barrios ---
+    # Capturo los parámetros de edad enviados desde SearchPage.jsx
+    min_age = request.args.get("min_age", type=int)
+    max_age = request.args.get("max_age", type=int)
+    # --------------------------------------------
+
+    # Definimos la base de la consulta
     query = (
         Profile.query
         .join(User)
@@ -61,9 +72,26 @@ def search_profiles():
             User.status == "active",
             Profile.city == city,
         )
-        .offset((page - 1) * per_page)
-        .limit(per_page)
     )
+
+    # --- Cambios realizados por Aaron Barrios ---
+    # 1. Filtro de Salida: El roomie debe estar en el rango que YO busco
+    if min_age:
+        query = query.filter(Profile.age >= min_age)
+    if max_age:
+        query = query.filter(Profile.age <= max_age)
+
+    # 2. Filtro de Entrada (Reciprocidad): 
+    # Solo me salen personas que aceptarían mi edad actual (31 años)
+    if my_profile and my_profile.age:
+        query = query.filter(
+            Profile.pref_min_age <= my_profile.age,
+            Profile.pref_max_age >= my_profile.age
+        )
+    # --------------------------------------------
+
+    # Aplicamos paginación al final de todos los filtros
+    query = query.offset((page - 1) * per_page).limit(per_page)
     profiles = query.all()
 
     results = []
