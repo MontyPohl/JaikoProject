@@ -1,6 +1,6 @@
 from datetime import datetime
 from ..extensions import db
-
+from typing import Optional
 
 class Chat(db.Model):
     __tablename__ = "chats"
@@ -20,7 +20,7 @@ class Chat(db.Model):
             return self.messages[-1].to_dict()
         return None
 
-    def to_dict(self, user_id: int = None) -> dict:
+    def to_dict(self, user_id: Optional[int] = None) -> dict:
         return {
             "id": self.id,
             "type": self.type,
