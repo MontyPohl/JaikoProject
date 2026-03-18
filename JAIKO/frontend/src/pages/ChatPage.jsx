@@ -23,12 +23,14 @@ export default function ChatPage() {
   const bottomRef = useRef(null)
   const typingTimer = useRef(null)
   const isLoadingHistory = useRef(false)
+  const activeRef = useRef(null)
   const [socket, setSocket] = useState(() => getSocket())
 
-  // Re-render when socket connects (fixes race condition on initial load)
+  // Keep activeRef in sync so socket handlers always see current active
+  useEffect(() => { activeRef.current = active }, [active])
+
+  // Get socket reactively: set state when socket connects
   useEffect(() => {
-    const s = getSocket()
-    if (s) { setSocket(s); return }
     return onSocketConnect((s) => setSocket(s))
   }, [])
 
@@ -66,23 +68,22 @@ export default function ChatPage() {
     socket.emit('join_chat', { chat_id: active.id })
   }, [socket, active?.id])
 
-  // Socket message listener
+  // Socket message listener — registered once per socket instance
+  // Uses activeRef to avoid stale closure on active chat
   useEffect(() => {
     if (!socket) return
     const handleMsg = (msg) => {
-      if (msg.chat_id === active?.id) {
+      if (msg.chat_id === activeRef.current?.id) {
         setMessages(m => {
-          // Deduplicate: ignore if already present
           if (m.some(existing => existing.id === msg.id)) return m
           const updated = [...m, msg]
           return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated
         })
       }
-      // Update last message in chat list
       setChats(cs => cs.map(c => c.id === msg.chat_id ? { ...c, last_message: msg } : c))
     }
     const handleTyping = ({ user_id }) => {
-      if (user_id !== user?.id) setTyping(true)
+      if (user_id !== activeRef.current?.id) setTyping(true)
     }
     const handleStopTyping = () => setTyping(false)
 
@@ -94,7 +95,7 @@ export default function ChatPage() {
       socket.off('user_typing', handleTyping)
       socket.off('user_stop_typing', handleStopTyping)
     }
-  }, [socket, active?.id, user?.id])
+  }, [socket])
 
   // Auto-scroll: al cargar historial va directo al fondo (sin animacion),
   // en mensajes nuevos hace scroll suave

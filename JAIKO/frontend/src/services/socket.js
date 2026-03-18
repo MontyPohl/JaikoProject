@@ -5,7 +5,8 @@ const connectListeners = new Set()
 
 export const connectSocket = () => {
   const token = localStorage.getItem('jaiko_token')
-  if (!token || socket?.connected) return
+  // Don't recreate if socket already exists (even while connecting)
+  if (!token || socket) return
 
   socket = io('/', {
     query: { token },
@@ -25,8 +26,15 @@ export const connectSocket = () => {
 
 export const getSocket = () => socket
 
-/** Subscribe to socket-ready event. Returns an unsubscribe function. */
+/**
+ * Subscribe to socket-ready. If socket already connected, calls fn immediately.
+ * Returns an unsubscribe function.
+ */
 export const onSocketConnect = (fn) => {
+  if (socket?.connected) {
+    fn(socket)
+    return () => {}
+  }
   connectListeners.add(fn)
   return () => connectListeners.delete(fn)
 }
