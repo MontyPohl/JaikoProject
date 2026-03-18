@@ -52,12 +52,19 @@ export default function EditProfilePage() {
     smoker:     profile?.smoker ?? false,
     schedule:   profile?.schedule || '',
     city:       profile?.city || 'Asunción',
-    lat:        profile?.lat ?? defaultLat,
-    lng:        profile?.lng ?? defaultLng,
+    lat:        profile?.lat ?? null,
+    lng:        profile?.lng ?? null,
     is_looking: profile?.is_looking ?? true,
   })
 
-  // Preview local de la foto antes de subir
+  // Solo setea valores predeterminados si no hay lat/lng guardados
+  useEffect(() => {
+    if (form.lat === null || form.lng === null) {
+      const coords = CITY_COORDS[form.city] || [defaultLat, defaultLng]
+      setForm(f => ({ ...f, lat: coords[0], lng: coords[1] }))
+    }
+  }, [form.city])
+
   const [photoPreview, setPhotoPreview]   = useState(profile?.profile_photo_url || null)
   const [photoFile, setPhotoFile]         = useState(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -66,46 +73,29 @@ export default function EditProfilePage() {
   const setField = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
   const toggle   = (k) => ()  => setForm(f => ({ ...f, [k]: !f[k] }))
 
-  useEffect(() => {
-    const coords = CITY_COORDS[form.city] || [defaultLat, defaultLng]
-    setForm(f => ({ ...f, lat: coords[0], lng: coords[1] }))
-  }, [form.city])
-
-  // ── Selección de foto ────────────────────────────────────────────────────
   const handlePhotoSelect = (e) => {
     const file = e.target.files[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('La imagen no puede superar 5MB')
-      return
-    }
+    if (file.size > 5 * 1024 * 1024) { toast.error('La imagen no puede superar 5MB'); return }
     setPhotoFile(file)
     setPhotoPreview(URL.createObjectURL(file))
   }
 
-  // ── Submit: primero sube la foto si hay una nueva, luego guarda el perfil ──
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.name.trim()) { toast.error('El nombre es obligatorio'); return }
-    if (form.budget_min < 0 || form.budget_max < 0) {
-      toast.error('El presupuesto no puede ser negativo')
-      return
-    }
+    if (form.budget_min < 0 || form.budget_max < 0) { toast.error('El presupuesto no puede ser negativo'); return }
 
     setLoading(true)
     try {
-      // 1. Subir foto si se seleccionó una nueva
       if (photoFile) {
         setUploadingPhoto(true)
         const photoUrl = await uploadProfilePhoto(photoFile)
         setUploadingPhoto(false)
-        // La foto ya se guardó en el backend al subirse, 
-        // pero actualizamos el preview con la URL real
         setPhotoPreview(photoUrl)
         setPhotoFile(null)
       }
 
-      // 2. Guardar datos del perfil
       const payload = {
         ...form,
         age:        form.age        ? parseInt(form.age)        : null,
@@ -155,7 +145,7 @@ export default function EditProfilePage() {
 
       <form onSubmit={handleSubmit} className="card space-y-6">
 
-        {/* ── Foto de perfil ─────────────────────────────────────────────── */}
+        {/* Foto de perfil */}
         <div className="flex flex-col items-center gap-3">
           <Label>Foto de perfil</Label>
           <div className="relative">
@@ -183,14 +173,9 @@ export default function EditProfilePage() {
             className="hidden"
             onChange={handlePhotoSelect}
           />
-          {photoFile && (
-            <p className="text-xs text-orange-400">
-              Nueva foto seleccionada: {photoFile.name} — se subirá al guardar
-            </p>
-          )}
         </div>
 
-        {/* ── Info básica ────────────────────────────────────────────────── */}
+        {/* Info básica */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div><Label>Nombre completo *</Label><input className={inputClass} value={form.name} onChange={setField('name')} required /></div>
           <div><Label>Edad</Label><input className={inputClass} type="number" min={18} max={80} value={form.age} onChange={setField('age')} /></div>
@@ -217,20 +202,20 @@ export default function EditProfilePage() {
           </div>
         </div>
 
-        {/* ── Mapa ───────────────────────────────────────────────────────── */}
+        {/* Mapa */}
         <div>
           <Label>Ubicación en el mapa</Label>
-          <MapContainer center={[form.lat, form.lng]} zoom={13} style={{ height: '300px', width: '100%', borderRadius: '8px' }}>
+          <MapContainer center={[form.lat ?? defaultLat, form.lng ?? defaultLng]} zoom={13} style={{ height: '300px', width: '100%', borderRadius: '8px' }}>
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <FlyToMarker lat={form.lat} lng={form.lng} />
             <LocationMarker />
           </MapContainer>
         </div>
 
-        {/* ── Bio ────────────────────────────────────────────────────────── */}
+        {/* Bio */}
         <div><Label>Bio</Label><textarea className={`${inputClass} h-28 resize-none`} value={form.bio} onChange={setField('bio')} /></div>
 
-        {/* ── Presupuesto ────────────────────────────────────────────────── */}
+        {/* Presupuesto */}
         <div>
           <Label>Presupuesto mensual (₲)</Label>
           <div className="grid grid-cols-2 gap-4">
@@ -239,15 +224,13 @@ export default function EditProfilePage() {
           </div>
         </div>
 
-        {/* ── Toggles ────────────────────────────────────────────────────── */}
+        {/* Toggles */}
         <div>
           <Label>Preferencias</Label>
           <div className="flex flex-wrap gap-3 mt-2">
-            {[
-              { key: 'pets',       label: '🐾 Tengo/acepto mascotas' },
-              { key: 'smoker',     label: '🚬 Soy fumador' },
-              { key: 'is_looking', label: '🔍 Estoy buscando activamente' },
-            ].map(({ key, label }) => (
+            {[{ key: 'pets', label: '🐾 Tengo/acepto mascotas' },
+              { key: 'smoker', label: '🚬 Soy fumador' },
+              { key: 'is_looking', label: '🔍 Estoy buscando activamente' }].map(({ key, label }) => (
               <button key={key} type="button" onClick={toggle(key)}
                 className={`px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${form[key] ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-orange-200 text-orange-400 hover:border-orange-300'}`}>
                 {label}
@@ -256,7 +239,7 @@ export default function EditProfilePage() {
           </div>
         </div>
 
-        {/* ── Submit ─────────────────────────────────────────────────────── */}
+        {/* Submit */}
         <div className="flex gap-3 justify-end pt-2 border-t border-orange-100">
           <button type="button" onClick={() => navigate('/profile')} className="btn-ghost">Cancelar</button>
           <button type="submit" disabled={loading} className="btn-primary">
