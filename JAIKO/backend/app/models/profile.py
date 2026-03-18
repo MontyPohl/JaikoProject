@@ -24,11 +24,18 @@ class Profile(db.Model):
     diseases = db.Column(db.Text, nullable=True)
     profile_photo_url = db.Column(db.String(500), nullable=True)
     city = db.Column(db.String(100), nullable=True, default="Asunción")
-    lat = db.Column(db.Float, nullable=True)  # Nueva columna latitud
-    lng = db.Column(db.Float, nullable=True)  # Nueva columna longitud
+    lat = db.Column(db.Float, nullable=True)  
+    lng = db.Column(db.Float, nullable=True)  
     verified = db.Column(db.Boolean, default=False)
     verification_status = db.Column(db.String(30), default="not_requested")
     is_looking = db.Column(db.Boolean, default=True)
+    
+    # --- Cambios realizados por Aaron Barrios ---
+    # Columnas para la reciprocidad de edad: qué rango busca este usuario
+    pref_min_age = db.Column(db.Integer, nullable=True, default=18)
+    pref_max_age = db.Column(db.Integer, nullable=True, default=99)
+    # --------------------------------------------
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -51,11 +58,15 @@ class Profile(db.Model):
             "schedule": self.schedule,
             "profile_photo_url": self.profile_photo_url,
             "city": self.city,
-            "lat": self.lat,   # Se retorna lat
-            "lng": self.lng,   # Se retorna lng
+            "lat": self.lat,
+            "lng": self.lng,
             "verified": self.verified,
             "verification_status": self.verification_status,
             "is_looking": self.is_looking,
+            # --- Cambios realizados por Aaron Barrios ---
+            "pref_min_age": self.pref_min_age,
+            "pref_max_age": self.pref_max_age,
+            # --------------------------------------------
             "created_at": self.created_at.isoformat(),
         }
         if include_private:
@@ -86,9 +97,15 @@ def update_profile():
     profile.smoker = data.get('smoker', profile.smoker)
     profile.schedule = data.get('schedule', profile.schedule)
     profile.city = data.get('city', profile.city)
-    profile.lat = data.get('lat', profile.lat)  # Guardar lat
-    profile.lng = data.get('lng', profile.lng)  # Guardar lng
+    profile.lat = data.get('lat', profile.lat)
+    profile.lng = data.get('lng', profile.lng)
     profile.is_looking = data.get('is_looking', profile.is_looking)
+
+    # --- Cambios realizados por Aaron Barrios ---
+    # Permitir que el usuario guarde su rango de edad preferido
+    profile.pref_min_age = data.get('pref_min_age', profile.pref_min_age)
+    profile.pref_max_age = data.get('pref_max_age', profile.pref_max_age)
+    # --------------------------------------------
 
     db.session.commit()
 

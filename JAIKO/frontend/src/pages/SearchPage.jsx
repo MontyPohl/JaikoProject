@@ -25,12 +25,26 @@ export default function SearchPage() {
     pets: '',
     smoker: '',
     schedule: '',
+    // --- Cambios realizados por Aaron Barrios ---
+    min_age: '', // Agrego rango min para que el filtro sea recíproco
+    max_age: '', // Agrego rango max para el filtro de edad
+    // --------------------------------------------
   })
 
   const fetchProfiles = useCallback(async (p = 1) => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ page: p, per_page: 20, city: filters.city })
+      // --- Cambios realizados por Aaron Barrios ---
+      // Seteo los parámetros incluyendo el rango de edad para que el back filtre la visibilidad mutua
+      const params = new URLSearchParams({ 
+        page: p, 
+        per_page: 20, 
+        city: filters.city,
+        min_age: filters.min_age, // Envío edad mínima al servidor para el match de edad
+        max_age: filters.max_age  // Envío edad máxima al servidor para el match de edad
+      })
+      // --------------------------------------------
+      
       const { data } = await api.get(`/profiles/search?${params}`)
       const profilesWithCoords = await Promise.all(data.profiles.map(async profile => {
         const coords = await getCoordinates(profile.city)
@@ -132,8 +146,33 @@ export default function SearchPage() {
             </select>
           </div>
 
-          <div className="col-span-2 md:col-span-4 flex justify-end">
-            <button type="submit" className="btn-primary">Aplicar filtros</button>
+          {/* --- Cambios realizados por Aaron Barrios --- */}
+          {/* Agrego inputs numéricos para filtrar edad y asegurar visibilidad mutua */}
+          <div>
+            <label className="block text-xs font-semibold text-orange-400 mb-1 uppercase tracking-wide">Edad Mín.</label>
+            <input 
+              type="number" 
+              className="input" 
+              placeholder="18"
+              value={filters.min_age}
+              onChange={e => setFilters(f => ({ ...f, min_age: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-orange-400 mb-1 uppercase tracking-wide">Edad Máx.</label>
+            <input 
+              type="number" 
+              className="input" 
+              placeholder="99"
+              value={filters.max_age}
+              onChange={e => setFilters(f => ({ ...f, max_age: e.target.value }))}
+            />
+          </div>
+          {/* -------------------------------------------- */}
+
+          <div className="col-span-2 md:col-span-2 flex justify-end items-end">
+            <button type="submit" className="btn-primary w-full md:w-auto">Aplicar filtros</button>
           </div>
         </form>
       )}

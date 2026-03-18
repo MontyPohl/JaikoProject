@@ -9,11 +9,19 @@ const useAuthStore = create((set, get) => ({
   loading: false,
   isNewUser: false,
 
-  // ── Registro con email + contraseña + nombre ──────────────────────────────
-  register: async ({ name, email, password }) => {
+  // ── Registro con email + contraseña + nombre + CAPTCHA ──────────────────────
+  // Modificado por Aaron Barrios para que el token de Google viaje al backend lpm
+  register: async ({ name, email, password, captcha_token }) => {
     set({ loading: true })
     try {
-      const { data } = await api.post('/auth/register', { name, email, password })
+      // Ahora enviamos el captcha_token en el body del POST (Aaron)
+      const { data } = await api.post('/auth/register', { 
+        name, 
+        email, 
+        password, 
+        captcha_token 
+      })
+      
       localStorage.setItem('jaiko_token', data.access_token)
       set({
         token: data.access_token,
@@ -25,6 +33,7 @@ const useAuthStore = create((set, get) => ({
       return { success: true }
     } catch (err) {
       set({ loading: false })
+      // Retornamos el error que venga del backend (ej: "CAPTCHA inválido")
       return { success: false, error: err.response?.data?.error }
     }
   },
@@ -49,7 +58,7 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // ── Login con Google ──────────────────────────────────────────────────────
+  // ... resto del código (loginWithGoogle, fetchMe, etc.) se mantiene igual ...
   loginWithGoogle: async (idToken) => {
     set({ loading: true })
     try {
@@ -70,7 +79,6 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // ── Obtener usuario actual ────────────────────────────────────────────────
   fetchMe: async () => {
     set({ loading: true })
     try {

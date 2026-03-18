@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 # Obtiene la ruta absoluta de la carpeta donde está este archivo
 basedir = os.path.abspath(os.path.dirname(__file__))
 # Carga el .env forzando la ruta para evitar errores de lectura
-load_dotenv(os.path.join(basedir, '.env'))
+load_dotenv(os.path.join(basedir, '..', '.env'))
 
 class Config:
     # Claves de seguridad

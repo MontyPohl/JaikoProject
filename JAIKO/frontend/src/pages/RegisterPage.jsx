@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom"
 import { Loader2, Eye, EyeOff } from "lucide-react"
 import { toast } from "react-hot-toast"
 import useAuthStore from "../context/authStore"
+// --- Agregado por Aaron Barrios para blindar JAIKO ---
+import ReCAPTCHA from "react-google-recaptcha"
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -14,13 +16,25 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  
+  // --- Estado para el Token de Google (Aaron) ---
+  const [captchaToken, setCaptchaToken] = useState(null)
 
   const handleRegister = async (e) => {
     e.preventDefault()
+    
+    // Validaciones básicas
     if (!name || !email || !password || !confirmPassword) {
       toast.error("Completá todos los campos")
       return
     }
+
+    // --- Validación de CAPTCHA lpm (Aaron) ---
+    if (!captchaToken) {
+      toast.error("¡Confirmá que no sos un robot, maaan!")
+      return
+    }
+
     if (password.length < 6) {
       toast.error("La contraseña debe tener al menos 6 caracteres")
       return
@@ -31,7 +45,13 @@ export default function RegisterPage() {
     }
 
     setLoading(true)
-    const result = await register({ name, email, password })
+    // --- Enviamos el captcha_token al backend (Aaron) ---
+    const result = await register({ 
+      name, 
+      email, 
+      password, 
+      captcha_token: captchaToken 
+    })
     setLoading(false)
 
     if (result.success) {
@@ -39,6 +59,9 @@ export default function RegisterPage() {
       navigate("/profile/edit")
     } else {
       toast.error(result.error || "Error al crear la cuenta")
+      // Si falla, reseteamos el captcha para que lo vuelvan a hacer
+      window.grecaptcha.reset() 
+      setCaptchaToken(null)
     }
   }
 
@@ -68,6 +91,7 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleRegister} className="space-y-5">
+            {/* Input Nombre */}
             <div>
               <label className="block text-[13px] font-bold text-[#1E293B] mb-2">
                 Nombre completo
@@ -81,6 +105,7 @@ export default function RegisterPage() {
               />
             </div>
 
+            {/* Input Email */}
             <div>
               <label className="block text-[13px] font-bold text-[#1E293B] mb-2">
                 Correo electrónico
@@ -94,6 +119,7 @@ export default function RegisterPage() {
               />
             </div>
 
+            {/* Input Password */}
             <div>
               <label className="block text-[13px] font-bold text-[#1E293B] mb-2">
                 Contraseña
@@ -116,6 +142,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Input Confirm Password */}
             <div>
               <label className="block text-[13px] font-bold text-[#1E293B] mb-2">
                 Confirmar contraseña
@@ -129,10 +156,22 @@ export default function RegisterPage() {
               />
             </div>
 
+            {/* --- EL DIBUJITO DEL CAPTCHA (Aaron Barrios) --- */}
+            <div className="flex justify-center py-2">
+              <ReCAPTCHA
+                sitekey="6Lc1R44sAAAAAMSJODZW1xsvID2xIMs7g-FUgXJU"
+                onChange={(token) => setCaptchaToken(token)}
+              />
+            </div>
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-[#2563C8] hover:bg-[#1E4EA6] text-white py-4 rounded-[14px] font-extrabold text-base shadow-lg shadow-blue-700/10 transition-all transform active:scale-[0.98] flex items-center justify-center gap-2"
+              disabled={loading || !captchaToken}
+              className={`w-full py-4 rounded-[14px] font-extrabold text-base transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg ${
+                !captchaToken 
+                ? "bg-gray-300 cursor-not-allowed text-gray-500" 
+                : "bg-[#2563C8] hover:bg-[#1E4EA6] text-white shadow-blue-700/10"
+              }`}
             >
               {loading ? (
                 <>

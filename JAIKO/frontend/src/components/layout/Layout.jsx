@@ -27,7 +27,6 @@ export default function Layout() {
     navigate('/login');
   };
 
-  // Fetch dinámico del grupo activo del usuario
   const fetchUserGroup = async () => {
     if (isAuthenticated()) {
       try {
@@ -40,9 +39,13 @@ export default function Layout() {
     }
   };
 
+  // CORRECCIÓN: se ejecuta solo una vez al montar el Layout.
+  // Antes tenía [isAuthenticated, profile] como dependencias, lo que causaba
+  // que se disparara un GET /groups/my en CADA navegación porque profile
+  // se actualiza cuando fetchMe() corre en App.jsx.
   useEffect(() => {
     fetchUserGroup();
-  }, [isAuthenticated, profile]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen flex flex-col font-main">
@@ -57,7 +60,6 @@ export default function Layout() {
           {/* Links desktop */}
           <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 gap-8">
             {NAV.filter(n => !n.auth || isAuthenticated()).map(({ to, label, icon: Icon }) => {
-              // Redirigir dinámicamente a su grupo si tiene uno
               const targetTo = to === '/groups' && userGroupId ? `/groups/${userGroupId}` : to;
               return (
                 <NavLink
@@ -67,7 +69,7 @@ export default function Layout() {
                   className={({ isActive }) =>
                     clsx(
                       'flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-white transition-all duration-300',
-                      isActive 
+                      isActive
                         ? 'bg-[#FBBF24] text-[#2563C8] shadow-md'
                         : 'hover:bg-white/20 hover:text-[#FBBF24] hover:scale-105'
                     )

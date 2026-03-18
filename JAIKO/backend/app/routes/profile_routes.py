@@ -1,14 +1,12 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..extensions import db
-from ..models import User, Profile, RoommateRequest
+from ..models import User, Profile
 from ..services.matching_service import compute_compatibility
-from typing import cast, List
 
 profile_bp = Blueprint("profiles", __name__)
-requests_bp = Blueprint("requests", __name__)
 
-# ── PERFIL ───────────────────────────────────────────────
+
 @profile_bp.route("/me", methods=["PUT"])
 @jwt_required()
 def update_my_profile():
@@ -20,11 +18,15 @@ def update_my_profile():
         db.session.add(profile)
 
     data = request.get_json()
+    # --- Cambios realizados por Aaron Barrios ---
+    # Agrego las preferencias de edad a los campos permitidos para guardar en el perfil
     allowed = [
         "name", "age", "gender", "profession", "bio",
         "budget_min", "budget_max", "pets", "smoker",
         "schedule", "diseases", "city", "is_looking",
+        "pref_min_age", "pref_max_age", # Columnas para la reciprocidad
     ]
+    # --------------------------------------------
     for field in allowed:
         if field in data:
             setattr(profile, field, data[field])
@@ -45,6 +47,7 @@ def get_profile(user_id):
 @profile_bp.route("/search", methods=["GET"])
 @jwt_required()
 def search_profiles():
+    """Return profiles with >= 80% compatibility and reciprocal age filtering."""
     current_user_id = int(get_jwt_identity())
     current_user = User.query.get_or_404(current_user_id)
     my_profile = current_user.profile
@@ -53,6 +56,13 @@ def search_profiles():
     page = int(request.args.get("page", 1))
     per_page = int(request.args.get("per_page", 20))
 
+    # --- Cambios realizados por Aaron Barrios ---
+    # Capturo los parámetros de edad enviados desde SearchPage.jsx
+    min_age = request.args.get("min_age", type=int)
+    max_age = request.args.get("max_age", type=int)
+    # --------------------------------------------
+
+    # Definimos la base de la consulta
     query = (
         Profile.query
         .join(User)
@@ -62,9 +72,26 @@ def search_profiles():
             User.status == "active",
             Profile.city == city,
         )
-        .offset((page - 1) * per_page)
-        .limit(per_page)
     )
+
+    # --- Cambios realizados por Aaron Barrios ---
+    # 1. Filtro de Salida: El roomie debe estar en el rango que YO busco
+    if min_age:
+        query = query.filter(Profile.age >= min_age)
+    if max_age:
+        query = query.filter(Profile.age <= max_age)
+
+    # 2. Filtro de Entrada (Reciprocidad): 
+    # Solo me salen personas que aceptarían mi edad actual (31 años)
+    if my_profile and my_profile.age:
+        query = query.filter(
+            Profile.pref_min_age <= my_profile.age,
+            Profile.pref_max_age >= my_profile.age
+        )
+    # --------------------------------------------
+
+    # Aplicamos paginación al final de todos los filtros
+    query = query.offset((page - 1) * per_page).limit(per_page)
     profiles = query.all()
 
     results = []
@@ -79,75 +106,3 @@ def search_profiles():
 
     results.sort(key=lambda x: x["compatibility"], reverse=True)
     return jsonify({"profiles": results, "page": page}), 200
-
-
-# ── SOLICITUDES ─────────────────────────────────────────────
-@requests_bp.route("/", methods=["POST"])
-@jwt_required()
-def create_request():
-    user_id = int(get_jwt_identity())
-    data = request.get_json()
-    target_user_id = data.get("target_user_id")
-    if not target_user_id:
-        return jsonify({"error": "target_user_id requerido"}), 400
-
-    req = RoommateRequest(
-        sender_user_id=user_id,
-        target_user_id=target_user_id,
-        type=data.get("type", "roommate"),
-        status="pending"
-    )
-    db.session.add(req)
-    db.session.commit()
-    return jsonify({"request_id": req.id}), 201
-
-
-@requests_bp.route("/<int:req_id>/respond", methods=["PUT"])
-@jwt_required()
-def respond_request(req_id):
-    user_id = int(get_jwt_identity())
-    data = request.get_json()
-    action = data.get("action")
-    if action not in ["accept", "reject"]:
-        return jsonify({"error": "Action inválida"}), 400
-
-    req = RoommateRequest.query.get_or_404(req_id)
-    if req.target_user_id != user_id:
-        return jsonify({"error": "No autorizado"}), 403
-
-    sender = req.sender_user
-    receiver = req.target_user
-
-    # Validar que ambos tengan perfil
-    if not sender.profile or not receiver.profile:
-        return jsonify({"error": "Uno de los usuarios no tiene perfil"}), 400
-
-    if action == "accept":
-        # Marcar solicitud como aceptada
-        req.status = "accepted"
-
-        # Guardar relación de roomies directamente
-        sender.profile.current_roomie_id = receiver.id
-        receiver.profile.current_roomie_id = sender.id
-
-        # Cambiar estado de búsqueda
-        sender.profile.is_looking = False
-        receiver.profile.is_looking = False
-
-        db.session.commit()
-
-        return jsonify({
-            "message": "Solicitud aceptada",
-            "roommate": {
-                "id": receiver.id,
-                "name": receiver.profile.name,
-                "profile_photo_url": receiver.profile.profile_photo_url
-            }
-        }), 200
-    else:
-        req.status = "rejected"
-        db.session.commit()
-        return jsonify({
-            "message": "Solicitud rechazada",
-            "redirect": "/notifications"
-        }), 200
