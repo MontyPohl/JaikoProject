@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Send, ArrowLeft } from 'lucide-react'
 import api from '../services/api'
-import { getSocket, onSocketConnect } from '../services/socket'
+import { connectSocket, getSocket, onSocketConnect } from '../services/socket'
 import useAuthStore from '../context/authStore'
 import { Avatar, Spinner, EmptyState } from '../components/ui'
 import { formatDistanceToNow } from 'date-fns'
@@ -35,7 +35,8 @@ export default function ChatPage() {
   useEffect(() => {
     // FIX #1: inicializar el socket explícitamente — sin esto socketRef.current
     // queda null para siempre y sendMessage falla silenciosamente.
-    getSocket()
+    // getSocket() solo DEVUELVE el socket existente, connectSocket() lo CREA.
+    connectSocket()
 
     const handleMsg = (msg) => {
       if (msg.chat_id === activeChatIdRef.current) {
