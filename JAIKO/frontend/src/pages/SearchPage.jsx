@@ -9,7 +9,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
-// Fix íconos de Leaflet con Vite
+// FIX íconos Leaflet con Vite
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -28,8 +28,6 @@ const CITIES = [
   'Asunción', 'San Lorenzo', 'Luque', 'Fernando de la Mora',
   'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este',
 ]
-
-// Centro de mapa por ciudad (fallback si el perfil no tiene lat/lng)
 const CITY_CENTERS = {
   'Asunción': [-25.2867, -57.647],
   'San Lorenzo': [-25.3355, -57.5178],
@@ -53,50 +51,44 @@ export default function SearchPage() {
 
   const [filters, setFilters] = useState({
     city: 'Asunción',
-    pets: '',
-    smoker: '',
-    schedule: '',
+    pets: '',      // "" | "true" | "false"
+    smoker: '',    // "" | "true" | "false"
+    schedule: '',  // "" | "morning" | ...
     min_age: '',
     max_age: '',
   })
 
-  const fetchProfiles = useCallback(
-    async (p = 1) => {
-      setLoading(true)
-      try {
-        // FIX: incluir TODOS los filtros en los params (antes pets/smoker/schedule no se enviaban)
-        const params = new URLSearchParams({ page: p, per_page: 20, city: filters.city })
-        if (filters.min_age) params.append('min_age', filters.min_age)
-        if (filters.max_age) params.append('max_age', filters.max_age)
-        if (filters.pets !== '') params.append('pets', filters.pets)
-        if (filters.smoker !== '') params.append('smoker', filters.smoker)
-        if (filters.schedule) params.append('schedule', filters.schedule)
+  const fetchProfiles = useCallback(async (p = 1) => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ page: p, per_page: 20, city: filters.city })
 
-        const { data } = await api.get(`/profiles/search?${params}`)
+      if (filters.min_age) params.append('min_age', filters.min_age)
+      if (filters.max_age) params.append('max_age', filters.max_age)
+      if (filters.pets !== '') params.append('pets', filters.pets)
+      if (filters.smoker !== '') params.append('smoker', filters.smoker)
+      if (filters.schedule) params.append('schedule', filters.schedule)
 
-        // FIX: usar lat/lng del perfil directamente (antes se geocodificaba la ciudad,
-        // lo que apilaba todos los usuarios en el mismo punto y hacía N llamadas a Nominatim)
-        const profilesWithCoords = (data.profiles || []).map((profile) => ({
-          ...profile,
-          location: {
-            lat: profile.lat ?? CITY_CENTERS[profile.city]?.[0] ?? -25.2637,
-            lng: profile.lng ?? CITY_CENTERS[profile.city]?.[1] ?? -57.5759,
-          },
-        }))
+      const { data } = await api.get(`/profiles/search?${params}`)
 
-        setProfiles(p === 1 ? profilesWithCoords : (prev) => [...prev, ...profilesWithCoords])
-        setPage(p)
-        setHasMore(data.has_more ?? false)
-      } catch {
-        toast.error('Error al buscar perfiles')
-      } finally {
-        setLoading(false)
-      }
-    },
-    [filters]
-  )
+      const profilesWithCoords = (data.profiles || []).map((profile) => ({
+        ...profile,
+        location: {
+          lat: profile.lat ?? CITY_CENTERS[profile.city]?.[0] ?? -25.2637,
+          lng: profile.lng ?? CITY_CENTERS[profile.city]?.[1] ?? -57.5759,
+        },
+      }))
 
-  // Re-buscar al cambiar la ciudad
+      setProfiles(p === 1 ? profilesWithCoords : (prev) => [...prev, ...profilesWithCoords])
+      setPage(p)
+      setHasMore(data.has_more ?? false)
+    } catch {
+      toast.error('Error al buscar perfiles')
+    } finally {
+      setLoading(false)
+    }
+  }, [filters])
+
   useEffect(() => {
     fetchProfiles(1)
   }, [filters.city]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -106,7 +98,6 @@ export default function SearchPage() {
     fetchProfiles(1)
   }
 
-  // Centro del mapa según ciudad seleccionada
   const mapCenter = CITY_CENTERS[filters.city] || [-25.2867, -57.647]
 
   return (
@@ -125,9 +116,7 @@ export default function SearchPage() {
             onClick={() => setShowFilters((f) => !f)}
             className="flex items-center gap-2 btn-secondary py-2 px-4 text-sm"
           >
-            <SlidersHorizontal size={16} />
-            Filtros
-            {showFilters && <X size={14} />}
+            <SlidersHorizontal size={16} /> Filtros {showFilters && <X size={14} />}
           </button>
 
           <button
@@ -141,10 +130,8 @@ export default function SearchPage() {
 
       {/* Panel de filtros */}
       {showFilters && (
-        <form
-          onSubmit={handleSearch}
-          className="card mb-6 grid grid-cols-2 md:grid-cols-4 gap-4"
-        >
+        <form onSubmit={handleSearch} className="card mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Ciudad */}
           <div>
             <label className="block text-xs font-semibold text-orange-400 mb-1 uppercase tracking-wide">
               Ciudad
@@ -154,14 +141,11 @@ export default function SearchPage() {
               value={filters.city}
               onChange={(e) => setFilters((f) => ({ ...f, city: e.target.value }))}
             >
-              {CITIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
 
+          {/* Mascotas */}
           <div>
             <label className="block text-xs font-semibold text-orange-400 mb-1 uppercase tracking-wide">
               Mascotas
@@ -177,6 +161,7 @@ export default function SearchPage() {
             </select>
           </div>
 
+          {/* Fumador */}
           <div>
             <label className="block text-xs font-semibold text-orange-400 mb-1 uppercase tracking-wide">
               Fumador
@@ -192,6 +177,7 @@ export default function SearchPage() {
             </select>
           </div>
 
+          {/* Horario */}
           <div>
             <label className="block text-xs font-semibold text-orange-400 mb-1 uppercase tracking-wide">
               Horario
@@ -202,14 +188,11 @@ export default function SearchPage() {
               onChange={(e) => setFilters((f) => ({ ...f, schedule: e.target.value }))}
             >
               <option value="">Cualquiera</option>
-              {SCHEDULES.map((s) => (
-                <option key={s} value={s}>
-                  {SCHEDULE_LABELS[s]}
-                </option>
-              ))}
+              {SCHEDULES.map((s) => <option key={s} value={s}>{SCHEDULE_LABELS[s]}</option>)}
             </select>
           </div>
 
+          {/* Edad mínima */}
           <div>
             <label className="block text-xs font-semibold text-orange-400 mb-1 uppercase tracking-wide">
               Edad mín.
@@ -225,6 +208,7 @@ export default function SearchPage() {
             />
           </div>
 
+          {/* Edad máxima */}
           <div>
             <label className="block text-xs font-semibold text-orange-400 mb-1 uppercase tracking-wide">
               Edad máx.
@@ -248,11 +232,9 @@ export default function SearchPage() {
         </form>
       )}
 
-      {/* Loading inicial */}
+      {/* Loading o resultados */}
       {loading && profiles.length === 0 ? (
-        <div className="flex justify-center py-20">
-          <Spinner size="lg" />
-        </div>
+        <div className="flex justify-center py-20"><Spinner size="lg" /></div>
       ) : profiles.length === 0 ? (
         <EmptyState
           icon="🔍"
@@ -260,87 +242,42 @@ export default function SearchPage() {
           description="Probá ajustar tus preferencias en tu perfil o cambiar el filtro de ciudad."
         />
       ) : showMap ? (
-        // ── Vista de mapa ──────────────────────────────────────────────────
-        <MapContainer
-          center={mapCenter}
-          zoom={13}
-          style={{ height: '500px', width: '100%', borderRadius: '16px' }}
-          scrollWheelZoom={false}
-        >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution="&copy; OpenStreetMap contributors"
-          />
+        <MapContainer center={mapCenter} zoom={13} style={{ height: '500px', width: '100%', borderRadius: '16px' }} scrollWheelZoom={false}>
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
           {profiles.map((p) => (
-            <Marker
-              key={p.user_id}
-              position={[p.location.lat, p.location.lng]}
-            >
+            <Marker key={p.user_id} position={[p.location.lat, p.location.lng]}>
               <Popup>
-                <div
-                  className="cursor-pointer w-60 p-2"
-                  onClick={() => navigate(`/profile/${p.user_id}`)}
-                >
+                <div className="cursor-pointer w-60 p-2" onClick={() => navigate(`/profile/${p.user_id}`)}>
                   <div className="flex items-center gap-2 mb-2">
-                    {/* FIX: profile_photo_url (antes usaba avatar_url que no existe) */}
-                    <img
-                      src={p.profile_photo_url || 'https://via.placeholder.com/40'}
-                      alt={p.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                      loading="lazy"
-                    />
+                    <img src={p.profile_photo_url || 'https://via.placeholder.com/40'} alt={p.name} className="w-10 h-10 rounded-full object-cover" loading="lazy"/>
                     <div>
                       <p className="font-semibold text-sm">{p.name}</p>
                       <p className="text-xs text-gray-500">{p.city}</p>
                     </div>
                   </div>
-                  {p.bio && (
-                    <p className="text-xs text-gray-600 mb-1 line-clamp-2">{p.bio}</p>
-                  )}
+                  {p.bio && <p className="text-xs text-gray-600 mb-1 line-clamp-2">{p.bio}</p>}
                   <p className="text-xs text-gray-400 mb-1">
-                    {p.smoker ? 'Fumador' : 'No fuma'}{' '}
-                    {p.schedule ? `• ${SCHEDULE_LABELS[p.schedule] || p.schedule}` : ''}
+                    {p.smoker ? 'Fumador' : 'No fuma'} {p.schedule ? `• ${SCHEDULE_LABELS[p.schedule] || p.schedule}` : ''}
                   </p>
-                  <div className="text-xs">
-                    Compatibilidad:{' '}
-                    <span className="font-semibold text-primary-600">
-                      {p.compatibility}%
-                    </span>
-                  </div>
+                  <div className="text-xs">Compatibilidad: <span className="font-semibold text-primary-600">{p.compatibility}%</span></div>
                 </div>
               </Popup>
             </Marker>
           ))}
         </MapContainer>
       ) : (
-        // ── Vista de tarjetas ──────────────────────────────────────────────
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {profiles.map((p) => (
-              <ProfileCard
-                key={p.user_id}
-                profile={p}
-                compatibility={p.compatibility}
-                matches={p.matches}
-                mismatches={p.mismatches}
-              />
-            ))}
-          </div>
-
-          {/* Cargar más */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {profiles.map((p) => (
+            <ProfileCard key={p.user_id} profile={p} compatibility={p.compatibility} matches={p.matches} mismatches={p.mismatches} />
+          ))}
           {hasMore && (
             <div className="flex justify-center mt-10">
-              <button
-                onClick={() => fetchProfiles(page + 1)}
-                disabled={loading}
-                className="btn-secondary flex items-center gap-2"
-              >
-                {loading ? <Spinner size="sm" /> : null}
-                Cargar más
+              <button onClick={() => fetchProfiles(page + 1)} disabled={loading} className="btn-secondary flex items-center gap-2">
+                {loading ? <Spinner size="sm" /> : null} Cargar más
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )

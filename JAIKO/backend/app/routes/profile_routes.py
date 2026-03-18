@@ -6,9 +6,6 @@ from ..services.matching_service import compute_compatibility
 
 profile_bp = Blueprint("profiles", __name__)
 
-# FIX: requests_bp eliminado (era código muerto — nunca se registraba en __init__.py)
-
-
 # ── ACTUALIZAR MI PERFIL ──────────────────────────────────────────────────────
 @profile_bp.route("/me", methods=["PUT"])
 @jwt_required()
@@ -21,8 +18,6 @@ def update_my_profile():
         db.session.add(profile)
 
     data = request.get_json()
-
-    # FIX: lat y lng agregados a la lista de campos permitidos
     allowed = [
         "name", "age", "gender", "profession", "bio",
         "budget_min", "budget_max", "pets", "smoker",
@@ -30,14 +25,12 @@ def update_my_profile():
         "lat", "lng",
         "pref_min_age", "pref_max_age",
     ]
-
     for field in allowed:
         if field in data:
             setattr(profile, field, data[field])
 
     db.session.commit()
     return jsonify({"profile": profile.to_dict(include_private=True)}), 200
-
 
 # ── VER PERFIL DE OTRO USUARIO ────────────────────────────────────────────────
 @profile_bp.route("/<int:user_id>", methods=["GET"])
@@ -48,12 +41,10 @@ def get_profile(user_id):
         return jsonify({"error": "Usuario no disponible"}), 404
     return jsonify({"profile": user.profile.to_dict() if user.profile else None}), 200
 
-
 # ── BUSCAR PERFILES COMPATIBLES ───────────────────────────────────────────────
 @profile_bp.route("/search", methods=["GET"])
 @jwt_required()
 def search_profiles():
-    """Devuelve perfiles con >= 80% de compatibilidad y filtrado recíproco de edad."""
     current_user_id = int(get_jwt_identity())
     current_user = User.query.get_or_404(current_user_id)
     my_profile = current_user.profile
@@ -65,15 +56,14 @@ def search_profiles():
     # Parámetros de filtrado
     min_age = request.args.get("min_age", type=int)
     max_age = request.args.get("max_age", type=int)
-
     pets_filter = request.args.get("pets")       # "true" | "false" | None
     smoker_filter = request.args.get("smoker")   # "true" | "false" | None
     schedule_filter = request.args.get("schedule")  # string | None
 
-    # JOIN explícito para evitar AmbiguousForeignKeysError
+    # Join explícito para evitar AmbiguousForeignKeysError
     query = (
         Profile.query
-        .join(User, Profile.user_id == User.id)
+        .join(User, User.id == Profile.user_id)
         .filter(
             Profile.user_id != current_user_id,
             Profile.is_looking == True,
@@ -82,30 +72,32 @@ def search_profiles():
         )
     )
 
-    # Filtrado por edad
+    # Filtro de edad de salida (el roomie debe estar en el rango que busco)
     if min_age:
         query = query.filter(Profile.age >= min_age)
     if max_age:
         query = query.filter(Profile.age <= max_age)
 
-    # Filtrado recíproco de edad (el roomie debe aceptar la edad del usuario actual)
+    # Filtro de edad de entrada — reciprocidad
     if my_profile and my_profile.age:
         query = query.filter(
             Profile.pref_min_age <= my_profile.age,
             Profile.pref_max_age >= my_profile.age,
         )
 
-    # Aplicar filtros de pets, smoker y schedule
+    
     if pets_filter is not None and pets_filter != "":
-        query = query.filter(Profile.pets == (pets_filter.lower() == "true"))
+        pets_bool = pets_filter.lower() == "true"
+        query = query.filter(Profile.pets == pets_bool)
     if smoker_filter is not None and smoker_filter != "":
-        query = query.filter(Profile.smoker == (smoker_filter.lower() == "true"))
+        smoker_bool = smoker_filter.lower() == "true"
+        query = query.filter(Profile.smoker == smoker_bool)
     if schedule_filter:
         query = query.filter(Profile.schedule == schedule_filter)
 
-    # Obtener todos los perfiles candidatos antes de filtrar por compatibilidad
     all_profiles = query.all()
 
+    # Calcular compatibilidad
     results = []
     for p in all_profiles:
         score, matches, mismatches = compute_compatibility(my_profile, p)
@@ -119,7 +111,7 @@ def search_profiles():
     # Ordenar por compatibilidad descendente
     results.sort(key=lambda x: x["compatibility"], reverse=True)
 
-    # Paginación
+    # Paginar resultados
     total = len(results)
     paged = results[(page - 1) * per_page: page * per_page]
     has_more = (page * per_page) < total
