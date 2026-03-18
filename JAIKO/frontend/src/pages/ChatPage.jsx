@@ -7,6 +7,7 @@ import useAuthStore from '../context/authStore'
 import { Avatar, Spinner, EmptyState } from '../components/ui'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { toast } from 'react-hot-toast'
 import clsx from 'clsx'
 
 export default function ChatPage() {
@@ -23,7 +24,7 @@ export default function ChatPage() {
 
   const bottomRef = useRef(null)
   const typingTimer = useRef(null)
-  const lastTypingEmit = useRef(0)  // FIX: throttle de typing
+  const lastTypingEmit = useRef(0)
   const isLoadingHistory = useRef(false)
   const activeChatIdRef = useRef(null)
   const socketRef = useRef(null)
@@ -32,6 +33,10 @@ export default function ChatPage() {
 
   // Registrar listeners del socket
   useEffect(() => {
+    // FIX #1: inicializar el socket explícitamente — sin esto socketRef.current
+    // queda null para siempre y sendMessage falla silenciosamente.
+    getSocket()
+
     const handleMsg = (msg) => {
       if (msg.chat_id === activeChatIdRef.current) {
         setMessages((m) => {
@@ -89,7 +94,7 @@ export default function ChatPage() {
     async (chat) => {
       const s = socketRef.current
 
-      // FIX: salir del chat anterior antes de entrar al nuevo
+      // Salir del chat anterior antes de entrar al nuevo
       if (activeChatIdRef.current && activeChatIdRef.current !== chat.id && s?.connected) {
         s.emit('leave_chat', { chat_id: activeChatIdRef.current })
       }
@@ -123,7 +128,16 @@ export default function ChatPage() {
 
   const sendMessage = () => {
     const s = socketRef.current
-    if (!text.trim() || !activeChatIdRef.current || !s?.connected) return
+    if (!text.trim() || !activeChatIdRef.current) return
+
+    // FIX #2: feedback al usuario si el socket no está conectado en lugar de
+    // fallar silenciosamente. Antes la guarda `!s?.connected` hacía un return
+    // sin ningún aviso, dejando al usuario confundido.
+    if (!s?.connected) {
+      toast.error('Sin conexión al chat. Intentá de nuevo en un momento.')
+      return
+    }
+
     s.emit('send_message', { chat_id: activeChatIdRef.current, content: text.trim() })
     setText('')
     clearTimeout(typingTimer.current)
@@ -142,7 +156,7 @@ export default function ChatPage() {
     setText(e.target.value)
 
     if (s?.connected && activeChatIdRef.current) {
-      // FIX: throttle — emitir typing máximo cada 500ms, no en cada pulsación
+      // Throttle — emitir typing máximo cada 500ms, no en cada pulsación
       const now = Date.now()
       if (now - lastTypingEmit.current > 500) {
         s.emit('typing', { chat_id: activeChatIdRef.current })
@@ -228,7 +242,6 @@ export default function ChatPage() {
               <button
                 className="md:hidden p-1"
                 onClick={() => {
-                  // FIX: emitir leave_chat al volver a la lista en mobile
                   const s = socketRef.current
                   if (s?.connected && activeChatIdRef.current) {
                     s.emit('leave_chat', { chat_id: activeChatIdRef.current })
