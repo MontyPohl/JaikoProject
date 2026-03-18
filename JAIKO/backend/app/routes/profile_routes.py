@@ -1,11 +1,15 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..extensions import db
-from ..models import User, Profile
+from ..models import User, Profile, RoommateRequest
 from ..services.matching_service import compute_compatibility
+from typing import cast, List
 
 profile_bp = Blueprint("profiles", __name__)
+# Blueprint para gestionar las solicitudes de rumi
+requests_bp = Blueprint("requests", __name__)
 
+# ── PERFIL ───────────────────────────────────────────────
 
 @profile_bp.route("/me", methods=["PUT"])
 @jwt_required()
@@ -18,6 +22,7 @@ def update_my_profile():
         db.session.add(profile)
 
     data = request.get_json()
+    
     # --- Cambios realizados por Aaron Barrios ---
     # Agrego las preferencias de edad a los campos permitidos para guardar en el perfil
     allowed = [
@@ -27,6 +32,7 @@ def update_my_profile():
         "pref_min_age", "pref_max_age", # Columnas para la reciprocidad
     ]
     # --------------------------------------------
+    
     for field in allowed:
         if field in data:
             setattr(profile, field, data[field])
