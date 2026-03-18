@@ -9,28 +9,27 @@ def create_app(env: str = None) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_map[env])
 
-    # Initialize extensions
+    # En desarrollo aceptamos todos los orígenes para facilitar pruebas
+    # desde distintos dispositivos en la red local.
+    # En producción cambiar "*" por la URL real del frontend.
+    allowed_origins = "*" if env == "development" else app.config["FRONTEND_URL"]
+
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
     cors.init_app(
         app,
-        resources={r"/api/*": {"origins": app.config["FRONTEND_URL"]}},
+        resources={r"/api/*": {"origins": allowed_origins}},
         supports_credentials=True,
     )
-
-    # threading es el modo correcto para Windows. eventlet con monkey_patch
-    # causa que los emit() a rooms de otros clientes fallen silenciosamente
-    # en Windows. Sin monkey_patch, threading maneja la concurrencia bien.
     socketio.init_app(
         app,
-        cors_allowed_origins=app.config["FRONTEND_URL"],
-        async_mode="threading",  # <-- threading funciona en Windows sin monkey_patch
+        cors_allowed_origins=allowed_origins,
+        async_mode="threading",
         logger=False,
         engineio_logger=False,
     )
 
-    # Register blueprints
     from .routes.auth_routes import auth_bp
     from .routes.profile_routes import profile_bp
     from .routes.listing_routes import listing_bp
@@ -57,7 +56,6 @@ def create_app(env: str = None) -> Flask:
     app.register_blueprint(upload_bp, url_prefix="/api/upload")
     app.register_blueprint(request_bp, url_prefix="/api/requests")
 
-    # Register SocketIO handlers
     from .sockets import chat_socket  # noqa: F401
 
     return app
