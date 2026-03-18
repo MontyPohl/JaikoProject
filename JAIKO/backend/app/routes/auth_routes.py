@@ -1,3 +1,5 @@
+import os
+import requests
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
@@ -8,10 +10,34 @@ from ..models import User, Profile
 
 auth_bp = Blueprint("auth", __name__)
 
+# --- Bloque de Seguridad reCAPTCHA — Agregado por Aaron Barrios (@aaronbarriospy) ---
+# No vamos a dejar que ningún bot nos ensucie la base de datos de JaikO! lpm
+def validar_captcha(token):
+    secret_key = os.getenv('RECAPTCHA_SECRET_KEY')
+    if not token:
+        return False
+    try:
+        verify_response = requests.post(
+            'https://www.google.com/recaptcha/api/siteverify',
+            data={'secret': secret_key, 'response': token}
+        )
+        return verify_response.json().get('success', False)
+    except Exception:
+        return False
+# ----------------------------------------------------------------------------------
+
 # --- REGISTRO TRADICIONAL ---
 @auth_bp.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
+
+    # ── VALIDACIÓN DE SEGURIDAD JAIKO — Aaron Barrios ──
+    # Verificamos el captcha que viene del frontend antes de mover un solo dedo
+    captcha_token = data.get('captcha_token')
+    if not validar_captcha(captcha_token):
+        return jsonify({"error": "Validación de seguridad fallida. ¡Confirmá que no sos un bot!"}), 400
+    # ───────────────────────────────────────────────────
+
     if not data or not data.get("email") or not data.get("password"):
         return jsonify({"error": "Email y contraseña requeridos"}), 400
 
