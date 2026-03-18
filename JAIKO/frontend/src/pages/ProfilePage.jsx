@@ -20,13 +20,23 @@ export default function ProfilePage() {
   const [reportModal, setReportModal] = useState(false)
   const [reportReason, setReportReason] = useState('fake_profile')
   const [reportDesc, setReportDesc] = useState('')
+  const [pendingRequest, setPendingRequest] = useState(null) // solicitud pendiente
 
   useEffect(() => {
     if (!isMe && targetId) {
-      api.get(`/profiles/${targetId}`).then(({ data }) => {
-        setProfile(data.profile)
-        setLoading(false)
-      }).catch(() => { toast.error('Perfil no encontrado'); navigate('/') })
+      api.get(`/profiles/${targetId}`)
+        .then(({ data }) => {
+          setProfile(data.profile)
+          setLoading(false)
+        })
+        .catch(() => { toast.error('Perfil no encontrado'); navigate('/') })
+
+      // Detectamos la solicitud desde la notificación
+      const storedRequest = JSON.parse(localStorage.getItem('lastRequestNotification'))
+      if (storedRequest?.sender_id === targetId) {
+        setPendingRequest({ id: storedRequest.request_id })
+        localStorage.removeItem('lastRequestNotification')
+      }
     } else {
       setProfile(myProfile)
       setLoading(false)
@@ -34,6 +44,17 @@ export default function ProfilePage() {
 
     api.get(`/reviews/user/${targetId}`).then(({ data }) => setReviews(data.reviews)).catch(() => {})
   }, [targetId])
+
+  // Función para aceptar/rechazar solicitud
+  const respondRequest = async (reqId, action) => {
+    try {
+      await api.put(`/requests/${reqId}/respond`, { action })
+      toast.success(`Solicitud ${action === 'accept' ? 'aceptada' : 'rechazada'}`)
+      setPendingRequest(null)
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Error al procesar solicitud')
+    }
+  }
 
   const handleSendRequest = async () => {
     try {
@@ -112,13 +133,24 @@ export default function ProfilePage() {
             </div>
 
             {profile.bio && <p className="text-gray-600 mt-3 text-sm leading-relaxed">{profile.bio}</p>}
+
+            {/* Botones aceptar/rechazar solicitud */}
+            {!isMe && pendingRequest && (
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => respondRequest(pendingRequest.id, 'accept')} className="btn-primary">
+                  Aceptar solicitud
+                </button>
+                <button onClick={() => respondRequest(pendingRequest.id, 'reject')} className="btn-secondary">
+                  Eliminar solicitud
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Details grid */}
+      {/* Preferences and Reviews */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-        {/* Preferences */}
         <div className="card">
           <h2 className="font-display font-bold text-lg mb-4">Preferencias de convivencia</h2>
           <div className="space-y-3 text-sm">
@@ -153,7 +185,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Reviews summary */}
         <div className="card">
           <h2 className="font-display font-bold text-lg mb-4">Reseñas ({reviews.length})</h2>
           {reviews.length === 0 ? (
@@ -173,46 +204,6 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
-
-      {/* Verification */}
-      {isMe && (
-        <div className="card border-dashed border-orange-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-display font-bold">Verificación de identidad</h3>
-              <p className="text-sm text-orange-400 mt-0.5">Estado: <span className="font-semibold">{profile.verification_status}</span></p>
-            </div>
-            {profile.verification_status !== 'verified' && (
-              <Link to="/verification" className="btn-primary text-sm py-2 px-4">
-                {profile.verification_status === 'not_requested' ? 'Verificar identidad' : 'Ver estado'}
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Report modal */}
-      <Modal open={reportModal} onClose={() => setReportModal(false)} title="Reportar usuario">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold mb-1">Razón del reporte</label>
-            <select className="input" value={reportReason} onChange={e => setReportReason(e.target.value)}>
-              {['spam', 'fake_profile', 'harassment', 'inappropriate_content', 'scam', 'hate_speech', 'other'].map(r => (
-                <option key={r} value={r}>{r.replace('_', ' ')}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold mb-1">Descripción (opcional)</label>
-            <textarea className="input h-24 resize-none" value={reportDesc}
-              onChange={e => setReportDesc(e.target.value)} placeholder="Explicá brevemente el problema..." />
-          </div>
-          <div className="flex gap-3 justify-end pt-2">
-            <button onClick={() => setReportModal(false)} className="btn-ghost">Cancelar</button>
-            <button onClick={handleReport} className="btn-primary bg-red-500 hover:bg-red-600">Reportar</button>
-          </div>
-        </div>
-      </Modal>
     </div>
   )
 }

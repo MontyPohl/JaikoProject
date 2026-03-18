@@ -21,8 +21,17 @@ export function NotificationsPage() {
   const handleClick = (n) => {
     markRead(n.id)
 
-    // Redirigir al perfil si la notificación tiene sender_id
     const senderId = n.data?.sender_id
+    const requestId = n.data?.request_id
+
+    // Guardamos request_id y sender_id para que ProfilePage los detecte
+    if (senderId && requestId) {
+      localStorage.setItem(
+        'lastRequestNotification',
+        JSON.stringify({ sender_id: senderId, request_id: requestId })
+      )
+    }
+
     if (senderId) {
       navigate(`/profile/${senderId}`)
     }
@@ -40,11 +49,7 @@ export function NotificationsPage() {
       </div>
 
       {notifications.length === 0 ? (
-        <EmptyState
-          icon="🔔"
-          title="Sin notificaciones"
-          description="Cuando alguien te contacte aparecerá aquí."
-        />
+        <EmptyState icon="🔔" title="Sin notificaciones" description="Cuando alguien te contacte aparecerá aquí." />
       ) : (
         <div className="space-y-2">
           {notifications.map(n => (
