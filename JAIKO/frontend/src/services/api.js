@@ -25,23 +25,38 @@ api.interceptors.response.use(
 )
 
 /**
- * Trae roomies compatibles usando el endpoint de búsqueda real.
- * FIX: antes llamaba a /api/roomies que no existe.
+ * Trae roomies compatibles para el mapa.
+ * FIX: verifica token antes de llamar (evita redirect 401 en páginas públicas).
+ * FIX: filtra perfiles sin coordenadas válidas.
  */
 export async function getRoomies(city = 'Asunción') {
+  // FIX: no llamar al endpoint protegido si no hay token
+  const token = localStorage.getItem('jaiko_token')
+  if (!token) return []
+
   try {
     const response = await api.get('/profiles/search', {
       params: { city, per_page: 100, page: 1 },
     })
-    return (response.data.profiles || []).map((r) => ({
-      id: r.user_id,
-      lat: r.lat,
-      lng: r.lng,
-      profile: r,
-      compatibility: r.compatibility,
-      matches: r.matches || [],
-      mismatches: r.mismatches || [],
-    }))
+
+    return (response.data.profiles || [])
+      // FIX: filtrar perfiles sin coordenadas válidas antes de devolverlos
+      .filter(
+        (r) =>
+          r.lat != null &&
+          r.lng != null &&
+          isFinite(r.lat) &&
+          isFinite(r.lng)
+      )
+      .map((r) => ({
+        id: r.user_id,
+        lat: r.lat,
+        lng: r.lng,
+        profile: r,
+        compatibility: r.compatibility ?? null,
+        matches: r.matches || [],
+        mismatches: r.mismatches || [],
+      }))
   } catch (error) {
     console.error('Error al traer roomies:', error)
     return []
