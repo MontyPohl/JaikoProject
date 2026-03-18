@@ -1,5 +1,4 @@
-// GroupsPage.jsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react' 
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Users } from 'lucide-react'
 import api from '../services/api'
@@ -39,13 +38,14 @@ export function GroupsPage() {
     }
   }
 
-  // NUEVA FUNCIÓN para solicitar ingreso (join-request)
-  const handleRequestJoin = async (id) => {
+  // Función unificada para solicitar ingreso usando la misma ruta que el botón de roomie
+  const handleRequestJoin = async (groupId) => {
     try {
-      setRequestingGroupId(id)
-      await api.post(`/groups/${id}/join-request`)
-      toast.success('Solicitud enviada al grupo')
-      load() // recargar grupos
+      setRequestingGroupId(groupId)
+      // Esta es la misma ruta del otro frontend que genera la notificación correctamente
+      const { data } = await api.post(`/groups/${groupId}/join-request`)
+      toast.success(data.message || 'Solicitud enviada al grupo')
+      load() // recargar grupos para actualizar el botón
     } catch (e) {
       toast.error(e.response?.data?.error || 'Error al enviar solicitud')
     } finally {

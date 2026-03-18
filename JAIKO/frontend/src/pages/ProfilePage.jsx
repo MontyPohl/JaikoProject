@@ -8,63 +8,100 @@ import { toast } from 'react-hot-toast'
 
 export default function ProfilePage() {
   const { userId } = useParams()
-  const { user: me, profile: myProfile } = useAuthStore()
+  const { user: me, profile: myProfile, setProfile: setMyProfile } = useAuthStore()
   const navigate = useNavigate()
 
   const targetId = userId ? parseInt(userId) : me?.id
   const isMe = !userId || parseInt(userId) === me?.id
 
-  const [profile, setProfile] = useState(isMe ? myProfile : null)
+  const [profile, setProfile] = useState(null)
   const [reviews, setReviews] = useState([])
-  const [loading, setLoading] = useState(!isMe)
+  const [loading, setLoading] = useState(true)
   const [reportModal, setReportModal] = useState(false)
   const [reportReason, setReportReason] = useState('fake_profile')
   const [reportDesc, setReportDesc] = useState('')
-  const [pendingRequest, setPendingRequest] = useState(null) // solicitud pendiente
+  const [pendingRequest, setPendingRequest] = useState(null)
+  const [verification, setVerification] = useState(null)
+  const [verifying, setVerifying] = useState(false)
+  const [roommate, setRoommate] = useState(null)
 
+  // ── Cargar perfil, reseñas y estado de verificación ──────────────────────
   useEffect(() => {
+    setLoading(true)
+    
     if (!isMe && targetId) {
+      // Perfil de otro usuario
       api.get(`/profiles/${targetId}`)
         .then(({ data }) => {
           setProfile(data.profile)
+          setRoommate(data.profile.current_roomie)
           setLoading(false)
         })
-        .catch(() => { toast.error('Perfil no encontrado'); navigate('/') })
+        .catch(() => { 
+          toast.error('Perfil no encontrado')
+          navigate('/') 
+        })
 
-      // Detectamos la solicitud desde la notificación
+      // Verificar si hay una notificación pendiente para este perfil
       const storedRequest = JSON.parse(localStorage.getItem('lastRequestNotification'))
       if (storedRequest?.sender_id === targetId) {
         setPendingRequest({ id: storedRequest.request_id })
         localStorage.removeItem('lastRequestNotification')
       }
     } else {
+      // Mi propio perfil
       setProfile(myProfile)
+      setRoommate(myProfile?.current_roomie)
       setLoading(false)
+      
+      api.get('/verification/me')
+        .then(({ data }) => setVerification(data.verification))
+        .catch(() => setVerification(null))
     }
 
-    api.get(`/reviews/user/${targetId}`).then(({ data }) => setReviews(data.reviews)).catch(() => {})
-  }, [targetId])
+    // Cargar reseñas (común para ambos)
+    api.get(`/reviews/user/${targetId}`)
+      .then(({ data }) => setReviews(data.reviews))
+      .catch(() => {})
 
-  // Función para aceptar/rechazar solicitud
+  }, [targetId, isMe, myProfile, navigate])
+
+  // ── Función para aceptar/rechazar solicitud ─────────────────────────────
   const respondRequest = async (reqId, action) => {
     try {
-      await api.put(`/requests/${reqId}/respond`, { action })
-      toast.success(`Solicitud ${action === 'accept' ? 'aceptada' : 'rechazada'}`)
+      const { data } = await api.put(`/requests/${reqId}/respond`, { action })
+
+      if (action === 'accept') {
+        toast.success('¡Solicitud aceptada! Ahora son roommates.')
+        
+        // Actualizamos el rumi localmente
+        setRoommate(data.roommate)
+        
+        // Si el perfil que estoy viendo es el mío, actualizo el store global
+        if (isMe) {
+          setMyProfile({ ...myProfile, current_roomie: data.roommate, is_looking: false })
+        }
+      } else {
+        toast.success('Solicitud rechazada')
+      }
+
       setPendingRequest(null)
     } catch (e) {
       toast.error(e.response?.data?.error || 'Error al procesar solicitud')
     }
   }
 
+  // ── Función para enviar solicitud de roomie ─────────────────────────────
   const handleSendRequest = async () => {
     try {
       await api.post('/requests/', { target_user_id: targetId, type: 'roommate' })
-      toast.success('Solicitud enviada')
+      toast.success('Solicitud enviada correctamente')
     } catch (e) {
       toast.error(e.response?.data?.error || 'Error al enviar solicitud')
     }
   }
 
+  // ── Función para abrir chat ─────────────────────────────────────────────
   const handleOpenChat = async () => {
     try {
       const { data } = await api.post(`/chats/private/${targetId}`)
@@ -74,6 +111,7 @@ export default function ProfilePage() {
     }
   }
 
+  // ── Función para reportar usuario ───────────────────────────────────────
   const handleReport = async () => {
     try {
       await api.post('/reports/', { reported_user_id: targetId, reason: reportReason, description: reportDesc })
@@ -81,6 +119,20 @@ export default function ProfilePage() {
       setReportModal(false)
     } catch {
       toast.error('Error al reportar')
+    }
+  }
+
+  // ── Función para solicitar verificación ────────────────────────────────
+  const handleRequestVerification = async () => {
+    setVerifying(true)
+    try {
+      const { data } = await api.post('/verification/request')
+      setVerification(data.verification)
+      toast.success('Solicitud de verificación enviada')
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Error al solicitar verificación')
+    } finally {
+      setVerifying(false)
     }
   }
 
@@ -99,17 +151,35 @@ export default function ProfilePage() {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="font-display font-extrabold text-2xl">{profile.name}</h1>
+
                   {profile.verified && <Badge variant="green">✓ Verificado</Badge>}
-                  {profile.is_looking && <Badge variant="orange">Buscando</Badge>}
+                  
+                  {isMe && !profile.verified && (
+                    <button
+                      onClick={handleRequestVerification}
+                      disabled={verifying || (verification && verification.status === 'pending_verification')}
+                      className="btn-secondary text-sm py-1.5 px-3"
+                    >
+                      {verification?.status === 'pending_verification' ? 'Verificación pendiente...' : 'Verificar perfil'}
+                    </button>
+                  )}
+                  {profile.is_looking && !roommate && <Badge variant="orange">Buscando</Badge>}
                 </div>
+
                 <div className="flex items-center gap-3 text-sm text-orange-400 mt-1 flex-wrap">
                   {profile.age && <span><Calendar size={13} className="inline" /> {profile.age} años</span>}
                   {profile.profession && <span><Briefcase size={13} className="inline" /> {profile.profession}</span>}
                   {profile.city && <span><MapPin size={13} className="inline" /> {profile.city}</span>}
                 </div>
+
+                {/* MODIFICACIÓN AQUÍ: Mostrar roomie dinámicamente */}
+                {roommate && (
+                  <div className="mt-2 text-sm text-emerald-600 font-bold bg-emerald-50 px-3 py-1 rounded-lg inline-block">
+                    🏠 {isMe ? `Soy roomie de ${roommate.name}` : `Es roomie de ${roommate.name}`}
+                  </div>
+                )}
               </div>
 
-              {/* Actions */}
               <div className="flex items-center gap-2">
                 {isMe ? (
                   <Link to="/profile/edit" className="btn-primary flex items-center gap-1.5 text-sm py-2">
@@ -117,9 +187,11 @@ export default function ProfilePage() {
                   </Link>
                 ) : (
                   <>
-                    <button onClick={handleSendRequest} className="btn-primary flex items-center gap-1.5 text-sm py-2">
-                      <UserPlus size={14} /> Solicitar roomie
-                    </button>
+                    {!roommate && (
+                      <button onClick={handleSendRequest} className="btn-primary flex items-center gap-1.5 text-sm py-2">
+                        <UserPlus size={14} /> Solicitar roomie
+                      </button>
+                    )}
                     <button onClick={handleOpenChat} className="btn-secondary flex items-center gap-1.5 text-sm py-2">
                       <MessageCircle size={14} /> Chat
                     </button>
@@ -134,15 +206,26 @@ export default function ProfilePage() {
 
             {profile.bio && <p className="text-gray-600 mt-3 text-sm leading-relaxed">{profile.bio}</p>}
 
-            {/* Botones aceptar/rechazar solicitud */}
-            {!isMe && pendingRequest && (
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => respondRequest(pendingRequest.id, 'accept')} className="btn-primary">
-                  Aceptar solicitud
-                </button>
-                <button onClick={() => respondRequest(pendingRequest.id, 'reject')} className="btn-secondary">
-                  Eliminar solicitud
-                </button>
+            {/* BOTONES DE ACEPTAR/RECHAZAR SOLICITUD */}
+            {!isMe && pendingRequest && !roommate && (
+              <div className="flex gap-2 mt-4 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-orange-800 mb-2">¡Te ha enviado una solicitud de roomie!</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => respondRequest(pendingRequest.id, 'accept')}
+                      className="btn-primary text-xs py-2 px-4"
+                    >
+                      Aceptar
+                    </button>
+                    <button
+                      onClick={() => respondRequest(pendingRequest.id, 'reject')}
+                      className="btn-secondary text-xs py-2 px-4"
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -190,9 +273,9 @@ export default function ProfilePage() {
           {reviews.length === 0 ? (
             <p className="text-orange-300 text-sm">Sin reseñas aún</p>
           ) : (
-            <>
+            <div className="space-y-4">
               {reviews.slice(0, 3).map(r => (
-                <div key={r.id} className="border-b border-orange-50 pb-3 mb-3 last:border-0">
+                <div key={r.id} className="border-b border-orange-50 pb-3 last:border-0 last:pb-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold text-sm">{r.reviewer_name}</span>
                     <StarRating value={r.rating} />
@@ -200,7 +283,7 @@ export default function ProfilePage() {
                   {r.comment && <p className="text-xs text-gray-500">{r.comment}</p>}
                 </div>
               ))}
-            </>
+            </div>
           )}
         </div>
       </div>
