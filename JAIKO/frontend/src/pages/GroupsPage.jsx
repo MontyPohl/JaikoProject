@@ -12,6 +12,7 @@ export function GroupsPage() {
   const [loading, setLoading]   = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', city: 'Asunción', max_members: 3 })
+  const [requestingGroupId, setRequestingGroupId] = useState(null) // para bloquear botón individual
   const navigate = useNavigate()
 
   const load = () => {
@@ -38,13 +39,17 @@ export function GroupsPage() {
     }
   }
 
-  const handleJoin = async (id) => {
+  // NUEVA FUNCIÓN para solicitar ingreso (join-request)
+  const handleRequestJoin = async (id) => {
     try {
-      await api.post(`/groups/${id}/join`)
-      toast.success('Te uniste al grupo')
-      load()
+      setRequestingGroupId(id)
+      await api.post(`/groups/${id}/join-request`)
+      toast.success('Solicitud enviada al grupo')
+      load() // recargar grupos
     } catch (e) {
-      toast.error(e.response?.data?.error || 'Error')
+      toast.error(e.response?.data?.error || 'Error al enviar solicitud')
+    } finally {
+      setRequestingGroupId(null)
     }
   }
 
@@ -77,7 +82,13 @@ export function GroupsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {groups.map(g => (
-            <GroupCard key={g.id} group={g} onJoin={() => handleJoin(g.id)} onView={() => navigate(`/groups/${g.id}`)} />
+            <GroupCard 
+              key={g.id} 
+              group={g} 
+              onJoin={() => handleRequestJoin(g.id)} 
+              onView={() => navigate(`/groups/${g.id}`)}
+              requesting={requestingGroupId === g.id}
+            />
           ))}
         </div>
       )}
@@ -108,7 +119,7 @@ export function GroupsPage() {
   )
 }
 
-function GroupCard({ group, isOwn, onJoin, onView }) {
+function GroupCard({ group, isOwn, onJoin, onView, requesting }) {
   const pct = Math.round((group.current_members / group.max_members) * 100)
   return (
     <div className="card hover:shadow-md transition-all cursor-pointer" onClick={onView}>
@@ -128,8 +139,12 @@ function GroupCard({ group, isOwn, onJoin, onView }) {
         </div>
       </div>
       {!isOwn && !group.is_full && (
-        <button onClick={e => { e.stopPropagation(); onJoin() }} className="btn-secondary text-sm py-1.5 w-full mt-1">
-          Unirme al grupo
+        <button 
+          onClick={e => { e.stopPropagation(); onJoin() }} 
+          className="btn-secondary text-sm py-1.5 w-full mt-1"
+          disabled={requesting}
+        >
+          <Users size={14} className="inline" /> {requesting ? 'Enviando solicitud...' : 'Solicitar ingreso'}
         </button>
       )}
     </div>

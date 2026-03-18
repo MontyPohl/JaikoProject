@@ -1,52 +1,52 @@
-import { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import useAuthStore from './context/authStore'
-import useNotifStore from './context/notifStore'
-import { getSocket } from './services/socket'
+import { useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import useAuthStore from "./context/authStore";
+import useNotifStore from "./context/notifStore";
+import { getSocket } from "./services/socket.js";  // <-- ruta corregida
 
-import Layout from './components/layout/Layout'
-import ProtectedRoute from './components/layout/ProtectedRoute'
-import AdminRoute from './components/layout/AdminRoute'
+import Layout from "./components/layout/Layout";
+import ProtectedRoute from "./components/layout/ProtectedRoute";
+import AdminRoute from "./components/layout/AdminRoute";
 
-import HomePage from './pages/HomePage'
-import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'      // ← NUEVO
-import SearchPage from './pages/SearchPage'
-import ProfilePage from './pages/ProfilePage'
-import EditProfilePage from './pages/EditProfilePage'
-import ListingsPage from './pages/ListingsPage'
-import ListingDetailPage from './pages/ListingDetailPage'
-import CreateListingPage from './pages/CreateListingPage'
-import GroupsPage from './pages/GroupsPage'
-import GroupDetailPage from './pages/GroupDetailPage'
-import ChatPage from './pages/ChatPage'
-import NotificationsPage from './pages/NotificationsPage'
-import VerificationPage from './pages/VerificationPage'
-import AdminPage from './pages/AdminPage'
-import NotFoundPage from './pages/NotFoundPage'
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import SearchPage from "./pages/SearchPage";
+import ProfilePage from "./pages/ProfilePage";
+import EditProfilePage from "./pages/EditProfilePage";
+import ListingsPage from "./pages/ListingsPage";
+import ListingDetailPage from "./pages/ListingDetailPage";
+import CreateListingPage from "./pages/CreateListingPage";
+import GroupsPage from "./pages/GroupsPage";
+import GroupDetailPage from "./pages/GroupDetailPage";
+import ChatPage from "./pages/ChatPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import VerificationPage from "./pages/VerificationPage";
+import AdminPage from "./pages/AdminPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
 export default function App() {
-  const { token, fetchMe } = useAuthStore()
-  const { fetch: fetchNotifs, addRealtime } = useNotifStore()
+  const { token, fetchMe } = useAuthStore();
+  const { fetch: fetchNotifs, addRealtime } = useNotifStore();
 
   useEffect(() => {
     if (token) {
-      fetchMe()
-      fetchNotifs()
+      fetchMe();
+      fetchNotifs();
     }
-  }, [token])
+  }, [token]);
 
   useEffect(() => {
-    const socket = getSocket()
-    if (!socket) return
-    socket.on('notification', addRealtime)
-    return () => socket.off('notification', addRealtime)
-  }, [token])
+    const socket = getSocket();
+    if (!socket) return;
+    socket.on('notification', addRealtime);
+    return () => socket.off('notification', addRealtime);
+  }, [token]);
 
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />  {/* ← NUEVO */}
+      <Route path="/register" element={<RegisterPage />} />
 
       <Route element={<Layout />}>
         <Route path="/" element={<HomePage />} />
@@ -58,7 +58,7 @@ export default function App() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/edit" element={<EditProfilePage />} />
-          <Route path="/profile/:userId" element={<ProfilePage />} />
+          <Route path="/profile/:userId" element={<ProfilePage />} /> {/* <-- ruta clave para notifications */}
           <Route path="/listings/new" element={<CreateListingPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/groups/:id" element={<GroupDetailPage />} />
@@ -76,5 +76,5 @@ export default function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
-  )
+  );
 }

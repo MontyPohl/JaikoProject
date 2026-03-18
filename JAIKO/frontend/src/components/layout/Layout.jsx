@@ -1,10 +1,11 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Home, Search, Building2, Users, MessageCircle, Bell, ShieldCheck, LogOut, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useAuthStore from '../../context/authStore';
 import useNotifStore from '../../context/notifStore';
 import clsx from 'clsx';
 import logo from '../../assets/logo.png';
+import api from '../../services/api';
 
 const NAV = [
   { to: '/', label: 'Inicio', icon: Home },
@@ -19,42 +20,63 @@ export default function Layout() {
   const { unread } = useNotifStore();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userGroupId, setUserGroupId] = useState(null);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  // Fetch dinámico del grupo activo del usuario
+  const fetchUserGroup = async () => {
+    if (isAuthenticated()) {
+      try {
+        const res = await api.get('/groups/my');
+        const group = res.data.groups?.[0];
+        setUserGroupId(group ? group.id : null);
+      } catch (err) {
+        setUserGroupId(null);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchUserGroup();
+  }, [isAuthenticated, profile]);
+
   return (
     <div className="min-h-screen flex flex-col font-main">
       {/* ── Navbar ── */}
       <nav className="sticky top-0 z-50 bg-[#2563C8]/90 backdrop-blur-md shadow-xl">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16 relative">
-          
-          {/* Logo principal grande (no interactivo, sin shadow) */}
+          {/* Logo principal */}
           <div className="flex-shrink-0">
             <img src={logo} alt="JAIKO!" className="h-16 w-auto" />
           </div>
 
-          {/* Links principales centrados con hover glow */}
+          {/* Links desktop */}
           <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 gap-8">
-            {NAV.filter(n => !n.auth || isAuthenticated()).map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === '/'}
-                className={({ isActive }) =>
-                  clsx(
-                    'flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-white transition-all duration-300',
-                    isActive 
-                      ? 'bg-[#FBBF24] text-[#2563C8] shadow-md'
-                      : 'hover:bg-white/20 hover:text-[#FBBF24] hover:scale-105'
-                  )
-                }
-              >
-                <Icon size={16} /> {label}
-              </NavLink>
-            ))}
+            {NAV.filter(n => !n.auth || isAuthenticated()).map(({ to, label, icon: Icon }) => {
+              // Redirigir dinámicamente a su grupo si tiene uno
+              const targetTo = to === '/groups' && userGroupId ? `/groups/${userGroupId}` : to;
+              return (
+                <NavLink
+                  key={to}
+                  to={targetTo}
+                  end={to === '/'}
+                  className={({ isActive }) =>
+                    clsx(
+                      'flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-white transition-all duration-300',
+                      isActive 
+                        ? 'bg-[#FBBF24] text-[#2563C8] shadow-md'
+                        : 'hover:bg-white/20 hover:text-[#FBBF24] hover:scale-105'
+                    )
+                  }
+                >
+                  <Icon size={16} /> {label}
+                </NavLink>
+              );
+            })}
           </div>
 
           {/* Right side: avatar y notificaciones */}
@@ -91,7 +113,6 @@ export default function Layout() {
                       {profile?.name?.[0]?.toUpperCase() || '?'}
                     </div>
                   )}
-                  {/* Solo mostrar primer nombre */}
                   <span className="hidden md:block text-sm font-semibold text-white">
                     {profile?.name?.split(' ')[0]}
                   </span>
@@ -120,22 +141,25 @@ export default function Layout() {
         {/* Mobile menu */}
         {mobileOpen && (
           <div className="md:hidden bg-[#2563C8]/95 px-4 pb-4 flex flex-col gap-2 animate-fade-in rounded-b-lg shadow-lg">
-            {NAV.filter(n => !n.auth || isAuthenticated()).map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === '/'}
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) =>
-                  clsx(
-                    'flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition duration-300',
-                    isActive ? 'bg-[#FBBF24] text-[#2563C8] shadow-md' : 'text-white hover:bg-white/20 hover:scale-105'
-                  )
-                }
-              >
-                <Icon size={16} /> {label}
-              </NavLink>
-            ))}
+            {NAV.filter(n => !n.auth || isAuthenticated()).map(({ to, label, icon: Icon }) => {
+              const targetTo = to === '/groups' && userGroupId ? `/groups/${userGroupId}` : to;
+              return (
+                <NavLink
+                  key={to}
+                  to={targetTo}
+                  end={to === '/'}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    clsx(
+                      'flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition duration-300',
+                      isActive ? 'bg-[#FBBF24] text-[#2563C8] shadow-md' : 'text-white hover:bg-white/20 hover:scale-105'
+                    )
+                  }
+                >
+                  <Icon size={16} /> {label}
+                </NavLink>
+              )
+            })}
           </div>
         )}
       </nav>

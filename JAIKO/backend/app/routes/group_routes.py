@@ -47,7 +47,7 @@ def create_group():
     db.session.flush()
 
     # Creator joins as admin
-    member = GroupMember(group_id=group.id, user_id=user_id, role="admin")
+    member = GroupMember(group_id=group.id, user_id=user_id, role="admin", status="active")
     db.session.add(member)
 
     # Create a group chat
@@ -85,7 +85,7 @@ def join_group(group_id):
     if existing:
         existing.status = "active"
     else:
-        member = GroupMember(group_id=group_id, user_id=user_id)
+        member = GroupMember(group_id=group_id, user_id=user_id, status="active")
         db.session.add(member)
 
     # Add to group chat
@@ -111,6 +111,40 @@ def join_group(group_id):
     return jsonify({"message": "Joined successfully", "group": group.to_dict()}), 200
 
 
+@group_bp.route("/<int:group_id>/join-request", methods=["POST"])
+@jwt_required()
+def request_join_group(group_id):
+    """
+    Nueva ruta para manejar solicitudes de ingreso al grupo.
+    Crea un registro pendiente y notifica a todos los miembros activos.
+    """
+    user_id = int(get_jwt_identity())
+    group = Group.query.get_or_404(group_id)
+
+    # Verificar si ya hay un miembro o solicitud existente
+    existing = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+    if existing:
+        return jsonify({"error": "Ya eres miembro o ya enviaste una solicitud"}), 400
+
+    # Crear solicitud pendiente
+    member = GroupMember(group_id=group_id, user_id=user_id, status="pending")
+    db.session.add(member)
+    db.session.commit()
+
+    # Enviar notificación a todos los miembros activos
+    active_members = GroupMember.query.filter_by(group_id=group_id, status="active").all()
+    for m in active_members:
+        send_notification(
+            user_id=m.user_id,
+            type="join_request",
+            title="Solicitud de ingreso",
+            content=f"El usuario {user_id} ha solicitado unirse a tu grupo {group.name}",
+            data={"group_id": group_id, "request_user_id": user_id},
+        )
+
+    return jsonify({"message": "Solicitud enviada"}), 200
+
+
 @group_bp.route("/<int:group_id>/leave", methods=["POST"])
 @jwt_required()
 def leave_group(group_id):
@@ -123,6 +157,19 @@ def leave_group(group_id):
     if group.status == "full":
         group.status = "open"
     db.session.commit()
+
+    # Verificar si el grupo quedó sin miembros activos y eliminarlo
+    active_members_count = GroupMember.query.filter_by(group_id=group_id, status="active").count()
+    if active_members_count == 0:
+        # Eliminar chat si existe
+        chat = Chat.query.filter_by(group_id=group_id).first()
+        if chat:
+            ChatMember.query.filter_by(chat_id=chat.id).delete()
+            db.session.delete(chat)
+        # Eliminar el grupo
+        db.session.delete(group)
+        db.session.commit()
+
     return jsonify({"message": "Left group"}), 200
 
 
@@ -133,3 +180,29 @@ def my_groups():
     memberships = GroupMember.query.filter_by(user_id=user_id, status="active").all()
     groups = [m.group.to_dict() for m in memberships]
     return jsonify({"groups": groups}), 200
+
+
+@group_bp.route("/<int:group_id>", methods=["PUT"])
+@jwt_required()
+def update_group(group_id):
+    user_id = int(get_jwt_identity())
+    group = Group.query.get_or_404(group_id)
+    
+    # Verificar si el usuario es miembro activo del grupo
+    member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id, status="active").first()
+    if not member:
+        return jsonify({"error": "No tienes permiso para editar este grupo"}), 403
+
+    data = request.get_json()
+
+    # Actualizar campos editables
+    group.name = data.get("name", group.name)
+    group.description = data.get("description", group.description)
+    group.city = data.get("city", group.city)
+    group.budget_max = data.get("budget_max", group.budget_max)
+    group.pets_allowed = data.get("pets_allowed", group.pets_allowed)
+    group.smoking_allowed = data.get("smoking_allowed", group.smoking_allowed)
+
+    db.session.commit()
+
+    return jsonify({"group": group.to_dict()}), 200
