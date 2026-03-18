@@ -2,14 +2,11 @@ from datetime import datetime
 from flask import request
 from flask_socketio import emit, join_room, leave_room, disconnect
 from flask_jwt_extended import decode_token
-from jwt.exceptions import InvalidTokenError
-from sqlalchemy.orm import joinedload
 from ..extensions import socketio, db
 from ..models import Chat, ChatMember, Message
 
 
 def _authenticate_socket() -> int | None:
-    """Extract user_id from socket auth token."""
     token = request.args.get("token") or (request.headers.get("Authorization", "").replace("Bearer ", ""))
     if not token:
         return None
@@ -26,9 +23,9 @@ def on_connect():
     if not user_id:
         disconnect()
         return False
-    # Join personal room for notifications
     join_room(f"user_{user_id}")
     emit("connected", {"user_id": user_id})
+    print(f"[SOCKET] Usuario {user_id} conectado")
 
 
 @socketio.on("disconnect")
@@ -36,24 +33,23 @@ def on_disconnect():
     user_id = _authenticate_socket()
     if user_id:
         leave_room(f"user_{user_id}")
+        print(f"[SOCKET] Usuario {user_id} desconectado")
 
 
 @socketio.on("join_chat")
 def on_join_chat(data):
-    """Join a specific chat room."""
     user_id = _authenticate_socket()
     if not user_id:
         return
-
     chat_id = data.get("chat_id")
     member = ChatMember.query.filter_by(chat_id=chat_id, user_id=user_id).first()
     if not member:
         emit("error", {"message": "Not a member of this chat"})
         return
-
     room = f"chat_{chat_id}"
     join_room(room)
-    emit("joined_chat", {"chat_id": chat_id}, room=room)
+    print(f"[SOCKET] Usuario {user_id} unido al room {room}")
+    emit("joined_chat", {"chat_id": chat_id})
 
 
 @socketio.on("leave_chat")
@@ -67,7 +63,6 @@ def on_leave_chat(data):
 
 @socketio.on("send_message")
 def on_send_message(data):
-    """Handle incoming message and broadcast to chat room."""
     user_id = _authenticate_socket()
     if not user_id:
         return
@@ -91,44 +86,42 @@ def on_send_message(data):
         type=data.get("type", "text"),
     )
     db.session.add(msg)
-
-    # Update last_read for sender
     member.last_read_at = datetime.utcnow()
     db.session.commit()
 
-    # Load chat members eagerly (needed for broadcast + notifications)
-    chat = (
-        Chat.query
-        .filter_by(id=chat_id)
-        .options(joinedload(Chat.members))
-        .first()
-    )
-
     msg_dict = msg.to_dict()
 
-    # Use socketio.emit (not the handler-scoped emit) to reliably broadcast
-    # to rooms that may belong to other socket connections
-    room = f"chat_{chat_id}"
-    socketio.emit("receive_message", msg_dict, room=room, namespace="/")
+    # CORRECCIÓN CRÍTICA: usar emit() con to= (handler-scoped) en lugar de
+    # socketio.emit() (module-level). Con async_mode="threading", la versión
+    # module-level falla para emitir a otros clientes desde un event handler.
+    # La versión handler-scoped tiene el contexto correcto garantizado.
 
-    # Also deliver to each member's personal room (works even without join_chat)
-    for cm in chat.members:
-        if cm.user_id != user_id:
-            socketio.emit("receive_message", msg_dict, room=f"user_{cm.user_id}", namespace="/")
+    # 1. Emitir a todos en el room del chat (incluye al emisor)
+    emit("receive_message", msg_dict, to=f"chat_{chat_id}")
+    print(f"[SOCKET] Mensaje emitido al room chat_{chat_id}")
 
-    # Send push notification to offline members
+    # 2. Emitir al room personal de cada miembro (por si no tienen join_chat activo)
+    chat = Chat.query.filter_by(id=chat_id).first()
+    if chat:
+        for cm in chat.members:
+            if cm.user_id != user_id:
+                emit("receive_message", msg_dict, to=f"user_{cm.user_id}")
+                print(f"[SOCKET] Mensaje emitido al room user_{cm.user_id}")
+
+    # 3. Notificaciones push
     sender_profile = msg.sender.profile
     sender_name = sender_profile.name if sender_profile else "Alguien"
     from ..services.notification_service import send_notification
-    for cm in chat.members:
-        if cm.user_id != user_id:
-            send_notification(
-                user_id=cm.user_id,
-                type="message",
-                title=f"Nuevo mensaje de {sender_name}",
-                content=content[:100],
-                data={"chat_id": chat_id},
-            )
+    if chat:
+        for cm in chat.members:
+            if cm.user_id != user_id:
+                send_notification(
+                    user_id=cm.user_id,
+                    type="message",
+                    title=f"Nuevo mensaje de {sender_name}",
+                    content=content[:100],
+                    data={"chat_id": chat_id},
+                )
 
 
 @socketio.on("typing")
@@ -137,8 +130,8 @@ def on_typing(data):
     if not user_id:
         return
     chat_id = data.get("chat_id")
-    room = f"chat_{chat_id}"
-    emit("user_typing", {"user_id": user_id, "chat_id": chat_id}, room=room, include_self=False)
+    emit("user_typing", {"user_id": user_id, "chat_id": chat_id},
+         to=f"chat_{chat_id}", include_self=False)
 
 
 @socketio.on("stop_typing")
@@ -147,5 +140,6 @@ def on_stop_typing(data):
     if not user_id:
         return
     chat_id = data.get("chat_id")
-    room = f"chat_{chat_id}"
-    emit("user_stop_typing", {"user_id": user_id, "chat_id": chat_id}, room=room, include_self=False)
+    emit("user_stop_typing", {"user_id": user_id, "chat_id": chat_id},
+         to=f"chat_{chat_id}", include_self=False)
+    

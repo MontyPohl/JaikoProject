@@ -14,29 +14,64 @@ export default function ChatPage() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
 
-  const [chats, setChats]     = useState([])
-  const [active, setActive]   = useState(null)
+  const [chats, setChats] = useState([])
+  const [active, setActive] = useState(null)
   const [messages, setMessages] = useState([])
-  const [text, setText]       = useState('')
-  const [typing, setTyping]   = useState(false)
+  const [text, setText] = useState('')
+  const [typing, setTyping] = useState(false)
   const [loading, setLoading] = useState(false)
+
   const bottomRef = useRef(null)
   const typingTimer = useRef(null)
   const isLoadingHistory = useRef(false)
-  const activeRef = useRef(null)
-  const [socket, setSocket] = useState(() => getSocket())
-
-  // Keep activeRef in sync so socket handlers always see current active
-  useEffect(() => { activeRef.current = active }, [active])
-
-  // Get socket reactively: set state when socket connects
-  useEffect(() => {
-    return onSocketConnect((s) => setSocket(s))
-  }, [])
+  const activeChatIdRef = useRef(null)
+  const socketRef = useRef(null)
 
   const MAX_MESSAGES = 100
 
-  // Load chat list
+  useEffect(() => {
+    const handleMsg = (msg) => {
+      console.log('📨 handleMsg — chat_id:', msg.chat_id, '| activo:', activeChatIdRef.current)
+      if (msg.chat_id === activeChatIdRef.current) {
+        setMessages(m => {
+          if (m.some(ex => ex.id === msg.id)) return m
+          const updated = [...m, msg]
+          return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated
+        })
+      }
+      setChats(cs => cs.map(c =>
+        c.id === msg.chat_id ? { ...c, last_message: msg } : c
+      ))
+    }
+
+    const handleTyping = ({ user_id }) => { if (user_id !== user?.id) setTyping(true) }
+    const handleStopTyping = () => setTyping(false)
+
+    const unsub = onSocketConnect((s) => {
+      socketRef.current = s
+      s.off('receive_message', handleMsg)
+      s.off('user_typing', handleTyping)
+      s.off('user_stop_typing', handleStopTyping)
+      s.on('receive_message', handleMsg)
+      s.on('user_typing', handleTyping)
+      s.on('user_stop_typing', handleStopTyping)
+      console.log('✅ Listeners registrados en socket:', s.id)
+      if (activeChatIdRef.current) {
+        s.emit('join_chat', { chat_id: activeChatIdRef.current })
+      }
+    })
+
+    return () => {
+      unsub()
+      const s = socketRef.current
+      if (s) {
+        s.off('receive_message', handleMsg)
+        s.off('user_typing', handleTyping)
+        s.off('user_stop_typing', handleStopTyping)
+      }
+    }
+  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     api.get('/chats/').then(({ data }) => {
       setChats(data.chats)
@@ -45,9 +80,10 @@ export default function ChatPage() {
         if (found) selectChat(found)
       }
     })
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectChat = useCallback(async (chat) => {
+    activeChatIdRef.current = chat.id
     setActive(chat)
     navigate(`/chat/${chat.id}`, { replace: true })
     setLoading(true)
@@ -55,50 +91,12 @@ export default function ChatPage() {
     const { data } = await api.get(`/chats/${chat.id}/messages`)
     setMessages(data.messages)
     setLoading(false)
-
-    if (socket) {
-      socket.emit('join_chat', { chat_id: chat.id })
+    const s = socketRef.current
+    if (s?.connected) {
+      s.emit('join_chat', { chat_id: chat.id })
     }
-  }, [socket])
+  }, [navigate])
 
-  // Re-join chat room if socket connects after the chat was already selected
-  // (fixes race condition where socket was null during selectChat)
-  useEffect(() => {
-    if (!socket || !active) return
-    socket.emit('join_chat', { chat_id: active.id })
-  }, [socket, active?.id])
-
-  // Socket message listener — registered once per socket instance
-  // Uses activeRef to avoid stale closure on active chat
-  useEffect(() => {
-    if (!socket) return
-    const handleMsg = (msg) => {
-      if (msg.chat_id === activeRef.current?.id) {
-        setMessages(m => {
-          if (m.some(existing => existing.id === msg.id)) return m
-          const updated = [...m, msg]
-          return updated.length > MAX_MESSAGES ? updated.slice(-MAX_MESSAGES) : updated
-        })
-      }
-      setChats(cs => cs.map(c => c.id === msg.chat_id ? { ...c, last_message: msg } : c))
-    }
-    const handleTyping = ({ user_id }) => {
-      if (user_id !== activeRef.current?.id) setTyping(true)
-    }
-    const handleStopTyping = () => setTyping(false)
-
-    socket.on('receive_message', handleMsg)
-    socket.on('user_typing', handleTyping)
-    socket.on('user_stop_typing', handleStopTyping)
-    return () => {
-      socket.off('receive_message', handleMsg)
-      socket.off('user_typing', handleTyping)
-      socket.off('user_stop_typing', handleStopTyping)
-    }
-  }, [socket])
-
-  // Auto-scroll: al cargar historial va directo al fondo (sin animacion),
-  // en mensajes nuevos hace scroll suave
   useEffect(() => {
     if (isLoadingHistory.current) {
       bottomRef.current?.scrollIntoView({ behavior: 'instant' })
@@ -109,30 +107,33 @@ export default function ChatPage() {
   }, [messages])
 
   const sendMessage = () => {
-    if (!text.trim() || !active || !socket) return
-    socket.emit('send_message', { chat_id: active.id, content: text.trim() })
+    const s = socketRef.current
+    if (!text.trim() || !activeChatIdRef.current || !s?.connected) return
+    s.emit('send_message', { chat_id: activeChatIdRef.current, content: text.trim() })
     setText('')
-    socket.emit('stop_typing', { chat_id: active.id })
+    s.emit('stop_typing', { chat_id: activeChatIdRef.current })
   }
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   }
 
-  const handleTyping = (e) => {
+  const handleTypingInput = (e) => {
+    const s = socketRef.current
     setText(e.target.value)
-    if (socket && active) {
-      socket.emit('typing', { chat_id: active.id })
+    if (s?.connected && activeChatIdRef.current) {
+      s.emit('typing', { chat_id: activeChatIdRef.current })
       clearTimeout(typingTimer.current)
-      typingTimer.current = setTimeout(() => socket.emit('stop_typing', { chat_id: active.id }), 1500)
+      typingTimer.current = setTimeout(
+        () => s.emit('stop_typing', { chat_id: activeChatIdRef.current }),
+        1500
+      )
     }
   }
 
-  // CORREGIDO: funciones para mostrar nombre y foto correctamente
   const getChatName = (chat) => {
     if (chat.type === 'group') return `Grupo #${chat.group_id}`
     const other = chat.members?.find(m => m.user_id !== user?.id)
-    // Si no tiene name, mostrar "Usuario #ID"
     return other?.name ?? `Usuario #${other?.user_id}`
   }
 
@@ -144,10 +145,7 @@ export default function ChatPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
       <h1 className="font-display font-extrabold text-3xl mb-6">Chats</h1>
-
       <div className="flex h-[70vh] bg-white rounded-2xl border border-orange-100 shadow-sm overflow-hidden">
-
-        {/* Sidebar */}
         <div className={clsx(
           'w-72 flex-shrink-0 border-r border-orange-100 flex flex-col',
           active && 'hidden md:flex'
@@ -176,12 +174,13 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Chat window */}
         {active ? (
           <div className="flex-1 flex flex-col">
-            {/* Chat header */}
             <div className="flex items-center gap-3 p-4 border-b border-orange-100">
-              <button className="md:hidden p-1" onClick={() => setActive(null)}>
+              <button className="md:hidden p-1" onClick={() => {
+                setActive(null)
+                activeChatIdRef.current = null
+              }}>
                 <ArrowLeft size={18} />
               </button>
               <Avatar src={getChatPhoto(active)} name={getChatName(active)} size="sm" />
@@ -190,8 +189,6 @@ export default function ChatPage() {
                 {typing && <p className="text-xs text-primary-500 animate-pulse">Escribiendo...</p>}
               </div>
             </div>
-
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {loading && <div className="flex justify-center"><Spinner /></div>}
               {messages.map(msg => {
@@ -201,9 +198,7 @@ export default function ChatPage() {
                     {!isMe && <Avatar src={msg.sender_photo} name={msg.sender_name} size="sm" />}
                     <div className={clsx(
                       'max-w-xs lg:max-w-md px-4 py-2.5 rounded-2xl text-sm',
-                      isMe
-                        ? 'bg-primary-500 text-white rounded-br-sm'
-                        : 'bg-orange-50 text-brand-dark rounded-bl-sm'
+                      isMe ? 'bg-primary-500 text-white rounded-br-sm' : 'bg-orange-50 text-brand-dark rounded-bl-sm'
                     )}>
                       {!isMe && <p className="font-semibold text-xs text-primary-600 mb-0.5">{msg.sender_name}</p>}
                       <p className="leading-relaxed">{msg.content}</p>
@@ -216,12 +211,10 @@ export default function ChatPage() {
               })}
               <div ref={bottomRef} />
             </div>
-
-            {/* Input */}
             <div className="p-4 border-t border-orange-100 flex items-end gap-3">
               <textarea
                 value={text}
-                onChange={handleTyping}
+                onChange={handleTypingInput}
                 onKeyDown={handleKeyDown}
                 rows={1}
                 placeholder="Escribí un mensaje..."
