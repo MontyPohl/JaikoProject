@@ -52,6 +52,13 @@ export default function ChatPage() {
     }
   }, [socket])
 
+  // Re-join chat room if socket connects after the chat was already selected
+  // (fixes race condition where socket was null during selectChat)
+  useEffect(() => {
+    if (!socket || !active) return
+    socket.emit('join_chat', { chat_id: active.id })
+  }, [socket, active?.id])
+
   // Socket message listener
   useEffect(() => {
     if (!socket) return

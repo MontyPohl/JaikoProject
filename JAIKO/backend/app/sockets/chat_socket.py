@@ -96,18 +96,27 @@ def on_send_message(data):
     member.last_read_at = datetime.utcnow()
     db.session.commit()
 
-    # Broadcast to all members in the room
-    room = f"chat_{chat_id}"
-    emit("receive_message", msg.to_dict(), room=room)
-
-    # Send push notification to offline members
-    # Eagerly load members to avoid N+1 queries
+    # Load chat members eagerly (needed for broadcast + notifications)
     chat = (
         Chat.query
         .filter_by(id=chat_id)
         .options(joinedload(Chat.members))
         .first()
     )
+
+    msg_dict = msg.to_dict()
+
+    # Broadcast to chat room (members who already joined the room)
+    room = f"chat_{chat_id}"
+    emit("receive_message", msg_dict, room=room)
+
+    # Also deliver directly to each member's personal room so the message
+    # arrives even if the recipient hasn't emitted join_chat yet
+    for cm in chat.members:
+        if cm.user_id != user_id:
+            emit("receive_message", msg_dict, room=f"user_{cm.user_id}")
+
+    # Send push notification to offline members
     sender_profile = msg.sender.profile
     sender_name = sender_profile.name if sender_profile else "Alguien"
     from ..services.notification_service import send_notification
