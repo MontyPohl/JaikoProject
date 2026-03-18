@@ -83,6 +83,22 @@ export default function Layout() {
 
           {/* Right side: avatar y notificaciones */}
           <div className="ml-auto flex items-center gap-3">
+            {!isAuthenticated() && (
+              <>
+                <NavLink
+                  to="/login"
+                  className="px-4 py-2 rounded-lg font-semibold text-white border-2 border-white hover:bg-white hover:text-[#2563C8] transition-all duration-300"
+                >
+                  Ingresar
+                </NavLink>
+                <NavLink
+                  to="/register"
+                  className="px-4 py-2 rounded-lg font-semibold bg-[#FBBF24] text-[#2563C8] hover:bg-yellow-300 transition-all duration-300 shadow-md"
+                >
+                  Registrarse
+                </NavLink>
+              </>
+            )}
             {isAuthenticated() && (
               <>
                 <NavLink
