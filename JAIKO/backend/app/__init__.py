@@ -4,7 +4,10 @@ from .config import config_map
 from .extensions import db, migrate, socketio, jwt, cors
 
 
-def create_app(env: str = None) -> Flask:
+
+
+
+def create_app(env: str | None = None) -> Flask:
     env = env or os.environ.get("FLASK_ENV", "development")
     app = Flask(__name__)
     app.config.from_object(config_map[env])
@@ -25,9 +28,9 @@ def create_app(env: str = None) -> Flask:
     socketio.init_app(
         app,
         cors_allowed_origins=allowed_origins,
-        async_mode=None, # Deja que Flask-SocketIO elija eventlet automáticamente
-        # ... resto de parámetros
+        async_mode='eventlet'
     )
+
 
 
     from .routes.auth_routes import auth_bp
