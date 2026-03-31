@@ -16,11 +16,12 @@ build/
 .env
 .env.local
 .env.*.local
+frontend/.env
+backend/.env
 
 # Database
 *.db
 *.sqlite3
-C:\Users\monty\Desktop\Hackaton-5.1-\JAIKO\frontend\.env
 # Flask migrations (keep the folder, ignore versions)
 # migrations/versions/
 
