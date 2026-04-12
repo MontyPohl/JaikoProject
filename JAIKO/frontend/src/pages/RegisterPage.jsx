@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom"
 import { Loader2, Eye, EyeOff } from "lucide-react"
 import { toast } from "react-hot-toast"
 import useAuthStore from "../context/authStore"
-// --- Agregado por Aaron Barrios para blindar JAIKO ---
-import ReCAPTCHA from "react-google-recaptcha"
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -16,22 +14,14 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  
-  // --- Estado para el Token de Google (Aaron) ---
-  const [captchaToken, setCaptchaToken] = useState(null)
+
+  const SITE_KEY = "6LeFE54sAAAAANoCNMtlX1CWET8BuIg6zcy4XE-8"
 
   const handleRegister = async (e) => {
     e.preventDefault()
-    
-    // Validaciones básicas
+
     if (!name || !email || !password || !confirmPassword) {
       toast.error("Completá todos los campos")
-      return
-    }
-
-    // --- Validación de CAPTCHA lpm (Aaron) ---
-    if (!captchaToken) {
-      toast.error("¡Confirmá que no sos un robot, maaan!")
       return
     }
 
@@ -39,30 +29,46 @@ export default function RegisterPage() {
       toast.error("La contraseña debe tener al menos 6 caracteres")
       return
     }
+
     if (password !== confirmPassword) {
       toast.error("Las contraseñas no coinciden")
       return
     }
 
     setLoading(true)
-    // --- Enviamos el captcha_token al backend (Aaron) ---
-    const result = await register({ 
-      name, 
-      email, 
-      password, 
-      captcha_token: captchaToken 
-    })
-    setLoading(false)
 
-    if (result.success) {
-      toast.success("¡Cuenta creada! Completá tu perfil")
-      navigate("/profile/edit")
-    } else {
-      toast.error(result.error || "Error al crear la cuenta")
-      // Si falla, reseteamos el captcha para que lo vuelvan a hacer
-      window.grecaptcha.reset() 
-      setCaptchaToken(null)
+    const recaptcha = window.grecaptcha?.enterprise;
+
+    if (!recaptcha) {
+      toast.error("El sistema de seguridad no cargó. Refrescá con F5.")
+      setLoading(false)
+      return
     }
+
+    recaptcha.ready(async () => {
+      try {
+        const token = await recaptcha.execute(SITE_KEY, { action: 'register' });
+
+        const result = await register({
+          name,
+          email,
+          password,
+          captcha_token: token
+        })
+
+        if (result.success) {
+          toast.success("¡Cuenta creada! Completá tu perfil")
+          navigate("/profile/edit")
+        } else {
+          toast.error(result.error || "Error al crear la cuenta")
+        }
+      } catch (error) {
+        console.error("Error reCAPTCHA:", error)
+        toast.error("Fallo en la validación de seguridad.")
+      } finally {
+        setLoading(false)
+      }
+    });
   }
 
   return (
@@ -91,11 +97,8 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleRegister} className="space-y-5">
-            {/* Input Nombre */}
             <div>
-              <label className="block text-[13px] font-bold text-[#1E293B] mb-2">
-                Nombre completo
-              </label>
+              <label className="block text-[13px] font-bold text-[#1E293B] mb-2">Nombre completo</label>
               <input
                 type="text"
                 placeholder="Tu nombre"
@@ -105,11 +108,8 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Input Email */}
             <div>
-              <label className="block text-[13px] font-bold text-[#1E293B] mb-2">
-                Correo electrónico
-              </label>
+              <label className="block text-[13px] font-bold text-[#1E293B] mb-2">Correo electrónico</label>
               <input
                 type="email"
                 placeholder="tu@correo.com"
@@ -119,11 +119,8 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Input Password */}
             <div>
-              <label className="block text-[13px] font-bold text-[#1E293B] mb-2">
-                Contraseña
-              </label>
+              <label className="block text-[13px] font-bold text-[#1E293B] mb-2">Contraseña</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -142,11 +139,8 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Input Confirm Password */}
             <div>
-              <label className="block text-[13px] font-bold text-[#1E293B] mb-2">
-                Confirmar contraseña
-              </label>
+              <label className="block text-[13px] font-bold text-[#1E293B] mb-2">Confirmar contraseña</label>
               <input
                 type={showPassword ? "text" : "password"}
                 placeholder="Repetí tu contraseña"
@@ -156,27 +150,16 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* --- EL DIBUJITO DEL CAPTCHA (Aaron Barrios) --- */}
-            <div className="flex justify-center py-2">
-              <ReCAPTCHA
-                sitekey="6Lc1R44sAAAAAMSJODZW1xsvID2xIMs7g-FUgXJU"
-                onChange={(token) => setCaptchaToken(token)}
-              />
-            </div>
-
             <button
               type="submit"
-              disabled={loading || !captchaToken}
-              className={`w-full py-4 rounded-[14px] font-extrabold text-base transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg ${
-                !captchaToken 
-                ? "bg-gray-300 cursor-not-allowed text-gray-500" 
-                : "bg-[#2563C8] hover:bg-[#1E4EA6] text-white shadow-blue-700/10"
-              }`}
+              disabled={loading}
+              className={`w-full py-4 rounded-[14px] font-extrabold text-base transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg bg-[#2563C8] hover:bg-[#1E4EA6] text-white shadow-blue-700/10 ${loading ? "opacity-70 cursor-not-allowed" : ""
+                }`}
             >
               {loading ? (
                 <>
                   <Loader2 className="animate-spin" size={20} />
-                  Creando cuenta...
+                  Procesando...
                 </>
               ) : (
                 "Crear cuenta gratis"

@@ -269,3 +269,7 @@ ADMIN_EMAIL=admin@jaiko.com.py
 ```
 VITE_GOOGLE_CLIENT_ID=
 ```
+
+
+
+pruebas de commit

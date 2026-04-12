@@ -13,14 +13,15 @@ build/
 .pytest_cache/
 
 # Environment
-
+.env
 .env.local
 .env.*.local
+frontend/.env
+backend/.env
 
 # Database
 *.db
 *.sqlite3
-
 # Flask migrations (keep the folder, ignore versions)
 # migrations/versions/
 
@@ -43,5 +44,3 @@ Thumbs.db
 
 # Logs
 *.log
-
-
