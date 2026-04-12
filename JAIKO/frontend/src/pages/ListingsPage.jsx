@@ -1,17 +1,16 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Map, LayoutGrid, Plus } from 'lucide-react'
-import api, { getRoomies } from '../services/api'
-import ListingCard from '../components/ui/ListingCard'
-import { Spinner, EmptyState } from '../components/ui'
-import useAuthStore from '../context/authStore'
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Map, LayoutGrid, Plus, SlidersHorizontal, X } from 'lucide-react';
+import api, { getRoomies } from '../services/api';
+import ListingCard from '../components/ui/ListingCard';
+import { Spinner, EmptyState } from '../components/ui';
+import useAuthStore from '../context/authStore';
 
 const CITIES = [
   'Asunción', 'San Lorenzo', 'Luque', 'Fernando de la Mora',
   'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este',
-]
+];
 
-// Centro por ciudad (fallback cuando el listing no tiene coordenadas)
 const CITY_CENTERS = {
   'Asunción': [-25.2867, -57.647],
   'San Lorenzo': [-25.3355, -57.5178],
@@ -21,16 +20,14 @@ const CITY_CENTERS = {
   'Capiatá': [-25.356, -57.4455],
   'Encarnación': [-27.3333, -55.8667],
   'Ciudad del Este': [-25.5097, -54.611],
-}
+};
 
 export default function ListingsPage() {
-  const { isAuthenticated } = useAuthStore()
-  const [listings, setListings] = useState([])
-  const [roomies, setRoomies] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [roomiesLoading, setRoomiesLoading] = useState(false)
-  const [view, setView] = useState('grid') // 'grid' | 'map'
-  const [JaikoMap, setJaikoMap] = useState(null)
+  const { isAuthenticated } = useAuthStore();
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('grid');
+  const [showFilters, setShowFilters] = useState(false);
 
   const [filters, setFilters] = useState({
     city: 'Asunción',
@@ -38,288 +35,162 @@ export default function ListingsPage() {
     max_price: '',
     pets_allowed: '',
     smoking_allowed: '',
-  })
+    type: '',
+  });
 
-  // ── Cargar listings según filtros ────────────────────────────────────────
   useEffect(() => {
-    const params = new URLSearchParams({
-      page: 1,
-      per_page: 24,
-      city: filters.city,
-    })
-    if (filters.min_price) params.set('min_price', filters.min_price)
-    if (filters.max_price) params.set('max_price', filters.max_price)
-    if (filters.pets_allowed) params.set('pets_allowed', filters.pets_allowed)
-    if (filters.smoking_allowed) params.set('smoking_allowed', filters.smoking_allowed)
+    const params = new URLSearchParams({ page: 1, per_page: 24, city: filters.city });
+    if (filters.min_price) params.set('min_price', filters.min_price);
+    if (filters.max_price) params.set('max_price', filters.max_price);
+    if (filters.pets_allowed) params.set('pets_allowed', filters.pets_allowed);
+    if (filters.smoking_allowed) params.set('smoking_allowed', filters.smoking_allowed);
+    if (filters.type) params.set('type', filters.type);
 
-    setLoading(true)
-    api
-      .get(`/listings/?${params}`)
-      .then(({ data }) => {
-        setListings(data.listings || [])
-      })
+    setLoading(true);
+    api.get(`/listings/?${params}`)
+      .then(({ data }) => setListings(data.listings || []))
       .catch(() => setListings([]))
-      .finally(() => setLoading(false))
-  }, [filters])
+      .finally(() => setLoading(false));
+  }, [filters]);
 
-  // ── Lazy-load JaikoMap solo cuando se necesita ───────────────────────────
-  useEffect(() => {
-    if (view === 'map' && !JaikoMap) {
-      import('../components/map/JaikoMap').then((m) =>
-        setJaikoMap(() => m.default)
-      )
-    }
-  }, [view, JaikoMap])
-
-  // ── Cargar roomies para el mapa (solo si está autenticado) ───────────────
-  // FIX: verificar auth antes de llamar getRoomies para evitar 401 → redirect
-  // FIX: pasar filters.city para traer roomies de la ciudad seleccionada
-  // FIX: re-cargar cuando cambia la ciudad (no solo cuando cambia view)
-  useEffect(() => {
-    if (view !== 'map') return
-    if (!isAuthenticated()) {
-      setRoomies([])
-      return
-    }
-
-    setRoomiesLoading(true)
-    getRoomies(filters.city)
-      .then(setRoomies)
-      .catch(() => setRoomies([]))
-      .finally(() => setRoomiesLoading(false))
-  }, [view, filters.city]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Marcadores de departamentos para el mapa ─────────────────────────────
-  // FIX: mapMarkers ahora SÍ se pasa al mapa (antes se calculaba pero nunca se usaba)
-  const listingMarkers = listings
-    .filter(
-      (l) =>
-        l.latitude != null &&
-        l.longitude != null &&
-        isFinite(l.latitude) &&
-        isFinite(l.longitude)
-    )
-    .map((l) => ({
-      lat: l.latitude,
-      lng: l.longitude,
-      id: l.id,
-      title: l.title,
-      price: l.total_price,
-      neighborhood: l.neighborhood,
-    }))
-
-  // ── Marcadores de roomies para el mapa (filtrados y validados) ───────────
-  // FIX: doble filtro de seguridad aquí también (getRoomies ya filtra, pero por si acaso)
-  const roomiMarkers = roomies.filter(
-    (r) =>
-      r &&
-      r.lat != null &&
-      r.lng != null &&
-      isFinite(r.lat) &&
-      isFinite(r.lng) &&
-      r.profile
-  )
-
-  // Centro del mapa según ciudad seleccionada
-  const mapCenter = CITY_CENTERS[filters.city] || [-25.2867, -57.647]
+  const activeFilterCount = [
+    filters.min_price, filters.max_price, filters.pets_allowed,
+    filters.smoking_allowed, filters.type
+  ].filter(Boolean).length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
-          <h1 className="font-display font-extrabold text-3xl">Departamentos</h1>
-          <p className="text-[#F5A623] text-sm mt-1">
-            {listings.length} publicaciones disponibles
-          </p>
+          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900">Departamentos</h1>
+          <p className="text-orange-500 font-medium mt-1">{listings.length} publicaciones disponibles</p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Toggle grid / mapa */}
-          <div className="flex rounded-xl border border-[#E2E8F0] overflow-hidden">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex bg-slate-100 p-1 rounded-2xl">
             <button
               onClick={() => setView('grid')}
-              className={`px-3 py-2 flex items-center gap-1.5 text-sm font-semibold transition-colors ${view === 'grid'
-                  ? 'bg-[#2563C8] text-white'
-                  : 'text-[#64748B] hover:bg-[#F4F7FF]'
-                }`}
+              className={`px-4 py-2 flex items-center gap-2 text-sm font-bold rounded-xl transition-all
+                ${view === 'grid' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              <LayoutGrid size={15} /> Grid
+              <LayoutGrid size={16} /> Grid
             </button>
             <button
               onClick={() => setView('map')}
-              className={`px-3 py-2 flex items-center gap-1.5 text-sm font-semibold transition-colors ${view === 'map'
-                  ? 'bg-[#2563C8] text-white'
-                  : 'text-[#64748B] hover:bg-[#F4F7FF]'
-                }`}
+              className={`px-4 py-2 flex items-center gap-2 text-sm font-bold rounded-xl transition-all
+                ${view === 'map' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              <Map size={15} /> Mapa
+              <Map size={16} /> Mapa
             </button>
           </div>
+
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all relative"
+          >
+            <SlidersHorizontal size={16} />
+            Filtros
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white shadow-sm">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
           {isAuthenticated() && (
-            <Link
-              to="/listings/new"
-              className="btn-primary flex items-center gap-1.5 text-sm"
-            >
-              <Plus size={15} /> Publicar
+            <Link to="/listings/new" className="btn-primary flex items-center gap-2 py-2.5">
+              <Plus size={18} /> Publicar
             </Link>
           )}
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="card mb-6 flex flex-wrap gap-4 items-end">
-        <div>
-          <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">
-            Ciudad
-          </label>
-          <select
-            className="input w-44 h-11 appearance-none pr-8"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748B' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 12px center',
-            }}
-            value={filters.city}
-            onChange={(e) => setFilters((f) => ({ ...f, city: e.target.value }))}
-          >
-            {CITIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">
-            Precio min (₲)
-          </label>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            className="input w-36 h-11"
-            value={filters.min_price}
-            placeholder="0"
-            onKeyDown={(e) =>
-              ['-', '+', 'e', '.'].includes(e.key) && e.preventDefault()
-            }
-            onChange={(e) => {
-              const v = e.target.value.replace(/[^0-9]/g, '')
-              setFilters((f) => ({ ...f, min_price: v }))
-            }}
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-[#64748B] mb-1 uppercase tracking-wide">
-            Precio max (₲)
-          </label>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            className="input w-36 h-11"
-            value={filters.max_price}
-            placeholder="Sin límite"
-            onKeyDown={(e) =>
-              ['-', '+', 'e', '.'].includes(e.key) && e.preventDefault()
-            }
-            onChange={(e) => {
-              const v = e.target.value.replace(/[^0-9]/g, '')
-              setFilters((f) => ({ ...f, max_price: v }))
-            }}
-          />
-        </div>
-
-        <div className="flex gap-2">
-          {[
-            ['pets_allowed', '🐾 Mascotas'],
-            ['smoking_allowed', '🚬 Fumadores'],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() =>
-                setFilters((f) => ({
-                  ...f,
-                  [key]: f[key] === 'true' ? '' : 'true',
-                }))
-              }
-              className={`px-3 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${filters[key] === 'true'
-                  ? 'border-[#2563C8] bg-[#EFF6FF] text-[#2563C8]'
-                  : 'border-[#E2E8F0] text-[#64748B] hover:border-[#BFDBFE]'
-                }`}
+      {/* ── Filters ───────────────────────────────────────────────────────── */}
+      <div className={`card mb-10 overflow-hidden transition-all duration-500 ${showFilters ? 'max-h-[1000px] opacity-100 p-8' : 'max-h-0 opacity-0 p-0 border-none shadow-none'}`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Ciudad</label>
+            <select
+              className="input"
+              value={filters.city}
+              onChange={e => setFilters(f => ({ ...f, city: e.target.value }))}
             >
-              {label}
+              {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Tipo</label>
+            <select
+              className="input"
+              value={filters.type}
+              onChange={e => setFilters(f => ({ ...f, type: e.target.value }))}
+            >
+              <option value="">Todos</option>
+              <option value="apartment">Departamento</option>
+              <option value="room">Habitación</option>
+              <option value="house">Casa</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Precio mín</label>
+            <input
+              type="number"
+              className="input"
+              value={filters.min_price}
+              placeholder="0"
+              onChange={e => setFilters(f => ({ ...f, min_price: e.target.value }))}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Precio máx</label>
+            <input
+              type="number"
+              className="input"
+              value={filters.max_price}
+              placeholder="Sin límite"
+              onChange={e => setFilters(f => ({ ...f, max_price: e.target.value }))}
+            />
+          </div>
+
+          <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap gap-3 pt-4 border-t border-slate-50">
+            {[
+              ['pets_allowed', '🐾 Mascotas'],
+              ['smoking_allowed', '🚬 Fumadores']
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setFilters(f => ({ ...f, [key]: f[key] === 'true' ? '' : 'true' }))}
+                className={`px-4 py-2 rounded-xl border-2 text-sm font-bold transition-all
+                  ${filters[key] === 'true'
+                    ? 'border-blue-500 bg-blue-50 text-blue-600'
+                    : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              onClick={() => setFilters({ city: 'Asunción', min_price: '', max_price: '', pets_allowed: '', smoking_allowed: '', type: '' })}
+              className="ml-auto text-sm font-bold text-red-400 hover:text-red-500 flex items-center gap-1"
+            >
+              <X size={14} /> Limpiar filtros
             </button>
-          ))}
+          </div>
         </div>
       </div>
 
-      {/* Contenido */}
+      {/* ── Content ───────────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Spinner size="lg" />
-        </div>
-      ) : view === 'map' ? (
-        // ── Vista mapa ─────────────────────────────────────────────────────
-        <div className="space-y-3">
-          {/* Leyenda */}
-          <div className="flex items-center gap-4 text-sm text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
-              {listingMarkers.length} departamentos
-            </span>
-            {isAuthenticated() && (
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-orange-400 inline-block" />
-                {roomiesLoading ? 'cargando roomies...' : `${roomiMarkers.length} roomies compatibles`}
-              </span>
-            )}
-            {!isAuthenticated() && (
-              <span className="text-xs text-orange-400 italic">
-                Iniciá sesión para ver roomies compatibles en el mapa
-              </span>
-            )}
-          </div>
-
-          <div className="h-[600px]">
-            {JaikoMap ? (
-              // FIX: pasar AMBOS: listingMarkers (departamentos) Y roomiMarkers (roomies)
-              <JaikoMap
-                center={mapCenter}
-                markers={roomiMarkers}
-                listingMarkers={listingMarkers}
-                height="600px"
-              />
-            ) : (
-              <div className="flex justify-center items-center h-full">
-                <Spinner />
-              </div>
-            )}
-          </div>
-
-          {listingMarkers.length === 0 && !loading && (
-            <p className="text-center text-sm text-orange-300 mt-2">
-              Ningún departamento de esta ciudad tiene coordenadas guardadas aún.
-            </p>
-          )}
-        </div>
+        <div className="flex justify-center py-32"><Spinner size="lg" /></div>
       ) : listings.length === 0 ? (
-        <EmptyState
-          icon="🏠"
-          title="No hay publicaciones"
-          description="Sé el primero en publicar en esta ciudad."
-        />
+        <EmptyState icon="🏠" title="No hay publicaciones" description="Sé el primero en publicar en esta ciudad." />
       ) : (
-        // ── Vista grid ─────────────────────────────────────────────────────
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {listings.map((l) => (
-            <ListingCard key={l.id} listing={l} />
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {listings.map(l => <ListingCard key={l.id} listing={l} />)}
         </div>
       )}
     </div>
-  )
+  );
 }
