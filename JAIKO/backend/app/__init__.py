@@ -4,14 +4,11 @@ from .config import config_map
 from .extensions import db, migrate, socketio, jwt, cors
 
 
-def create_app(env: str = None) -> Flask:
+def create_app(env: str | None = None) -> Flask:
     env = env or os.environ.get("FLASK_ENV", "development")
     app = Flask(__name__)
     app.config.from_object(config_map[env])
 
-    # En desarrollo aceptamos todos los orígenes para facilitar pruebas
-    # desde distintos dispositivos en la red local.
-    # En producción cambiar "*" por la URL real del frontend.
     allowed_origins = "*" if env == "development" else app.config["FRONTEND_URL"]
 
     db.init_app(app)
@@ -25,10 +22,13 @@ def create_app(env: str = None) -> Flask:
     socketio.init_app(
         app,
         cors_allowed_origins=allowed_origins,
-        async_mode="threading",
-        logger=False,
-        engineio_logger=False,
+        async_mode='eventlet'
     )
+
+    @app.after_request
+    def add_security_headers(response):
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+        return response
 
     from .routes.auth_routes import auth_bp
     from .routes.profile_routes import profile_bp

@@ -10,33 +10,46 @@ from ..models import User, Profile
 
 auth_bp = Blueprint("auth", __name__)
 
-# --- Bloque de Seguridad reCAPTCHA — Agregado por Aaron Barrios (@aaronbarriospy) ---
-# No vamos a dejar que ningún bot nos ensucie la base de datos de JaikO! lpm
 def validar_captcha(token):
-    secret_key = os.getenv('RECAPTCHA_SECRET_KEY')
+    api_key = os.getenv('AIzaSyDQ3MhacAZ8rpAldrtTxhSsK9KbM9jo5DA')  # Tu API Key (AIza...)
+    project_id = "jaiko-490414"
+    site_key = "6LeFE54sAAAAANoCNMtlX1CWET8BuIg6zcy4XE-8"
+    
     if not token:
         return False
+        
     try:
-        verify_response = requests.post(
-            'https://www.google.com/recaptcha/api/siteverify',
-            data={'secret': secret_key, 'response': token}
-        )
-        return verify_response.json().get('success', False)
-    except Exception:
+        # URL FINAL CORREGIDA
+        url = f"https://recaptchaenterprise.googleapis.com{project_id}/assessments?key={api_key}"
+        
+        payload = {
+            "event": {
+                "token": token,
+                "siteKey": site_key,
+                "expectedAction": "register"
+            }
+        }
+        
+        response = requests.post(url, json=payload, timeout=5)
+        result = response.json()
+        
+        print(f"DEBUG RECAPTCHA RESPONSE: {result}")
+        
+        if result.get('tokenProperties', {}).get('valid'):
+            score = result.get('riskAnalysis', {}).get('score', 0)
+            return score >= 0.3 
         return False
-# ----------------------------------------------------------------------------------
+    except Exception as e:
+        print(f"Error en validación reCAPTCHA: {e}")
+        return False
 
-# --- REGISTRO TRADICIONAL ---
 @auth_bp.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
-
-    # ── VALIDACIÓN DE SEGURIDAD JAIKO — Aaron Barrios ──
-    # Verificamos el captcha que viene del frontend antes de mover un solo dedo
     captcha_token = data.get('captcha_token')
+
     if not validar_captcha(captcha_token):
-        return jsonify({"error": "Validación de seguridad fallida. ¡Confirmá que no sos un bot!"}), 400
-    # ───────────────────────────────────────────────────
+        return jsonify({"error": "Validación de seguridad fallida. Reintentá."}), 400
 
     if not data or not data.get("email") or not data.get("password"):
         return jsonify({"error": "Email y contraseña requeridos"}), 400
@@ -67,7 +80,6 @@ def register():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# --- LOGIN TRADICIONAL ---
 @auth_bp.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
@@ -82,14 +94,12 @@ def login():
 
         access_token = create_access_token(identity=str(user.id))
         return jsonify({
-            "access_token": access_token,           # ← consistente con Google login
+            "access_token": access_token,
             "user": user.to_dict(),
             "profile": user.profile.to_dict() if user.profile else None
         }), 200
-
     return jsonify({"error": "Credenciales inválidas"}), 401
 
-# --- LOGIN CON GOOGLE ---
 @auth_bp.route("/google", methods=["POST"])
 def google_login():
     data = request.get_json()
@@ -100,11 +110,7 @@ def google_login():
 
     try:
         client_id = current_app.config["GOOGLE_CLIENT_ID"]
-        id_info = id_token.verify_oauth2_token(
-            token,
-            google_requests.Request(),
-            client_id
-        )
+        id_info = id_token.verify_oauth2_token(token, google_requests.Request(), client_id)
     except Exception as e:
         return jsonify({"error": f"Token inválido: {str(e)}"}), 401
 
@@ -139,7 +145,6 @@ def google_login():
         "is_new_user": is_new_user
     }), 200
 
-# --- OBTENER MI PERFIL ---
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_me():

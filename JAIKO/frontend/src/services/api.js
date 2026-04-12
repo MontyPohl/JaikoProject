@@ -1,24 +1,37 @@
 import axios from 'axios'
 
+// 1. Detectamos la URL base según el entorno
+// En Railway (Producción), usamos la variable VITE_API_URL que configuramos.
+// En Local (Desarrollo), usamos '/api' para que funcione el proxy de vite.config.js.
+const isProduction = import.meta.env.PROD;
+const BASE_URL = isProduction
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Adjuntar JWT automáticamente
+// 2. Adjuntar JWT automáticamente en cada petición
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('jaiko_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })
 
-// Manejar 401 globalmente
+// 3. Manejar errores 401 (Sesión expirada) globalmente
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem('jaiko_token')
-      window.location.href = '/login'
+      // Solo redirigir si no estamos ya en la página de login
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(err)
   }
@@ -26,11 +39,8 @@ api.interceptors.response.use(
 
 /**
  * Trae roomies compatibles para el mapa.
- * FIX: verifica token antes de llamar (evita redirect 401 en páginas públicas).
- * FIX: filtra perfiles sin coordenadas válidas.
  */
 export async function getRoomies(city = 'Asunción') {
-  // FIX: no llamar al endpoint protegido si no hay token
   const token = localStorage.getItem('jaiko_token')
   if (!token) return []
 
@@ -40,7 +50,6 @@ export async function getRoomies(city = 'Asunción') {
     })
 
     return (response.data.profiles || [])
-      // FIX: filtrar perfiles sin coordenadas válidas antes de devolverlos
       .filter(
         (r) =>
           r.lat != null &&

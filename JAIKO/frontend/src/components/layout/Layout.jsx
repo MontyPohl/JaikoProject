@@ -1,194 +1,209 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Home, Search, Building2, Users, MessageCircle, Bell, ShieldCheck, LogOut, Menu, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom'; // IMPORTAMOS Outlet
+import { 
+  Home, 
+  Search, 
+  Users, 
+  Bell, 
+  User, 
+  LogOut, 
+  Menu, 
+  X,
+  ShieldCheck
+} from 'lucide-react';
 import useAuthStore from '../../context/authStore';
 import useNotifStore from '../../context/notifStore';
+import { Avatar } from '../ui';
 import clsx from 'clsx';
-import logo from '../../assets/logo.png';
-import api from '../../services/api';
 
-const NAV = [
-  { to: '/', label: 'Inicio', icon: Home },
-  { to: '/search', label: 'Buscar roomies', icon: Search, auth: true },
-  { to: '/listings', label: 'Departamentos', icon: Building2 },
-  { to: '/groups', label: 'Grupos', icon: Users, auth: true },
-  { to: '/chat', label: 'Chat', icon: MessageCircle, auth: true },
-];
-
-export default function Layout() {
-  const { profile, logout, isAuthenticated, isAdmin } = useAuthStore();
+const Navbar = () => {
+  const { isAuthenticated, user, profile, logout } = useAuthStore(); // Agregamos logout
   const { unread } = useNotifStore();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [userGroupId, setUserGroupId] = useState(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const fetchUserGroup = async () => {
-    if (isAuthenticated()) {
-      try {
-        const res = await api.get('/groups/my');
-        const group = res.data.groups?.[0];
-        setUserGroupId(group ? group.id : null);
-      } catch (err) {
-        setUserGroupId(null);
-      }
-    }
-  };
-
-  // CORRECCIÓN: se ejecuta solo una vez al montar el Layout.
-  // Antes tenía [isAuthenticated, profile] como dependencias, lo que causaba
-  // que se disparara un GET /groups/my en CADA navegación porque profile
-  // se actualiza cuando fetchMe() corre en App.jsx.
   useEffect(() => {
-    fetchUserGroup();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const navLinks = [
+    { to: '/', label: 'Inicio', icon: Home },
+    ...(isAuthenticated() ? [
+      { to: '/listings', label: 'Departamentos', icon: Search },
+      { to: '/groups', label: 'Grupos', icon: Users },
+    ] : []),
+  ];
+
+  const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="min-h-screen flex flex-col font-main">
-      {/* ── Navbar ── */}
-      <nav className="sticky top-0 z-50 bg-[#2563C8]/90 backdrop-blur-md shadow-xl">
-        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16 relative">
-          {/* Logo principal */}
-          <div className="flex-shrink-0">
-            <img src={logo} alt="JAIKO!" className="h-16 w-auto" />
+    <nav className={clsx(
+      'fixed top-0 left-0 w-full z-50 transition-all duration-300 px-6 py-4',
+      isScrolled ? 'bg-white/80 backdrop-blur-lg border-b border-slate-100 py-3' : 'bg-transparent'
+    )}>
+      <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2 group">
+          <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20 group-hover:scale-110 transition-transform">
+            <ShieldCheck className="text-white w-6 h-6" />
           </div>
+          <span className="text-2xl font-display font-extrabold tracking-tighter text-slate-900">
+            JAIK<span className="text-blue-600">O!</span>
+          </span>
+        </Link>
 
-          {/* Links desktop */}
-          <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 gap-8">
-            {NAV.filter(n => !n.auth || isAuthenticated()).map(({ to, label, icon: Icon }) => {
-              const targetTo = to === '/groups' && userGroupId ? `/groups/${userGroupId}` : to;
-              return (
-                <NavLink
-                  key={to}
-                  to={targetTo}
-                  end={to === '/'}
-                  className={({ isActive }) =>
-                    clsx(
-                      'flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-white transition-all duration-300',
-                      isActive
-                        ? 'bg-[#FBBF24] text-[#2563C8] shadow-md'
-                        : 'hover:bg-white/20 hover:text-[#FBBF24] hover:scale-105'
-                    )
-                  }
-                >
-                  <Icon size={16} /> {label}
-                </NavLink>
-              );
-            })}
-          </div>
-
-          {/* Right side: avatar y notificaciones */}
-          <div className="ml-auto flex items-center gap-3">
-            {!isAuthenticated() && (
-              <>
-                <NavLink
-                  to="/login"
-                  className="px-4 py-2 rounded-lg font-semibold text-white border-2 border-white hover:bg-white hover:text-[#2563C8] transition-all duration-300"
-                >
-                  Ingresar
-                </NavLink>
-                <NavLink
-                  to="/register"
-                  className="px-4 py-2 rounded-lg font-semibold bg-[#FBBF24] text-[#2563C8] hover:bg-yellow-300 transition-all duration-300 shadow-md"
-                >
-                  Registrarse
-                </NavLink>
-              </>
-            )}
-            {isAuthenticated() && (
-              <>
-                <NavLink
-                  to="/notifications"
-                  className="relative p-2 rounded-lg hover:bg-white/20 transition duration-300 hover:scale-110"
-                >
-                  <Bell size={22} />
-                  {unread > 0 && (
-                    <span className="absolute top-0 right-0 w-5 h-5 bg-[#FBBF24] text-[#2563C8] text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
-                      {unread > 9 ? '9+' : unread}
-                    </span>
-                  )}
-                </NavLink>
-
-                {isAdmin() && (
-                  <NavLink to="/admin" className="p-2 rounded-lg hover:bg-white/20 transition duration-300 hover:scale-110">
-                    <ShieldCheck size={22} />
-                  </NavLink>
-                )}
-
-                <NavLink to="/profile" className="flex items-center gap-2 pl-2 hover:scale-105 transition duration-300">
-                  {profile?.profile_photo_url ? (
-                    <img
-                      src={profile.profile_photo_url}
-                      alt={profile.name}
-                      className="w-10 h-10 rounded-full object-cover border-2 border-[#FBBF24]"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-[#FBBF24] flex items-center justify-center font-bold text-sm text-[#2563C8]">
-                      {profile?.name?.[0]?.toUpperCase() || '?'}
-                    </div>
-                  )}
-                  <span className="hidden md:block text-sm font-semibold text-white">
-                    {profile?.name?.split(' ')[0]}
-                  </span>
-                </NavLink>
-
-                <button
-                  onClick={handleLogout}
-                  className="p-2 rounded-lg hover:bg-white/20 transition duration-300 hover:scale-110"
-                  title="Cerrar sesión"
-                >
-                  <LogOut size={18} />
-                </button>
-              </>
-            )}
-
-            {/* Mobile menu toggle */}
-            <button
-              className="md:hidden p-2 rounded-lg hover:bg-white/20 text-white transition duration-300 hover:scale-110"
-              onClick={() => setMobileOpen(o => !o)}
+        {/* Desktop Nav */}
+        <div className="hidden md:flex items-center gap-8">
+          {navLinks.map((link) => (
+            <Link 
+              key={link.to} 
+              to={link.to} 
+              className={clsx(
+                'text-sm font-bold transition-colors hover:text-orange-500',
+                isActive(link.to) ? 'text-orange-500' : 'text-slate-600'
+              )}
             >
-              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-          </div>
+              {link.label}
+            </Link>
+          ))}
         </div>
 
-        {/* Mobile menu */}
-        {mobileOpen && (
-          <div className="md:hidden bg-[#2563C8]/95 px-4 pb-4 flex flex-col gap-2 animate-fade-in rounded-b-lg shadow-lg">
-            {NAV.filter(n => !n.auth || isAuthenticated()).map(({ to, label, icon: Icon }) => {
-              const targetTo = to === '/groups' && userGroupId ? `/groups/${userGroupId}` : to;
-              return (
-                <NavLink
-                  key={to}
-                  to={targetTo}
-                  end={to === '/'}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    clsx(
-                      'flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition duration-300',
-                      isActive ? 'bg-[#FBBF24] text-[#2563C8] shadow-md' : 'text-white hover:bg-white/20 hover:scale-105'
-                    )
-                  }
-                >
-                  <Icon size={16} /> {label}
-                </NavLink>
-              )
-            })}
-          </div>
-        )}
-      </nav>
+        <div className="hidden md:flex items-center gap-4">
+          {isAuthenticated() ? (
+            <>
+              <Link to="/notifications" className="relative p-2 text-slate-400 hover:text-orange-500 transition-colors">
+                <Bell size={20} />
+                {unread > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full border-2 border-white" />
+                )}
+              </Link>
+              <Link to="/profile" className="flex items-center gap-3 pl-4 border-l border-slate-100">
+                <div className="text-right">
+                  <p className="text-xs font-bold text-slate-900">{profile?.name || user?.email}</p>
+                  <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Mi Perfil</p>
+                </div>
+                <Avatar src={profile?.profile_photo_url} name={profile?.name} size="sm" />
+              </Link>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link to="/login" className="px-6 py-2.5 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">
+                Ingresar
+              </Link>
+              <Link to="/register" className="btn-primary py-2.5 text-sm">
+                Registrarse
+              </Link>
+            </div>
+          )}
+        </div>
 
-      <main className="flex-1">
-        <Outlet />
+        {/* Mobile Toggle */}
+        <button 
+          className="md:hidden p-2 text-slate-600"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          {isOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
+
+      {/* Mobile Menu */}
+      <div className={clsx(
+        'fixed inset-0 top-[72px] bg-white z-40 transition-transform duration-500 md:hidden p-8',
+        isOpen ? 'translate-x-0' : 'translate-x-full'
+      )}>
+        <div className="flex flex-col gap-6">
+          {navLinks.map((link) => (
+            <Link 
+              key={link.to} 
+              to={link.to} 
+              onClick={() => setIsOpen(false)}
+              className={clsx(
+                'text-2xl font-display font-extrabold flex items-center gap-4',
+                isActive(link.to) ? 'text-orange-500' : 'text-slate-900'
+              )}
+            >
+              <link.icon className="w-6 h-6" />
+              {link.label}
+            </Link>
+          ))}
+          <hr className="border-slate-100 my-4" />
+          {isAuthenticated() ? (
+            <>
+              <Link to="/profile" onClick={() => setIsOpen(false)} className="flex items-center gap-4 text-2xl font-display font-extrabold text-slate-900">
+                <User className="w-6 h-6" /> Mi Perfil
+              </Link>
+              <Link to="/notifications" onClick={() => setIsOpen(false)} className="flex items-center gap-4 text-2xl font-display font-extrabold text-slate-900">
+                <Bell className="w-6 h-6" /> Notificaciones
+              </Link>
+              <button 
+                onClick={() => { logout(); setIsOpen(false); }}
+                className="flex items-center gap-4 text-2xl font-display font-extrabold text-red-500 mt-4"
+              >
+                <LogOut className="w-6 h-6" /> Salir
+              </button>
+            </>
+          ) : (
+            <div className="flex flex-col gap-4 pt-4">
+              <Link to="/login" onClick={() => setIsOpen(false)} className="btn-secondary text-center">Ingresar</Link>
+              <Link to="/register" onClick={() => setIsOpen(false)} className="btn-primary text-center">Registrarse</Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+const Layout = () => {
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <main className="flex-1 pt-20">
+        {/* CORRECCIÓN CLAVE: Outlet renderiza la página actual (Home, Listings, etc.) */}
+        <Outlet /> 
       </main>
-
-      <footer className="bg-[#2563C8] text-white text-center py-5 text-sm font-body">
-        <span className="font-alt font-bold text-[#FBBF24]">JAIKO!</span> – Encontrá tu roomie ideal en Paraguay · {new Date().getFullYear()}
+      <footer className="bg-slate-900 text-white py-20 px-6">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
+          <div className="md:col-span-2">
+            <Link to="/" className="flex items-center gap-2 mb-6">
+              <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+                <ShieldCheck className="text-white w-6 h-6" />
+              </div>
+              <span className="text-2xl font-display font-extrabold tracking-tighter text-white">
+                JAIK<span className="text-blue-500">O!</span>
+              </span>
+            </Link>
+            <p className="text-slate-400 max-w-sm leading-relaxed">
+              La plataforma líder en Paraguay para encontrar el compañero de hogar ideal. Seguridad, rapidez y compatibilidad en un solo lugar.
+            </p>
+          </div>
+          <div>
+            <h4 className="font-bold mb-6 text-lg">Plataforma</h4>
+            <ul className="space-y-4 text-slate-400 text-sm">
+              <li><Link to="/listings" className="hover:text-white transition-colors">Departamentos</Link></li>
+              <li><Link to="/groups" className="hover:text-white transition-colors">Grupos</Link></li>
+              <li><Link to="/search" className="hover:text-white transition-colors">Buscar Roomies</Link></li>
+              <li><Link to="/verification" className="hover:text-white transition-colors">Verificación</Link></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-bold mb-6 text-lg">Legal</h4>
+            <ul className="space-y-4 text-slate-400 text-sm">
+              <li><a href="#" className="hover:text-white transition-colors">Términos y Condiciones</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Privacidad</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Cookies</a></li>
+            </ul>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto border-t border-white/10 mt-20 pt-8 text-center text-slate-500 text-xs font-bold uppercase tracking-widest">
+          © {new Date().getFullYear()} JAIKO! — Todos los derechos reservados.
+        </div>
       </footer>
     </div>
   );
-}
+};
+
+export default Layout;

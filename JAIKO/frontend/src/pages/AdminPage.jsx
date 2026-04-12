@@ -20,15 +20,11 @@ export default function AdminPage() {
   const [verifications, setVerifications] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Modal selfie
+  // Modales y Estados de UI
   const [selfieModal, setSelfieModal] = useState(null)   // { url, userName, vr }
   const [loadingSelfie, setLoadingSelfie] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
-
-  // Modal advertencia inline en reportes
   const [warnModal, setWarnModal] = useState(null)       // { id, note }
-
-  // Búsqueda de usuarios
   const [userSearch, setUserSearch] = useState('')
 
   useEffect(() => {
@@ -142,28 +138,28 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
 
       {/* HEADER */}
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 rounded-xl bg-brand-dark flex items-center justify-center">
-          <ShieldX size={20} className="text-primary-400" />
+      <div className="flex items-center gap-3 mb-6 sm:mb-8">
+        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-brand-dark flex items-center justify-center flex-shrink-0">
+          <ShieldX size={18} className="text-primary-400" />
         </div>
         <div>
-          <h1 className="font-display font-extrabold text-3xl">Panel de Administración</h1>
+          <h1 className="font-display font-extrabold text-xl sm:text-3xl">Panel de Administración</h1>
           <p className="text-orange-400 text-sm">Gestión de JAIKO!</p>
         </div>
       </div>
 
-      {/* TABS */}
-      <div className="flex gap-2 mb-6 border-b border-orange-100 pb-0">
+      {/* TABS - scrollable on mobile */}
+      <div className="flex gap-1 sm:gap-2 mb-6 border-b border-orange-100 overflow-x-auto pb-0 -mx-3 px-3 sm:mx-0 sm:px-0">
         {TABS.map((t, i) => (
           <button
             key={t}
             onClick={() => setTab(i)}
-            className={`relative px-4 py-2.5 font-semibold text-sm rounded-t-xl transition-all
+            className={`relative flex-shrink-0 px-3 sm:px-4 py-2 sm:py-2.5 font-semibold text-xs sm:text-sm rounded-t-xl transition-all whitespace-nowrap
               ${tab === i
-                ? 'bg-blue-500 text-white border border-orange-400 border-[1px]'
+                ? 'bg-blue-500 text-white border border-orange-400'
                 : 'text-orange-400 border border-transparent hover:text-primary-500'}`}
           >
             {t}
@@ -176,132 +172,97 @@ export default function AdminPage() {
         ))}
       </div>
 
-      {/* ── ESTADÍSTICAS ────────────────────────────────────────────────── */}
+      {/* ── ESTADÍSTICAS ─────────────────────────────────────────────────── */}
       {tab === 0 && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Usuarios */}
-            <div className="card p-5 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Usuarios</span>
-                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                  <UsersRound size={16} className="text-blue-500" />
+        <div className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            {[
+              {
+                label: 'Usuarios', icon: UsersRound, color: 'text-blue-500', bg: 'bg-blue-50',
+                value: stats?.users?.total ?? 0,
+                rows: [
+                  { icon: CheckCheck, color: 'text-green-600', label: 'Activos', val: stats?.users?.active ?? 0 },
+                  { icon: Ban, color: 'text-red-500', label: 'Bloqueados', val: stats?.users?.blocked ?? 0 },
+                ]
+              },
+              {
+                label: 'Listings', icon: Home, color: 'text-orange-500', bg: 'bg-orange-50',
+                value: stats?.listings?.total ?? 0,
+                rows: [
+                  { icon: CheckCheck, color: 'text-green-600', label: 'Activos', val: stats?.listings?.active ?? 0 },
+                  { icon: TrendingUp, color: 'text-blue-600', label: 'Ingresos', val: `₲ ${((stats?.listings?.total_income ?? 0) / 1_000_000).toFixed(1)}M` },
+                ]
+              },
+              {
+                label: 'Grupos', icon: Users, color: 'text-purple-500', bg: 'bg-purple-50',
+                value: stats?.groups?.total ?? 0,
+                rows: [
+                  { icon: CheckCheck, color: 'text-green-600', label: 'Abiertos', val: stats?.groups?.open ?? 0 },
+                  { icon: XCircle, color: 'text-gray-400', label: 'Cerrados', val: (stats?.groups?.total ?? 0) - (stats?.groups?.open ?? 0) },
+                ]
+              },
+              {
+                label: 'Reportes', icon: FileWarning, color: 'text-red-500', bg: 'bg-red-50',
+                value: stats?.reports?.total ?? 0,
+                rows: [
+                  { icon: AlertCircle, color: 'text-red-500', label: 'Abiertos', val: stats?.reports?.open ?? 0 },
+                  { icon: CheckCheck, color: 'text-green-600', label: 'Revisados', val: stats?.reports?.reviewed ?? 0 },
+                ]
+              },
+            ].map(({ label, icon: Icon, color, bg, value, rows }) => (
+              <div key={label} className="card p-4 sm:p-5 flex flex-col gap-2 sm:gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</span>
+                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg ${bg} flex items-center justify-center`}>
+                    <Icon size={14} className={color} />
+                  </div>
+                </div>
+                <p className="text-2xl sm:text-3xl font-extrabold text-gray-800">{value}</p>
+                <div className="flex flex-col gap-1 text-xs">
+                  {rows.map(({ icon: RowIcon, color: rc, label: rl, val }) => (
+                    <div key={rl} className="flex items-center justify-between">
+                      <span className={`flex items-center gap-1 ${rc}`}><RowIcon size={11} />{rl}</span>
+                      <span className="font-semibold">{val}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <p className="text-3xl font-extrabold text-gray-800">{stats?.users?.total ?? 0}</p>
-              <div className="flex flex-col gap-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-green-600"><CheckCheck size={12} />Activos</span>
-                  <span className="font-semibold">{stats?.users?.active ?? 0}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-red-500"><Ban size={12} />Bloqueados</span>
-                  <span className="font-semibold">{stats?.users?.blocked ?? 0}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Listings */}
-            <div className="card p-5 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Listings</span>
-                <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
-                  <Home size={16} className="text-orange-500" />
-                </div>
-              </div>
-              <p className="text-3xl font-extrabold text-gray-800">{stats?.listings?.total ?? 0}</p>
-              <div className="flex flex-col gap-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-green-600"><CheckCheck size={12} />Activos</span>
-                  <span className="font-semibold">{stats?.listings?.active ?? 0}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-blue-600"><TrendingUp size={12} />Ingresos</span>
-                  <span className="font-semibold">
-                    ₲ {((stats?.listings?.total_income ?? 0) / 1_000_000).toFixed(1)}M
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Grupos */}
-            <div className="card p-5 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Grupos</span>
-                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
-                  <Users size={16} className="text-purple-500" />
-                </div>
-              </div>
-              <p className="text-3xl font-extrabold text-gray-800">{stats?.groups?.total ?? 0}</p>
-              <div className="flex flex-col gap-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-green-600"><CheckCheck size={12} />Abiertos</span>
-                  <span className="font-semibold">{stats?.groups?.open ?? 0}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-gray-400"><XCircle size={12} />Cerrados</span>
-                  <span className="font-semibold">
-                    {(stats?.groups?.total ?? 0) - (stats?.groups?.open ?? 0)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Reportes */}
-            <div className="card p-5 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Reportes</span>
-                <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
-                  <FileWarning size={16} className="text-red-500" />
-                </div>
-              </div>
-              <p className="text-3xl font-extrabold text-gray-800">{stats?.reports?.total ?? 0}</p>
-              <div className="flex flex-col gap-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-red-500"><AlertCircle size={12} />Abiertos</span>
-                  <span className="font-semibold">{stats?.reports?.open ?? 0}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-green-600"><CheckCheck size={12} />Revisados</span>
-                  <span className="font-semibold">{stats?.reports?.reviewed ?? 0}</span>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* Resumen rápido */}
-          <div className="card p-5">
-            <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wide mb-4">Resumen de actividad</h2>
+          {/* Actividad resumida */}
+          <div className="card p-4 sm:p-5">
+            <h2 className="font-bold text-sm text-gray-500 uppercase tracking-wide mb-3 sm:mb-4">Resumen de actividad</h2>
             <div className="grid grid-cols-3 divide-x divide-orange-100 text-center">
-              <div className="px-4">
-                <p className="text-2xl font-extrabold text-blue-500">{stats?.users?.active ?? 0}</p>
-                <p className="text-xs text-gray-400 mt-1">Usuarios activos</p>
+              <div className="px-2 sm:px-4">
+                <p className="text-xl sm:text-2xl font-extrabold text-blue-500">{stats?.users?.active ?? 0}</p>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-1">Usuarios activos</p>
               </div>
-              <div className="px-4">
-                <p className="text-2xl font-extrabold text-orange-500">{stats?.listings?.active ?? 0}</p>
-                <p className="text-xs text-gray-400 mt-1">Listings publicados</p>
+              <div className="px-2 sm:px-4">
+                <p className="text-xl sm:text-2xl font-extrabold text-orange-500">{stats?.listings?.active ?? 0}</p>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-1">Listings publicados</p>
               </div>
-              <div className="px-4">
-                <p className="text-2xl font-extrabold text-red-500">{stats?.reports?.open ?? 0}</p>
-                <p className="text-xs text-gray-400 mt-1">Reportes pendientes</p>
+              <div className="px-2 sm:px-4">
+                <p className="text-xl sm:text-2xl font-extrabold text-red-500">{stats?.reports?.open ?? 0}</p>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-1">Reportes pendientes</p>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── REPORTES ────────────────────────────────────────────────────── */}
+      {/* ── REPORTES ─────────────────────────────────────────────────────── */}
       {tab === 1 && (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {(!reports || reports.length === 0) ? (
-            <div className="card text-center py-16">
-              <FileWarning size={48} className="text-orange-400 mx-auto mb-3" />
-              <p className="font-display font-bold text-lg text-orange-600">De momento no hay reportes</p>
+            <div className="card text-center py-12 sm:py-16">
+              <FileWarning size={40} className="text-orange-400 mx-auto mb-3" />
+              <p className="font-display font-bold text-base sm:text-lg text-orange-600">De momento no hay reportes</p>
               <p className="text-gray-400 text-sm mt-1">Los reportes aparecerán aquí cuando se generen.</p>
             </div>
           ) : (
             reports.map(r => (
-              <div key={r.id} className="card p-4 border border-orange-100 rounded-xl space-y-3">
+              <div key={r.id} className="card p-3 sm:p-4 border border-orange-100 rounded-xl space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-bold text-sm">Reporte #{r?.id}</p>
@@ -309,7 +270,7 @@ export default function AdminPage() {
                       Motivo: <span className="text-gray-600 font-medium">{r?.reason ?? 'Sin motivo'}</span>
                     </p>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide flex-shrink-0
                     ${r?.status === 'open' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
                     {r?.status ?? 'desconocido'}
                   </span>
@@ -319,7 +280,7 @@ export default function AdminPage() {
                   <p className="text-sm text-gray-500 bg-gray-50 rounded-lg px-3 py-2">{r.description}</p>
                 )}
 
-                <div className="flex flex-wrap gap-3 text-xs text-gray-400">
+                <div className="flex flex-wrap gap-2 sm:gap-3 text-xs text-gray-400">
                   {r?.reported_user_id && (
                     <span className="flex items-center gap-1">
                       <Users size={11} /> Usuario reportado: <strong className="text-gray-600">#{r.reported_user_id}</strong>
@@ -337,25 +298,22 @@ export default function AdminPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 pt-1 border-t border-orange-50">
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-orange-50">
                   {r?.reported_user_id && (
-                    <button
-                      onClick={() => handleReport(r.id, 'block', 'reviewed')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors">
-                      <Ban size={13} /> Bloquear usuario
+                    <button onClick={() => handleReport(r.id, 'block', 'reviewed')}
+                      className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors">
+                      <Ban size={12} /> Bloquear usuario
                     </button>
                   )}
                   {r?.reported_user_id && (
-                    <button
-                      onClick={() => setWarnModal(warnModal?.id === r.id ? null : { id: r.id, note: '' })}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-50 text-yellow-700 text-xs font-semibold hover:bg-yellow-100 transition-colors">
-                      <AlertTriangle size={13} /> Advertir
+                    <button onClick={() => setWarnModal(warnModal?.id === r.id ? null : { id: r.id, note: '' })}
+                      className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-yellow-50 text-yellow-700 text-xs font-semibold hover:bg-yellow-100 transition-colors">
+                      <AlertTriangle size={12} /> Advertir
                     </button>
                   )}
-                  <button
-                    onClick={() => handleReport(r.id, 'dismiss', 'reviewed')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-500 text-xs font-semibold hover:bg-gray-200 transition-colors ml-auto">
-                    <XCircle size={13} /> Descartar
+                  <button onClick={() => handleReport(r.id, 'dismiss', 'reviewed')}
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-gray-100 text-gray-500 text-xs font-semibold hover:bg-gray-200 transition-colors ml-auto">
+                    <XCircle size={12} /> Descartar
                   </button>
                 </div>
 
@@ -363,20 +321,17 @@ export default function AdminPage() {
                   <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 space-y-2">
                     <p className="text-xs font-semibold text-yellow-700">Nota de advertencia para el usuario:</p>
                     <textarea
-                      rows={2}
-                      placeholder="Describe la razón de la advertencia..."
+                      rows={2} placeholder="Describe la razón de la advertencia..."
                       value={warnModal.note}
                       onChange={e => setWarnModal(w => ({ ...w, note: e.target.value }))}
                       className="w-full text-xs rounded-lg border border-yellow-300 bg-white px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-yellow-400"
                     />
                     <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => setWarnModal(null)}
+                      <button onClick={() => setWarnModal(null)}
                         className="px-3 py-1.5 text-xs rounded-lg bg-white border border-gray-200 text-gray-500 hover:bg-gray-50">
                         Cancelar
                       </button>
-                      <button
-                        onClick={() => { handleReport(r.id, 'warn', 'reviewed', warnModal.note); setWarnModal(null) }}
+                      <button onClick={() => { handleReport(r.id, 'warn', 'reviewed', warnModal.note); setWarnModal(null) }}
                         className="px-3 py-1.5 text-xs rounded-lg bg-yellow-500 text-white font-semibold hover:bg-yellow-600">
                         Enviar advertencia
                       </button>
@@ -389,24 +344,20 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── USUARIOS ────────────────────────────────────────────────────── */}
+      {/* ── USUARIOS ─────────────────────────────────────────────────────── */}
       {tab === 2 && (
-        <div className="space-y-4">
-          {/* Buscador */}
+        <div className="space-y-3 sm:space-y-4">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
-              type="text"
-              value={userSearch}
+              type="text" value={userSearch}
               onChange={e => setUserSearch(e.target.value)}
               placeholder="Buscar por nombre, email o ID..."
               className="input pl-9 pr-9 w-full"
             />
             {userSearch && (
-              <button
-                onClick={() => setUserSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={() => setUserSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <X size={14} />
               </button>
             )}
@@ -417,8 +368,8 @@ export default function AdminPage() {
           </div>
 
           {filteredUsers.length === 0 ? (
-            <div className="card text-center py-16">
-              <Users size={48} className="text-orange-200 mx-auto mb-3" />
+            <div className="card text-center py-12">
+              <Users size={40} className="text-orange-200 mx-auto mb-3" />
               <p className="font-display font-bold text-lg text-orange-400">Sin usuarios</p>
               <p className="text-gray-400 text-sm mt-1">
                 {userSearch ? 'No hay resultados para esa búsqueda.' : 'No hay usuarios registrados aún.'}
@@ -426,101 +377,90 @@ export default function AdminPage() {
             </div>
           ) : (
             <div className="card overflow-hidden p-0">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-orange-100 bg-orange-50/60">
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Usuario</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide hidden md:table-cell">Rol</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Estado</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Registro</th>
-                    <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-orange-50">
-                  {filteredUsers.map(u => (
-                    <tr key={u.id} className="hover:bg-orange-50/40 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          {/* Avatar fallback */}
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-200 to-primary-200 flex items-center justify-center flex-shrink-0 text-xs font-bold text-primary-700">
-                            {(u.name || u.email || '?')[0].toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold truncate max-w-[140px]">
-                              {u.name || <span className="text-gray-400 italic">Sin nombre</span>}
-                            </p>
-                            <p className="text-xs text-gray-400 truncate max-w-[140px]">{u.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">{roleBadge(u.role)}</td>
-                      <td className="px-4 py-3">{statusBadge(u.status)}</td>
-                      <td className="px-4 py-3 text-xs text-gray-400 hidden lg:table-cell">
-                        {u.created_at
-                          ? formatDistanceToNow(new Date(u.created_at), { locale: es, addSuffix: true })
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {u.status !== 'active' && (
-                            <button
-                              onClick={() => handleUserStatus(u.id, 'active')}
-                              title="Activar"
-                              className="p-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                            >
-                              <CheckCircle2 size={14} />
-                            </button>
-                          )}
-                          {u.status !== 'warned' && u.role !== 'admin' && (
-                            <button
-                              onClick={() => handleUserStatus(u.id, 'warned')}
-                              title="Advertir"
-                              className="p-1.5 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
-                            >
-                              <AlertTriangle size={14} />
-                            </button>
-                          )}
-                          {u.status !== 'blocked' && u.role !== 'admin' && (
-                            <button
-                              onClick={() => {
-                                if (window.confirm(`¿Bloquear a ${u.name || u.email}?`)) {
-                                  handleUserStatus(u.id, 'blocked')
-                                }
-                              }}
-                              title="Bloquear"
-                              className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
-                            >
-                              <Ban size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[520px]">
+                  <thead>
+                    <tr className="border-b border-orange-100 bg-orange-50/60">
+                      <th className="text-left px-3 sm:px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Usuario</th>
+                      <th className="text-left px-3 sm:px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide hidden md:table-cell">Rol</th>
+                      <th className="text-left px-3 sm:px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Estado</th>
+                      <th className="text-left px-3 sm:px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Registro</th>
+                      <th className="text-right px-3 sm:px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-orange-50">
+                    {filteredUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-orange-50/40 transition-colors">
+                        <td className="px-3 sm:px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-orange-200 to-primary-200
+                              flex items-center justify-center flex-shrink-0 text-xs font-bold text-primary-700">
+                              {(u.name || u.email || '?')[0].toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold truncate max-w-[100px] sm:max-w-[140px] text-xs sm:text-sm">
+                                {u.name || <span className="text-gray-400 italic">Sin nombre</span>}
+                              </p>
+                              <p className="text-xs text-gray-400 truncate max-w-[100px] sm:max-w-[140px]">{u.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 hidden md:table-cell">{roleBadge(u.role)}</td>
+                        <td className="px-3 sm:px-4 py-3">{statusBadge(u.status)}</td>
+                        <td className="px-3 sm:px-4 py-3 text-xs text-gray-400 hidden lg:table-cell">
+                          {u.created_at
+                            ? formatDistanceToNow(new Date(u.created_at), { locale: es, addSuffix: true })
+                            : '—'}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            {u.status !== 'active' && (
+                              <button onClick={() => handleUserStatus(u.id, 'active')} title="Activar"
+                                className="p-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
+                                <CheckCircle2 size={13} />
+                              </button>
+                            )}
+                            {u.status !== 'warned' && u.role !== 'admin' && (
+                              <button onClick={() => handleUserStatus(u.id, 'warned')} title="Advertir"
+                                className="p-1.5 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors">
+                                <AlertTriangle size={13} />
+                              </button>
+                            )}
+                            {u.status !== 'blocked' && u.role !== 'admin' && (
+                              <button
+                                onClick={() => { if (window.confirm(`¿Bloquear a ${u.name || u.email}?`)) handleUserStatus(u.id, 'blocked') }}
+                                title="Bloquear"
+                                className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                                <Ban size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ── VERIFICACIONES ──────────────────────────────────────────────── */}
+      {/* ── VERIFICACIONES ───────────────────────────────────────────────── */}
       {tab === 3 && (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {(!verifications || verifications.length === 0) ? (
-            <div className="card text-center py-16">
-              <ShieldCheck size={48} className="text-emerald-300 mx-auto mb-3" />
+            <div className="card text-center py-12 sm:py-16">
+              <ShieldCheck size={40} className="text-emerald-300 mx-auto mb-3" />
               <p className="font-display font-bold text-lg text-emerald-600">Sin verificaciones pendientes</p>
               <p className="text-gray-400 text-sm mt-1">Cuando alguien suba una selfie aparecerá aquí.</p>
             </div>
           ) : (
             verifications.map(vr => (
-              <div key={vr.id} className="card p-4 border border-orange-100 rounded-xl space-y-3">
+              <div key={vr.id} className="card p-3 sm:p-4 border border-orange-100 rounded-xl space-y-3">
                 <div className="flex items-start justify-between gap-2 flex-wrap">
                   <div>
-                    <p className="font-bold text-sm">
-                      {vr.user_name || `Usuario #${vr.user_id}`}
-                    </p>
+                    <p className="font-bold text-sm">{vr.user_name || `Usuario #${vr.user_id}`}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       Código: <span className="font-mono font-bold text-brand-dark">{vr.verification_code}</span>
                     </p>
@@ -530,41 +470,23 @@ export default function AdminPage() {
                       </p>
                     )}
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide bg-yellow-100 text-yellow-700">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide bg-yellow-100 text-yellow-700 flex-shrink-0">
                     pendiente
                   </span>
                 </div>
-
-                <div className="flex items-center gap-2 pt-1 border-t border-orange-50">
-                  {/* Ver selfie */}
-                  <button
-                    onClick={() => handleVerSelfie(vr)}
-                    disabled={loadingSelfie === vr.id}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-semibold hover:bg-blue-100 transition-colors disabled:opacity-60"
-                  >
-                    {loadingSelfie === vr.id
-                      ? <Loader2 size={13} className="animate-spin" />
-                      : <Eye size={13} />}
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-orange-50">
+                  <button onClick={() => handleVerSelfie(vr)} disabled={loadingSelfie === vr.id}
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-semibold hover:bg-blue-100 transition-colors disabled:opacity-60">
+                    {loadingSelfie === vr.id ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
                     Ver selfie
                   </button>
-
-                  {/* Aprobar directo (sin ver selfie) */}
-                  <button
-                    onClick={() => handleReview(vr.id, 'approve')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-600 text-xs font-semibold hover:bg-green-100 transition-colors"
-                  >
-                    <CheckCircle2 size={13} /> Aprobar
+                  <button onClick={() => handleReview(vr.id, 'approve')}
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-green-50 text-green-600 text-xs font-semibold hover:bg-green-100 transition-colors">
+                    <CheckCircle2 size={12} /> Aprobar verificación
                   </button>
-
-                  {/* Rechazar directo */}
-                  <button
-                    onClick={() => {
-                      const reason = window.prompt('Motivo de rechazo (opcional):') ?? ''
-                      handleReview(vr.id, 'reject', reason)
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-500 text-xs font-semibold hover:bg-red-100 transition-colors ml-auto"
-                  >
-                    <XCircle size={13} /> Rechazar
+                  <button onClick={() => { const reason = window.prompt('Motivo de rechazo (opcional):') ?? ''; handleReview(vr.id, 'reject', reason) }}
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-50 text-red-500 text-xs font-semibold hover:bg-red-100 transition-colors ml-auto">
+                    <XCircle size={12} /> Rechazar
                   </button>
                 </div>
               </div>
@@ -573,80 +495,62 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── MODAL SELFIE ────────────────────────────────────────────────── */}
+      {/* ── MODAL SELFIE ─────────────────────────────────────────────────── */}
       {selfieModal && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={() => setSelfieModal(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4"
+            className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
-            {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-display font-extrabold text-xl">Selfie de verificación</h2>
+                <h2 className="font-display font-extrabold text-lg sm:text-xl">Selfie de verificación</h2>
                 <p className="text-sm text-orange-400">{selfieModal.userName}</p>
               </div>
-              <button
-                onClick={() => setSelfieModal(null)}
-                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors"
-              >
+              <button onClick={() => setSelfieModal(null)}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
                 <X size={18} />
               </button>
             </div>
 
-            {/* Código */}
             <div className="bg-gray-900 rounded-xl px-4 py-2 text-center">
               <p className="text-xs text-gray-400 mb-1">Código esperado</p>
-              <p className="font-mono font-extrabold text-2xl text-primary-400 tracking-widest">
+              <p className="font-mono font-extrabold text-xl sm:text-2xl text-primary-400 tracking-widest">
                 {selfieModal.vr.verification_code}
               </p>
             </div>
 
-            {/* Imagen */}
-            <div className="rounded-xl overflow-hidden border-2 border-orange-100 bg-gray-50 max-h-80">
-              <img
-                src={selfieModal.url}
-                alt="Selfie de verificación"
-                className="w-full h-full object-contain"
-              />
+            <div className="rounded-xl overflow-hidden border-2 border-orange-100 bg-gray-50 max-h-64 sm:max-h-80">
+              <img src={selfieModal.url} alt="Selfie de verificación" className="w-full h-full object-contain" />
             </div>
 
-            {/* Input motivo rechazo */}
             <div>
               <label className="block text-xs font-semibold text-orange-400 uppercase tracking-wide mb-1">
                 Motivo de rechazo (opcional)
               </label>
-              <input
-                type="text"
-                value={rejectReason}
+              <input type="text" value={rejectReason}
                 onChange={e => setRejectReason(e.target.value)}
                 placeholder="Ej: El código no es visible en la imagen"
                 className="input w-full text-sm"
               />
             </div>
 
-            {/* Acciones */}
             <div className="flex gap-3 pt-2 border-t border-orange-100">
-              <button
-                onClick={() => handleReview(selfieModal.vr.id, 'reject', rejectReason)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition-colors border border-red-200"
-              >
+              <button onClick={() => handleReview(selfieModal.vr.id, 'reject', rejectReason)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition-colors border border-red-200">
                 <XCircle size={15} /> Rechazar
               </button>
-              <button
-                onClick={() => handleReview(selfieModal.vr.id, 'approve')}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 transition-colors shadow-sm"
-              >
+              <button onClick={() => handleReview(selfieModal.vr.id, 'approve')}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 transition-colors shadow-sm">
                 <CheckCircle2 size={15} /> Aprobar verificación
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   )
 }

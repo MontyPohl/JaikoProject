@@ -1,157 +1,275 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "react-feather";
-
-import publicidad1 from "../assets/publicidad1.png";
-import publicidad3 from "../assets/publicidad3.png";
-import publicidad4 from "../assets/publicidad4.png";
-
-const isAuthenticated = () => false;
+import { motion, AnimatePresence } from "motion/react";
+import { 
+  ShieldCheck, 
+  Zap, 
+  Users, 
+  Lightbulb, 
+  ArrowRight, 
+  Sparkles, 
+  CheckCircle2,
+  Home as HomeIcon,
+  Search,
+  MessageCircle,
+  ChevronRight
+} from "lucide-react";
 
 const FEATURES = [
-  { icon: "🔒", title: "Seguro", desc: "Todos los perfiles son verificados para tu tranquilidad." },
-  { icon: "⚡", title: "Rápido", desc: "Encuentra tu roomie ideal en minutos con nuestro sistema inteligente." },
-  { icon: "🤝", title: "Confiable", desc: "Conexiones exitosas y perfiles verificados garantizan confianza." },
-  { icon: "💡", title: "Fácil", desc: "Interfaz intuitiva para crear perfil y buscar roommates sin complicaciones." },
+  { 
+    icon: <ShieldCheck className="w-6 h-6" />, 
+    title: "Seguro", 
+    desc: "Todos los perfiles son verificados para tu tranquilidad.",
+    color: "bg-orange-500/10 text-orange-600 border-orange-500/20"
+  },
+  { 
+    icon: <Zap className="w-6 h-6" />, 
+    title: "Rápido", 
+    desc: "Encuentra tu roomie ideal en minutos con nuestro sistema inteligente.",
+    color: "bg-blue-500/10 text-blue-600 border-blue-500/20"
+  },
+  { 
+    icon: <Users className="w-6 h-6" />, 
+    title: "Confiable", 
+    desc: "Conexiones exitosas y perfiles verificados garantizan confianza.",
+    color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+  },
+  { 
+    icon: <Lightbulb className="w-6 h-6" />, 
+    title: "Fácil", 
+    desc: "Interfaz intuitiva para crear perfil y buscar roommates sin complicaciones.",
+    color: "bg-purple-500/10 text-purple-600 border-purple-500/20"
+  },
 ];
 
-const slides = [
-  { image: publicidad1 },
-  { image: publicidad3 },
-  { image: publicidad4 },
+const SLIDES = [
+  { 
+    image: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=2070",
+    title: "Viví con roomies segura y sin dramas",
+    subtitle: "Tu grupo seguro para compartir el hogar."
+  },
+  { 
+    image: "https://images.unsplash.com/photo-1512428559087-560fa5ceab42?auto=format&fit=crop&q=80&w=2070",
+    title: "Encuentra a tu rumi ideal según tus preferencias",
+    subtitle: "Match inteligente basado en tu estilo de vida."
+  },
+  { 
+    image: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=2070",
+    title: "Alquila tus departamentos de forma inteligente",
+    subtitle: "Gestión segura para propietarios y edificios."
+  },
+];
+
+const STEPS = [
+  { step: '01', icon: <HomeIcon className="w-8 h-8" />, title: 'Creá tu perfil', desc: 'Contanos sobre vos, tus hábitos y presupuesto.', bg: 'bg-orange-500', textColor: 'text-orange-600' },
+  { step: '02', icon: <Search className="w-8 h-8" />, title: 'Explorá perfiles', desc: 'Match inteligente según tus preferencias.', bg: 'bg-blue-600', textColor: 'text-blue-600' },
+  { step: '03', icon: <MessageCircle className="w-8 h-8" />, title: 'Conectá y acordá', desc: 'Chat seguro para conocer a tu futuro roomie.', bg: 'bg-emerald-500', textColor: 'text-emerald-600' },
+  { step: '04', icon: <Sparkles className="w-8 h-8" />, title: '¡A vivir!', desc: 'Mudate y disfrutá de compartir gastos.', bg: 'bg-rose-500', textColor: 'text-rose-600' },
 ];
 
 const HomePage = () => {
   const [current, setCurrent] = useState(0);
-
-  // Refs para secciones
-  const heroRef = useRef(null);
-  const howItWorksRef = useRef(null);
-  const featuresRef = useRef(null);
-
-  // Control de sección actual
-  const sections = [heroRef, howItWorksRef, featuresRef];
-  const [currentSection, setCurrentSection] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handleScroll);
     const interval = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % slides.length);
-    }, 4000);
-    return () => clearInterval(interval);
+      setCurrent((prev) => (prev + 1) % SLIDES.length);
+    }, 6000);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearInterval(interval);
+    };
   }, []);
 
-  // Scroll con flechas
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        const next = Math.min(currentSection + 1, sections.length - 1);
-        setCurrentSection(next);
-        sections[next]?.current?.scrollIntoView({ behavior: "smooth" });
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        const prev = Math.max(currentSection - 1, 0);
-        setCurrentSection(prev);
-        sections[prev]?.current?.scrollIntoView({ behavior: "smooth" });
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentSection]);
-
   return (
-    <div className="flex flex-col font-main bg-[#F4F7FF] text-[#1E293B]">
-
-      {/* Hero */}
-      <div ref={heroRef} className="relative w-full h-screen overflow-hidden bg-white">
-        {slides.map((slide, index) => (
-          <div
-            key={index}
-            className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out
-              ${current === index ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"}`}
+    <div className="min-h-screen bg-white">
+      {/* ── Hero ───────────────────────────────────────────────────────────── */}
+      <section className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={current}
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            className="absolute inset-0 z-0"
           >
-            <div className="relative w-full h-full pt-[0px] flex items-center justify-center overflow-hidden bg-gray-50 z-0">
-              <img
-                src={slide.image}
-                alt={`Slide ${index + 1}`}
-                className="w-full h-full object-fill object-center"
-              />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/20 to-white z-10" />
+            <img 
+              src={SLIDES[current].image} 
+              alt="Background" 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="relative z-20 max-w-5xl mx-auto px-6 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-md border border-slate-200 text-xs font-bold uppercase tracking-widest mb-8 text-slate-600"
+          >
+            <Sparkles className="w-4 h-4 text-orange-500" />
+            <span>La forma más inteligente de compartir</span>
+          </motion.div>
+
+          <motion.h1 
+            key={`title-${current}`}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-5xl md:text-8xl font-display font-extrabold tracking-tight leading-[0.9] mb-6 text-slate-900"
+          >
+            {SLIDES[current].title.split(" ").map((word, i) => (
+              <span key={i} className={word === "segura" || word === "ideal" || word === "inteligente" ? "text-orange-500 block md:inline" : ""}>
+                {word}{" "}
+              </span>
+            ))}
+          </motion.h1>
+
+          <motion.p 
+            key={`sub-${current}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-10 font-medium"
+          >
+            {SLIDES[current].subtitle}
+          </motion.p>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
+            <Link to="/login" className="group relative px-8 py-4 bg-orange-500 text-white rounded-2xl font-bold text-lg overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-orange-500/40">
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+              <span className="relative flex items-center gap-2">
+                EMPEZAR AHORA <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </span>
+            </Link>
+            <a href="#how-it-works" className="px-8 py-4 rounded-2xl font-bold text-lg border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-all">
+              Ver cómo funciona
+            </a>
+          </motion.div>
+        </div>
+
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 flex gap-3">
+          {SLIDES.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrent(i)}
+              className={`h-1.5 rounded-full transition-all duration-500 ${
+                current === i ? "bg-orange-500 w-12" : "bg-slate-300 w-3 hover:bg-slate-400"
+              }`}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* ── How it works ────────────────────────────────────────────────────── */}
+      <section id="how-it-works" className="py-32 px-6 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-6xl font-display font-extrabold mb-6 tracking-tight text-slate-900">
+              ¿Cómo <span className="text-orange-500">funciona</span>?
+            </h2>
+            <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+              En solo 4 pasos estás conectando con tu futuro roomie de manera segura y divertida.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {STEPS.map((step, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="group relative p-8 rounded-[2.5rem] bg-white border-2 border-slate-100 hover:border-orange-500/50 transition-all duration-500 shadow-xl shadow-slate-200/50"
+              >
+                <div className="absolute top-6 right-8 text-5xl font-display font-black text-slate-100 group-hover:text-slate-200 transition-colors">
+                  {step.step}
+                </div>
+                <div className={`w-16 h-16 rounded-2xl ${step.bg} flex items-center justify-center mb-6 text-white shadow-lg shadow-${step.bg.split('-')[1]}-500/30`}>
+                  {step.icon}
+                </div>
+                <h3 className="text-xl font-bold mb-3 text-slate-900">{step.title}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">{step.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Features ────────────────────────────────────────────────────────── */}
+      <section id="features" className="py-32 px-6 bg-slate-50 relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+        
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-20 items-center">
+            <div>
+              <h2 className="text-4xl md:text-6xl font-display font-extrabold mb-8 tracking-tight leading-tight text-slate-900">
+                Diseñado para <br />
+                <span className="text-orange-500">vivir sin dramas</span>
+              </h2>
+              <p className="text-slate-500 text-lg mb-12 leading-relaxed">
+                Nos enfocamos en la seguridad y la compatibilidad para que tu única preocupación sea elegir qué película ver el viernes por la noche.
+              </p>
+              
+              <div className="space-y-6">
+                {["Perfiles 100% verificados", "Match por estilo de vida", "Chat seguro integrado"].map((item, i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4 text-orange-500" />
+                    </div>
+                    <span className="font-medium text-slate-700">{item}</span>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Div azul */}
-            <div className="absolute bottom-[-1vh] left-0 w-full h-[20vh] flex flex-col items-center justify-center z-30 backdrop-blur-md border-t border-white/20 shadow-2xl bg-transparent">
-              <Link
-                to="/login"
-                className="relative z-1 px-4 py-2 text-xl font-black text-white rounded-2xl transition-all duration-300 ease-out
-                           bg-gradient-to-r from-[#F5A623] to-[#FFB347] shadow-[0_10px_25px_rgba(245,166,35,0.5)]
-                           border-t border-white/30 hover:scale-[1.05] hover:brightness-110 active:scale-95
-                           mt-[-30px] flex items-center justify-center"
-              >
-                <span className="drop-shadow-md">EMPIEZA AHORA</span>
-              </Link>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {FEATURES.map((f, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className={`p-8 rounded-[2.5rem] border ${f.color} flex flex-col gap-4 hover:scale-105 transition-transform duration-300 bg-white shadow-sm`}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center">
+                    {f.icon}
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">{f.title}</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
+                </motion.div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
-
-{/* How it works section */}
-<section ref={howItWorksRef} className="section bg-[#F4F7FF] py-20">
-  <h2 className="section-title text-center mb-4 text-4xl md:text-5xl font-alt font-bold">
-    ¿Cómo <span className="text-[#2563C8]">funciona</span>?
-  </h2>
-  <p className="section-sub text-center mb-12 text-lg md:text-xl text-[#64748B] max-w-2xl mx-auto">
-    En solo 4 pasos estás conectando con tu futuro roomie de manera segura y divertida
-  </p>
-  <div className="flex flex-wrap justify-center gap-6">
-    {[ 
-      { step: '1', icon: '📝', title: 'Creá tu perfil', desc: 'Contanos sobre vos, tus hábitos, tu presupuesto y la zona donde querés vivir.', bg: 'from-[#EFF6FF] to-[#DBEAFE]' },
-      { step: '2', icon: '🔍', title: 'Explorá perfiles', desc: 'Nuestro sistema te muestra personas compatibles según tus preferencias de vida.', bg: 'from-[#FFF7ED] to-[#FFEDD5]' },
-      { step: '3', icon: '💬', title: 'Conectá y acordá', desc: 'Chatéen, conózcanse y definan los términos del alquiler compartido juntos.', bg: 'from-[#F0FDF4] to-[#DCFCE7]' },
-      { step: '4', icon: '🏡', title: '¡A vivir!', desc: 'Mudense y disfruten de su nuevo hogar compartiendo los gastos equitativamente.', bg: 'from-[#FFF1F2] to-[#FFE4E6]' },
-    ].map(({ step, icon, title, desc, bg }) => (
-      <div
-        key={step}
-        className="relative bg-white p-5 w-56 rounded-2xl shadow-sm transition-all transform hover:-translate-y-1 hover:shadow-[0_4px_15px_rgba(251,191,36,0.5)]"
-        style={{ transition: 'all 0.3s ease' }}
-      >
-        <div className="step-num absolute -top-6 left-1/2 transform -translate-x-1/2 w-12 h-12 rounded-full bg-gradient-to-r from-[#2563C8] to-[#3B82F6] flex items-center justify-center text-white text-lg font-bold shadow-md">
-          {step}
         </div>
-        <div className={`step-icon w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center text-4xl bg-gradient-to-br ${bg} shadow-inner`}>
-          {icon}
-        </div>
-        <h3 className="font-alt font-bold text-base text-[#1E293B] mb-1 text-center">{title}</h3>
-        <p className="text-sm text-[#64748B] text-center">{desc}</p>
-      </div>
-    ))}
-  </div>
-</section>
+      </section>
 
-{/* Features section */}
-<section ref={featuresRef} className="section py-20 bg-white">
-  <h2 className="section-title text-center mb-4 text-4xl md:text-5xl font-alt font-bold">
-    ¿Por qué elegir <span className="text-[#2563C8]">JAIK</span><span className="text-[#FBBF24]">O!</span>?
-  </h2>
-  <p className="section-sub text-center mb-12 text-lg md:text-xl text-[#64748B] max-w-2xl mx-auto">
-    Diseñado para que encontrar roomie sea seguro, rápido y sin dramas
-  </p>
-  <div className="features-grid flex flex-wrap justify-center gap-4">
-    {FEATURES.map(({ icon, title, desc }) => (
-      <div
-        key={title}
-        className="feat-card flex flex-col items-center text-center gap-2 p-5 w-64 rounded-2xl border border-[#E2E8F0] shadow-sm transition-all transform hover:-translate-y-1 hover:shadow-[0_4px_15px_rgba(251,191,36,0.5)] bg-white"
-      >
-        <div className="feat-icon w-14 h-14 flex items-center justify-center rounded-xl mb-2 bg-gradient-to-br from-[#EFF6FF] to-[#DBEAFE] shadow-inner">
-          <span className="text-2xl">{icon}</span>
+      {/* ── CTA ────────────────────────────────────────────────────────────── */}
+      <section className="py-32 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="relative p-12 md:p-20 rounded-[3rem] bg-orange-500 overflow-hidden text-center">
+            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent" />
+            <h2 className="relative z-10 text-4xl md:text-6xl font-display font-extrabold mb-8 tracking-tight text-white">
+              ¿Listo para encontrar <br /> a tu roomie ideal?
+            </h2>
+            <Link to="/login" className="relative z-10 inline-flex items-center gap-3 px-10 py-5 bg-white text-orange-500 rounded-2xl font-bold text-xl hover:scale-105 active:scale-95 transition-all shadow-xl">
+              EMPEZAR AHORA <ChevronRight />
+            </Link>
+          </div>
         </div>
-        <h3 className="font-alt font-bold text-base text-[#1E293B]">{title}</h3>
-        <p className="text-sm text-[#64748B]">{desc}</p>
-      </div>
-    ))}
-  </div>
-</section>
-
+      </section>
     </div>
   );
 };
