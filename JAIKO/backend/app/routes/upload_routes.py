@@ -9,10 +9,52 @@ upload_bp = Blueprint("upload", __name__)
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
+# Límite de 5 MB expresado en bytes.
+# Por qué 5 MB: es más que suficiente para una foto de perfil o departamento
+# de buena calidad. Imágenes más grandes casi siempre son fotos sin comprimir
+# que el frontend debería redimensionar antes de subir.
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
 
 def _get_ext(filename: str) -> str:
     """Extrae la extensión del nombre de archivo en minúsculas."""
     return filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+
+def _validate_file(file) -> tuple[bool, str]:
+    """
+    Valida extensión y tamaño de un archivo subido.
+
+    Por qué existe esta función:
+    Los 4 endpoints de upload necesitan las mismas dos validaciones.
+    Centralizar la lógica aquí significa que si mañana cambia el límite
+    de tamaño o las extensiones permitidas, se edita en un solo lugar.
+
+    Por qué usamos seek/tell en lugar de len(file.read()):
+    file.read() cargaría el archivo completo en memoria solo para contar bytes,
+    que es exactamente el problema que queremos prevenir. seek(0, 2) mueve
+    el cursor al final del archivo y tell() devuelve esa posición (= tamaño),
+    sin leer nada. Después seek(0) resetea el cursor para que el read()
+    posterior funcione correctamente.
+
+    Returns:
+        (True, "")            si el archivo es válido
+        (False, "mensaje")    si hay algún problema
+    """
+    ext = _get_ext(file.filename)
+    if ext not in ALLOWED_EXTENSIONS:
+        return False, "Solo se permiten jpg/png/webp"
+
+    # Medimos el tamaño sin leer el contenido
+    file.seek(0, 2)  # mover cursor al final
+    size = file.tell()  # leer la posición = tamaño en bytes
+    file.seek(0)  # resetear cursor al inicio
+
+    if size > MAX_FILE_SIZE:
+        mb = MAX_FILE_SIZE // (1024 * 1024)
+        return False, f"El archivo supera el límite de {mb} MB"
+
+    return True, ""
 
 
 # ── Foto de perfil ────────────────────────────────────────────────────────────
@@ -28,10 +70,11 @@ def upload_profile_photo():
     if not file.filename:
         return jsonify({"error": "Empty filename"}), 400
 
-    ext = _get_ext(file.filename)
-    if ext not in ALLOWED_EXTENSIONS:
-        return jsonify({"error": "Solo se permiten jpg/png/webp"}), 400
+    ok, error = _validate_file(file)
+    if not ok:
+        return jsonify({"error": error}), 400
 
+    ext = _get_ext(file.filename)
     filename = f"{user_id}_{uuid.uuid4().hex[:8]}.{ext}"
 
     try:
@@ -61,10 +104,12 @@ def upload_listing_photo(listing_id):
         return jsonify({"error": "No file provided"}), 400
 
     file = request.files["file"]
-    ext  = _get_ext(file.filename)
-    if ext not in ALLOWED_EXTENSIONS:
-        return jsonify({"error": "Solo se permiten jpg/png/webp"}), 400
 
+    ok, error = _validate_file(file)
+    if not ok:
+        return jsonify({"error": error}), 400
+
+    ext = _get_ext(file.filename)
     filename = f"{listing_id}_{uuid.uuid4().hex[:8]}.{ext}"
 
     try:
@@ -89,19 +134,21 @@ def upload_listing_photo(listing_id):
 @jwt_required()
 def upload_group_photo(group_id):
     user_id = int(get_jwt_identity())
-    group   = Group.query.get_or_404(group_id)
+    group = Group.query.get_or_404(group_id)
 
-    if group.created_by != user_id:  # ← BUG #5: era group.owner_id (no existe)
+    if group.created_by != user_id:
         return jsonify({"error": "Forbidden"}), 403
 
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 
     file = request.files["file"]
-    ext  = _get_ext(file.filename)
-    if ext not in ALLOWED_EXTENSIONS:
-        return jsonify({"error": "Solo se permiten jpg/png/webp"}), 400
 
+    ok, error = _validate_file(file)
+    if not ok:
+        return jsonify({"error": error}), 400
+
+    ext = _get_ext(file.filename)
     filename = f"group_{group_id}_{uuid.uuid4().hex[:8]}.{ext}"
 
     try:
@@ -129,11 +176,12 @@ def upload_verification_selfie():
         return jsonify({"error": "No file provided"}), 400
 
     file = request.files["file"]
-    ext  = _get_ext(file.filename)
-    if ext not in ALLOWED_EXTENSIONS:
-        return jsonify({"error": "Solo se permiten jpg/png/webp"}), 400
 
-    # Path descriptivo: verify_{user_id}_{uuid}.ext
+    ok, error = _validate_file(file)
+    if not ok:
+        return jsonify({"error": error}), 400
+
+    ext = _get_ext(file.filename)
     filename = f"verify_{user_id}_{uuid.uuid4().hex[:8]}.{ext}"
 
     try:
