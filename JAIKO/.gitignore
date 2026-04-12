@@ -39,7 +39,7 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Docker
+# DockerS
 .docker/
 
 # Logs
