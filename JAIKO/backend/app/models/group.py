@@ -11,16 +11,22 @@ class Group(db.Model):
     city = db.Column(db.String(100), nullable=False, default="Asunción")
     max_members = db.Column(db.Integer, nullable=False, default=3)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    status = db.Column(db.String(20), default="open")   # open | full | closed | disbanded
+    status = db.Column(
+        db.String(20), default="open"
+    )  # open | full | closed | disbanded
     budget_max = db.Column(db.Integer, nullable=True)
     pets_allowed = db.Column(db.Boolean, default=False)
     smoking_allowed = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     # Relationships
     creator = db.relationship("User", foreign_keys=[created_by])
-    members = db.relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
+    members = db.relationship(
+        "GroupMember", back_populates="group", cascade="all, delete-orphan"
+    )
 
     @property
     def current_members(self) -> int:
@@ -55,8 +61,8 @@ class GroupMember(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     group_id = db.Column(db.Integer, db.ForeignKey("groups.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    role = db.Column(db.String(20), default="member")   # admin | member
-    status = db.Column(db.String(20), default="active") # active | left | kicked
+    role = db.Column(db.String(20), default="member")  # admin | member
+    status = db.Column(db.String(20), default="active")  # active | left | kicked
     joined_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     group = db.relationship("Group", back_populates="members")
@@ -68,6 +74,7 @@ class GroupMember(db.Model):
             "id": self.id,
             "user_id": self.user_id,
             "role": self.role,
+            "status": self.status,  # ← línea nueva
             "joined_at": self.joined_at.isoformat(),
             "profile": profile.to_dict() if profile else None,
         }

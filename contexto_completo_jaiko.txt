@@ -307,9 +307,11 @@ limiter = Limiter(key_func=get_remote_address)
 FILE_PATH: .\JAIKO\backend\app\__init__.py
 ----------------------------------------
 import os
-from flask import Flask
+from flask import Flask, jsonify  # ← añadí jsonify
+from werkzeug.exceptions import HTTPException  # ← añadí HTTPException
 from .config import config_map
-from .extensions import db, migrate, socketio, jwt, cors
+
+# ── Import duplicado eliminado (línea 312 era código muerto) ──
 from .extensions import db, migrate, socketio, jwt, cors, limiter
 
 
@@ -332,34 +334,15 @@ def create_app(env: str | None = None) -> Flask:
     socketio.init_app(app, cors_allowed_origins=allowed_origins, async_mode="eventlet")
 
     # ── Callbacks de JWT ──────────────────────────────────────────────────────
-    #
-    # token_in_blocklist_loader se ejecuta automáticamente en CADA petición
-    # que use @jwt_required(). Si retorna True, Flask-JWT-Extended rechaza
-    # el token con un 401 antes de que llegue a la función de la ruta.
-    #
-    # Esto resuelve dos problemas de una sola vez:
-    #
-    # 1. Logout real: cuando el usuario cierra sesión, su token se guarda en
-    #    TokenBlocklist. Las peticiones siguientes con ese token son rechazadas
-    #    aunque el token todavía no haya expirado.
-    #
-    # 2. Usuarios bloqueados: si un admin bloquea a un usuario, sus tokens
-    #    existentes dejan de funcionar en la próxima petición (máximo
-    #    segundos de demora), sin esperar los 7 días de expiración.
-    #
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(jwt_header, jwt_payload):
         from .models import TokenBlocklist, User
 
         jti = jwt_payload["jti"]
 
-        # Primero: ¿fue este token explícitamente revocado (logout)?
         if TokenBlocklist.query.filter_by(jti=jti).first():
             return True
 
-        # Segundo: ¿el usuario está bloqueado por el admin?
-        # Consultamos el estado actual del usuario en la DB en cada request.
-        # Si el admin bloquea al usuario, su próxima petición fallará aquí.
         user_id = int(jwt_payload["sub"])
         user = User.query.get(user_id)
         if user is None or user.is_blocked():
@@ -372,6 +355,37 @@ def create_app(env: str | None = None) -> Flask:
     def add_security_headers(response):
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
         return response
+
+    # ── Global error handler ──────────────────────────────────────────────────
+    #
+    # Por qué existe este handler:
+    # Sin él, cualquier excepción no controlada (DB caída, bug inesperado)
+    # le devuelve al frontend un traceback completo de Python con nombres de
+    # tablas, columnas y rutas internas del servidor — información que no
+    # debería ser pública.
+    #
+    # Cómo funciona:
+    # Flask llama a este handler ANTES de enviar cualquier respuesta 500.
+    # - Si el error es HTTP normal (404, 400, 401...) lo deja pasar sin tocar.
+    # - Si es cualquier otra excepción, loguea el detalle internamente,
+    #   hace rollback de la sesión de DB y devuelve un mensaje genérico.
+    #
+    # El rollback es importante: sin él, una sesión de SQLAlchemy que falló
+    # queda en estado inválido y las siguientes queries del mismo proceso
+    # también fallan en cascada.
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(e):
+        if isinstance(e, HTTPException):
+            return e  # 404, 400, 401, etc. — Flask los maneja normalmente
+
+        app.logger.error("Error no controlado: %s", str(e), exc_info=True)
+        db.session.rollback()
+        return (
+            jsonify(
+                {"error": "Error interno del servidor. Por favor intentá más tarde."}
+            ),
+            500,
+        )
 
     # ── Blueprints ────────────────────────────────────────────────────────────
     from .routes.auth_routes import auth_bp
@@ -507,16 +521,22 @@ class Group(db.Model):
     city = db.Column(db.String(100), nullable=False, default="Asunción")
     max_members = db.Column(db.Integer, nullable=False, default=3)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    status = db.Column(db.String(20), default="open")   # open | full | closed | disbanded
+    status = db.Column(
+        db.String(20), default="open"
+    )  # open | full | closed | disbanded
     budget_max = db.Column(db.Integer, nullable=True)
     pets_allowed = db.Column(db.Boolean, default=False)
     smoking_allowed = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     # Relationships
     creator = db.relationship("User", foreign_keys=[created_by])
-    members = db.relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
+    members = db.relationship(
+        "GroupMember", back_populates="group", cascade="all, delete-orphan"
+    )
 
     @property
     def current_members(self) -> int:
@@ -551,8 +571,8 @@ class GroupMember(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     group_id = db.Column(db.Integer, db.ForeignKey("groups.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    role = db.Column(db.String(20), default="member")   # admin | member
-    status = db.Column(db.String(20), default="active") # active | left | kicked
+    role = db.Column(db.String(20), default="member")  # admin | member
+    status = db.Column(db.String(20), default="active")  # active | left | kicked
     joined_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     group = db.relationship("Group", back_populates="members")
@@ -564,6 +584,7 @@ class GroupMember(db.Model):
             "id": self.id,
             "user_id": self.user_id,
             "role": self.role,
+            "status": self.status,  # ← línea nueva
             "joined_at": self.joined_at.isoformat(),
             "profile": profile.to_dict() if profile else None,
         }
@@ -1225,6 +1246,273 @@ def get_stats():
 
 FILE_PATH: .\JAIKO\backend\app\routes\auth_routes.py
 ----------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# auth_routes.py  —  JAIKO! Backend
+# Endpoints: /register  /login  /google  /me  /logout
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# ¿Por qué separamos la autenticación en su propio Blueprint?
+# Clean Code recomienda "Separation of Concerns": cada módulo hace UNA cosa.
+# auth_routes.py solo gestiona identidad (quién sos). Otros blueprints gestionan
+# recursos (grupos, listings, etc.). Esto hace el código más fácil de testear
+# y de encontrar cuando algo falla.
+#
+from datetime import datetime
+
+from flask import Blueprint, current_app, jsonify, request
+from flask_jwt_extended import (
+    create_access_token,
+    get_jwt,
+    get_jwt_identity,
+    jwt_required,
+)
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
+
+from ..extensions import db, limiter
+from ..models import Profile, TokenBlocklist, User
+
+# Blueprint: le dice a Flask que estas rutas pertenecen al grupo "auth".
+# __init__.py las registra con url_prefix="/api/auth", así que cada ruta
+# aquí es relativa — "/login" se convierte en "/api/auth/login".
+auth_bp = Blueprint("auth", __name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HELPER PRIVADO: _build_auth_response
+# ─────────────────────────────────────────────────────────────────────────────
+# ¿Por qué existe esta función?
+# /register, /login y /google devuelven exactamente la misma estructura JSON.
+# Si duplicáramos ese código 3 veces, un cambio futuro (agregar un campo al
+# user, por ejemplo) requeriría editarlo en 3 lugares y es fácil olvidar uno.
+# Este helper centraliza esa lógica — es el principio DRY (Don't Repeat Yourself).
+#
+def _build_auth_response(user: User, is_new_user: bool = False) -> dict:
+    """Construye el dict JSON estándar que el frontend espera al autenticarse."""
+    access_token = create_access_token(identity=str(user.id))
+    return {
+        "access_token": access_token,
+        "user": user.to_dict(),
+        "profile": user.profile.to_dict(include_private=True) if user.profile else None,
+        "is_new_user": is_new_user,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/auth/register
+# ─────────────────────────────────────────────────────────────────────────────
+# ¿Por qué limitamos a 5/minuto?
+# Sin rate limiting, un atacante puede crear miles de cuentas falsas por segundo
+# (ataque de registro masivo). 5 intentos/minuto es suficiente para un usuario
+# real pero bloquea automatizaciones maliciosas.
+#
+@auth_bp.route("/register", methods=["POST"])
+@limiter.limit("5 per minute")
+def register():
+    data = request.get_json()
+
+    # ── Validaciones de entrada ───────────────────────────────────────────────
+    # Validamos primero y devolvemos mensajes claros.
+    # Beneficio para el usuario: sabe exactamente qué falta completar.
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    if not name:
+        return jsonify({"error": "El nombre es requerido"}), 400
+    if not email:
+        return jsonify({"error": "El email es requerido"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "La contraseña debe tener al menos 6 caracteres"}), 400
+
+    # ── Verificar email duplicado ─────────────────────────────────────────────
+    # ¿Por qué verificamos antes de hacer commit?
+    # Si no chequeamos, la DB lanza IntegrityError (email es UNIQUE).
+    # Capturar esa excepción es posible pero devuelve un mensaje genérico.
+    # Este chequeo explícito nos permite devolver "El email ya está registrado"
+    # — mensaje claro que el usuario entiende.
+    if User.query.filter_by(email=email).first():
+        return jsonify({"error": "El email ya está registrado"}), 409
+
+    # ── Crear usuario y perfil ────────────────────────────────────────────────
+    # Creamos User y Profile en la misma transacción.
+    # ¿Por qué? Si el Profile fallara en una segunda transacción, tendríamos
+    # un User sin Profile — estado inconsistente que rompería toda la app.
+    user = User(email=email)
+    user.set_password(
+        password
+    )  # bcrypt hashea internamente — nunca guardamos texto plano
+    db.session.add(user)
+    db.session.flush()  # flush() asigna user.id sin hacer commit todavía
+
+    profile = Profile(user_id=user.id, name=name)
+    db.session.add(profile)
+    db.session.commit()
+
+    return jsonify(_build_auth_response(user, is_new_user=True)), 201
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/auth/login
+# ─────────────────────────────────────────────────────────────────────────────
+# ¿Por qué el mensaje de error es genérico ("Credenciales incorrectas")?
+# Si dijéramos "Email no encontrado" o "Contraseña incorrecta" por separado,
+# le indicaríamos al atacante si un email existe en nuestra base de datos
+# (ataque de enumeración de usuarios). El mensaje genérico evita eso.
+#
+@auth_bp.route("/login", methods=["POST"])
+@limiter.limit("10 per minute")
+def login():
+    data = request.get_json()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    user = User.query.filter_by(email=email).first()
+
+    # check_password() usa bcrypt para comparar — nunca comparamos texto plano
+    if not user or not user.check_password(password):
+        return jsonify({"error": "Credenciales incorrectas"}), 401
+
+    if user.is_blocked():
+        return jsonify({"error": "Tu cuenta está suspendida. Contactá soporte."}), 403
+
+    # Actualizamos last_login para saber cuándo fue el último acceso
+    user.last_login = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify(_build_auth_response(user)), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/auth/google
+# ─────────────────────────────────────────────────────────────────────────────
+# ¿Cómo funciona Google OAuth con id_token?
+# 1. El frontend usa el SDK de Google → el usuario hace clic en "Login con Google"
+# 2. Google le entrega al frontend un id_token (JWT firmado por Google)
+# 3. El frontend envía ese token a NUESTRO backend
+# 4. Nuestro backend lo VERIFICA contra los servidores de Google
+# 5. Si es válido, extraemos el email y creamos/encontramos el usuario
+#
+# ¿Por qué verificamos en el backend y no confiamos en el frontend?
+# Cualquiera podría fabricar un JSON con "email: admin@jaiko.com" y enviarlo.
+# La verificación criptográfica de Google garantiza que el token es auténtico.
+#
+@auth_bp.route("/google", methods=["POST"])
+@limiter.limit("10 per minute")
+def google_login():
+    data = request.get_json()
+    token = data.get("id_token")
+
+    if not token:
+        return jsonify({"error": "id_token requerido"}), 400
+
+    # ── Verificar el token con Google ─────────────────────────────────────────
+    try:
+        client_id = current_app.config["GOOGLE_CLIENT_ID"]
+        # google_id_token.verify_oauth2_token hace una petición a los servidores
+        # de Google para validar la firma criptográfica del token
+        id_info = google_id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            client_id,
+        )
+    except ValueError as e:
+        # ValueError significa que el token es inválido o expiró
+        return jsonify({"error": f"Token de Google inválido: {str(e)}"}), 401
+
+    google_sub = id_info.get("sub")  # ID único del usuario en Google
+    email = id_info.get("email", "").lower()
+    name = id_info.get("name", "Usuario")
+
+    if not email:
+        return jsonify({"error": "No se pudo obtener el email de Google"}), 400
+
+    # ── Buscar usuario existente o crear uno nuevo ────────────────────────────
+    # Buscamos primero por google_id (más específico), luego por email.
+    # ¿Por qué buscar por email también?
+    # Un usuario pudo haberse registrado antes con email+contraseña con el
+    # mismo email. En ese caso vinculamos su google_id a la cuenta existente
+    # en lugar de crear una cuenta duplicada.
+    is_new = False
+    user = User.query.filter_by(google_id=google_sub).first()
+
+    if not user:
+        user = User.query.filter_by(email=email).first()
+        if user:
+            # Vincular cuenta existente con Google
+            user.google_id = google_sub
+        else:
+            # Crear cuenta nueva
+            is_new = True
+            user = User(email=email, google_id=google_sub)
+            db.session.add(user)
+            db.session.flush()
+
+            profile = Profile(user_id=user.id, name=name)
+            db.session.add(profile)
+
+    if user.is_blocked():
+        db.session.rollback()
+        return jsonify({"error": "Tu cuenta está suspendida. Contactá soporte."}), 403
+
+    user.last_login = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify(_build_auth_response(user, is_new_user=is_new)), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /api/auth/me
+# ─────────────────────────────────────────────────────────────────────────────
+# ¿Para qué sirve este endpoint?
+# Cuando el usuario recarga la página, el frontend tiene el token en
+# localStorage pero no tiene los datos del usuario en memoria (Zustand se
+# reinicia). Este endpoint permite "rehidratar" el estado del frontend
+# sin pedir al usuario que vuelva a loguearse.
+#
+@auth_bp.route("/me", methods=["GET"])
+@jwt_required()
+def get_me():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+
+    if not user or user.is_blocked():
+        return jsonify({"error": "Usuario no encontrado o suspendido"}), 404
+
+    return (
+        jsonify(
+            {
+                "user": user.to_dict(),
+                "profile": (
+                    user.profile.to_dict(include_private=True) if user.profile else None
+                ),
+            }
+        ),
+        200,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/auth/logout
+# ─────────────────────────────────────────────────────────────────────────────
+# ¿Por qué guardamos el token en una "lista negra" (TokenBlocklist)?
+# Un JWT es válido por su firma criptográfica hasta que expira (7 días).
+# Si solo borramos el token del localStorage, el servidor no sabe que ese
+# token ya no debe aceptarse — alguien que lo copió antes del logout
+# podría seguir usándolo. Al guardar el jti (JWT ID) en la DB, el callback
+# token_in_blocklist_loader en __init__.py rechaza ese token en cada petición.
+#
+@auth_bp.route("/logout", methods=["POST"])
+@jwt_required()
+def logout():
+    jti = get_jwt()["jti"]  # jti = identificador único de ESTE token específico
+
+    # Si por alguna razón el token ya estaba en la blocklist, no fallamos
+    if not TokenBlocklist.query.filter_by(jti=jti).first():
+        db.session.add(TokenBlocklist(jti=jti))
+        db.session.commit()
+
+    return jsonify({"message": "Sesión cerrada correctamente"}), 200
 
 ----------------------------------------
 
@@ -1384,7 +1672,12 @@ def list_groups():
         .limit(per_page)
         .all()
     )
-    return jsonify({"groups": [g.to_dict() for g in groups], "total": total, "page": page}), 200
+    return (
+        jsonify(
+            {"groups": [g.to_dict() for g in groups], "total": total, "page": page}
+        ),
+        200,
+    )
 
 
 # --- Crear grupo ---
@@ -1413,7 +1706,9 @@ def create_group():
     db.session.flush()
 
     # Creador entra como admin
-    member = GroupMember(group_id=group.id, user_id=user_id, role="admin", status="active")
+    member = GroupMember(
+        group_id=group.id, user_id=user_id, role="admin", status="active"
+    )
     db.session.add(member)
 
     # Crear chat grupal
@@ -1434,14 +1729,18 @@ def get_group(group_id):
     group_data = group.to_dict()
 
     # Incluir solicitudes pendientes
-    pending_members = GroupMember.query.filter_by(group_id=group_id, status="pending").all()
+    pending_members = GroupMember.query.filter_by(
+        group_id=group_id, status="pending"
+    ).all()
     group_data["join_requests"] = [
         {
             "id": m.id,
             "user": {
                 "id": m.user_id,
-                "profile": m.user.profile.to_dict() if m.user and m.user.profile else {}
-            }
+                "profile": (
+                    m.user.profile.to_dict() if m.user and m.user.profile else {}
+                ),
+            },
         }
         for m in pending_members
     ]
@@ -1481,7 +1780,7 @@ def join_group(group_id):
 
     send_notification(
         user_id=group.created_by,
-        type="group_invite",
+        notif_type="group_invite",
         title="Nuevo miembro en tu grupo",
         content=f"Alguien se unió a tu grupo {group.name}",
         data={"group_id": group_id},
@@ -1513,25 +1812,39 @@ def request_join_group(group_id):
         return jsonify({"error": f"No se pudo guardar la solicitud: {str(e)}"}), 500
 
     # Notificar a todos los miembros activos
-    active_members = GroupMember.query.filter_by(group_id=group_id, status="active").all()
+    active_members = GroupMember.query.filter_by(
+        group_id=group_id, status="active"
+    ).all()
     for m in active_members:
         send_notification(
             user_id=m.user_id,
-            type="join_request",
+            notif_type="join_request",
             title="Solicitud de ingreso al grupo",
             content=f"Un usuario quiere unirse a {group.name}",
             data={"group_id": group_id, "request_user_id": user_id},
         )
 
-    return jsonify({"message": "Solicitud enviada", "member": {"id": member.id, "status": member.status}}), 200
+    return (
+        jsonify(
+            {
+                "message": "Solicitud enviada",
+                "member": {"id": member.id, "status": member.status},
+            }
+        ),
+        200,
+    )
 
 
 # --- Aceptar solicitud ---
-@group_bp.route("/<int:group_id>/join-request/<int:request_id>/accept", methods=["POST"])
+@group_bp.route(
+    "/<int:group_id>/join-request/<int:request_id>/accept", methods=["POST"]
+)
 @jwt_required()
 def accept_join_request(group_id, request_id):
     user_id = int(get_jwt_identity())
-    admin = GroupMember.query.filter_by(group_id=group_id, user_id=user_id, role="admin", status="active").first()
+    admin = GroupMember.query.filter_by(
+        group_id=group_id, user_id=user_id, role="admin", status="active"
+    ).first()
     if not admin:
         return jsonify({"error": "Solo un admin puede aceptar solicitudes"}), 403
 
@@ -1544,17 +1857,19 @@ def accept_join_request(group_id, request_id):
 
     chat = Chat.query.filter_by(group_id=group_id).first()
     if chat:
-        if not ChatMember.query.filter_by(chat_id=chat.id, user_id=request_member.user_id).first():
+        if not ChatMember.query.filter_by(
+            chat_id=chat.id, user_id=request_member.user_id
+        ).first():
             db.session.add(ChatMember(chat_id=chat.id, user_id=request_member.user_id))
 
     db.session.commit()
 
     send_notification(
         user_id=request_member.user_id,
-        type="request_accepted",
+        notif_type="request_accepted",
         title=f"Aceptado en {group.name}",
         content="¡Fuiste agregado al grupo!",
-        data={"group_id": group_id}
+        data={"group_id": group_id},
     )
     return jsonify({"message": "Solicitud aceptada"}), 200
 
@@ -1563,17 +1878,16 @@ def accept_join_request(group_id, request_id):
 # BUG #3 CORREGIDO: se agregó Group.query.get_or_404(group_id) para definir
 # la variable 'group' antes de usarla en send_notification(). Sin esta línea,
 # Python lanzaba NameError en runtime al intentar leer group.name.
-@group_bp.route("/<int:group_id>/join-request/<int:request_id>/reject", methods=["POST"])
+@group_bp.route(
+    "/<int:group_id>/join-request/<int:request_id>/reject", methods=["POST"]
+)
 @jwt_required()
 def reject_join_request(group_id, request_id):
     user_id = int(get_jwt_identity())
 
     # 1. Verificar que quien rechaza es admin activo del grupo
     admin = GroupMember.query.filter_by(
-        group_id=group_id,
-        user_id=user_id,
-        role="admin",
-        status="active"
+        group_id=group_id, user_id=user_id, role="admin", status="active"
     ).first()
     if not admin:
         return jsonify({"error": "Solo un admin puede rechazar solicitudes"}), 403
@@ -1589,10 +1903,10 @@ def reject_join_request(group_id, request_id):
     # 4. Notificar al usuario rechazado (ahora group.name existe y no lanza error)
     send_notification(
         user_id=request_member.user_id,
-        type="request_rejected",
+        notif_type="request_rejected",
         title=f"Solicitud rechazada en {group.name}",
         content="Tu solicitud fue rechazada.",
-        data={"group_id": group_id}
+        data={"group_id": group_id},
     )
 
     return jsonify({"message": "Solicitud rechazada"}), 200
@@ -1614,7 +1928,9 @@ def leave_group(group_id):
 
     db.session.commit()
 
-    active_count = GroupMember.query.filter_by(group_id=group_id, status="active").count()
+    active_count = GroupMember.query.filter_by(
+        group_id=group_id, status="active"
+    ).count()
     if active_count == 0:
         chat = Chat.query.filter_by(group_id=group_id).first()
         if chat:
@@ -1662,6 +1978,7 @@ def update_group(group_id):
 
     db.session.commit()
     return jsonify({"group": group.to_dict()}), 200
+
 ----------------------------------------
 
 FILE_PATH: .\JAIKO\backend\app\routes\listing_routes.py
@@ -1849,20 +2166,24 @@ def get_notifications():
     unread = base_query.filter_by(read=False).count()
 
     notifs = (
-        base_query
-        .order_by(Notification.created_at.desc())
+        base_query.order_by(Notification.created_at.desc())
         .offset((page - 1) * per_page)
         .limit(per_page)
         .all()
     )
 
-    return jsonify({
-        "notifications": [n.to_dict() for n in notifs],
-        "unread": unread,
-        "total": total,
-        "page": page,
-        "has_more": (page * per_page) < total,
-    }), 200
+    return (
+        jsonify(
+            {
+                "notifications": [n.to_dict() for n in notifs],
+                "unread": unread,
+                "total": total,
+                "page": page,
+                "has_more": (page * per_page) < total,
+            }
+        ),
+        200,
+    )
 
 
 # ── MARCAR UNA NOTIFICACIÓN COMO LEÍDA ───────────────────────────────────────
@@ -1908,12 +2229,13 @@ def send_test_notification():
     user_id = int(get_jwt_identity())
     send_notification(
         user_id=user_id,
-        type="system",
+        notif_type="system",
         title="Prueba de notificación",
         content="Esta es una notificación de prueba",
         data={"example": True},
     )
     return jsonify({"message": "Notificación de prueba enviada"}), 200
+
 ----------------------------------------
 
 FILE_PATH: .\JAIKO\backend\app\routes\profile_routes.py
@@ -1941,11 +2263,24 @@ def update_my_profile():
 
     data = request.get_json()
     allowed = [
-        "name", "age", "gender", "profession", "bio",
-        "budget_min", "budget_max", "pets", "smoker",
-        "schedule", "diseases", "city", "is_looking",
-        "lat", "lng",
-        "pref_min_age", "pref_max_age",
+        "name",
+        "age",
+        "gender",
+        "profession",
+        "bio",
+        "budget_min",
+        "budget_max",
+        "pets",
+        "smoker",
+        "schedule",
+        "diseases",
+        "city",
+        "is_looking",
+        "lat",
+        "lng",
+        "pref_min_age",
+        "pref_max_age",
+        "profile_photo_url",  # ← añadido: el frontend lo envía, el modelo lo tiene
     ]
     for field in allowed:
         if field in data:
@@ -1986,12 +2321,12 @@ def search_profiles():
     current_user = User.query.get_or_404(current_user_id)
     my_profile = current_user.profile
 
-    city          = request.args.get("city", "Asunción")
-    page          = int(request.args.get("page", 1))
-    per_page      = int(request.args.get("per_page", 20))
-    min_age       = request.args.get("min_age", type=int)
-    max_age       = request.args.get("max_age", type=int)
-    pets_filter   = _parse_bool(request.args.get("pets"))
+    city = request.args.get("city", "Asunción")
+    page = int(request.args.get("page", 1))
+    per_page = int(request.args.get("per_page", 20))
+    min_age = request.args.get("min_age", type=int)
+    max_age = request.args.get("max_age", type=int)
+    pets_filter = _parse_bool(request.args.get("pets"))
     smoker_filter = _parse_bool(request.args.get("smoker"))
     schedule_filter = request.args.get("schedule")
 
@@ -2000,15 +2335,11 @@ def search_profiles():
     # El frontend puede pasar ?min_score=80 si quiere el comportamiento antiguo.
     min_score = float(request.args.get("min_score", 50)) / 100.0
 
-    query = (
-        Profile.query
-        .join(User, User.id == Profile.user_id)
-        .filter(
-            Profile.user_id != current_user_id,
-            Profile.is_looking == True,
-            User.status == "active",
-            Profile.city == city,
-        )
+    query = Profile.query.join(User, User.id == Profile.user_id).filter(
+        Profile.user_id != current_user_id,
+        Profile.is_looking == True,
+        User.status == "active",
+        Profile.city == city,
     )
 
     # Filtros de edad del roomie buscado
@@ -2055,16 +2386,22 @@ def search_profiles():
     results.sort(key=lambda x: x["compatibility"], reverse=True)
 
     # Paginar DESPUÉS de filtrar (comportamiento correcto: página sobre resultados reales)
-    total  = len(results)
-    paged  = results[(page - 1) * per_page: page * per_page]
+    total = len(results)
+    paged = results[(page - 1) * per_page : page * per_page]
     has_more = (page * per_page) < total
 
-    return jsonify({
-        "profiles": paged,
-        "page": page,
-        "total": total,
-        "has_more": has_more,
-    }), 200
+    return (
+        jsonify(
+            {
+                "profiles": paged,
+                "page": page,
+                "total": total,
+                "has_more": has_more,
+            }
+        ),
+        200,
+    )
+
 ----------------------------------------
 
 FILE_PATH: .\JAIKO\backend\app\routes\report_routes.py
@@ -2139,7 +2476,10 @@ def create_request():
     listing_id = data.get("listing_id")
 
     if not target and not group_id and not listing_id:
-        return jsonify({"error": "target_user_id, group_id, o listing_id requerido"}), 400
+        return (
+            jsonify({"error": "target_user_id, group_id, o listing_id requerido"}),
+            400,
+        )
 
     # FIX: no permitir solicitud a uno mismo
     if target and target == user_id:
@@ -2154,7 +2494,10 @@ def create_request():
         status="pending",
     ).first()
     if existing:
-        return jsonify({"error": "Ya tenés una solicitud pendiente con este usuario"}), 409
+        return (
+            jsonify({"error": "Ya tenés una solicitud pendiente con este usuario"}),
+            409,
+        )
 
     req = RoommateRequest(
         sender_user_id=user_id,
@@ -2171,7 +2514,7 @@ def create_request():
     if target:
         send_notification(
             user_id=target,
-            type="match_request",
+            notif_type="match_request",
             title="Nueva solicitud de roomie",
             content="Alguien quiere ser tu roomie",
             data={"request_id": req.id, "sender_id": user_id},
@@ -2226,7 +2569,7 @@ def respond_request(req_id):
         # FIX: notificar al EMISOR que fue aceptado
         send_notification(
             user_id=sender.id,
-            type="request_accepted",
+            notif_type="request_accepted",
             title="¡Solicitud aceptada!",
             content=f"{receiver.profile.name} aceptó tu solicitud de roomie",
             data={
@@ -2237,14 +2580,19 @@ def respond_request(req_id):
         )
 
         # FIX: devolver el EMISOR como roommate (no el receiver)
-        return jsonify({
-            "message": "Solicitud aceptada",
-            "roommate": {
-                "id": sender.id,
-                "name": sender.profile.name,
-                "profile_photo_url": sender.profile.profile_photo_url,
-            },
-        }), 200
+        return (
+            jsonify(
+                {
+                    "message": "Solicitud aceptada",
+                    "roommate": {
+                        "id": sender.id,
+                        "name": sender.profile.name,
+                        "profile_photo_url": sender.profile.profile_photo_url,
+                    },
+                }
+            ),
+            200,
+        )
 
     else:
         req.status = "rejected"
@@ -2253,7 +2601,7 @@ def respond_request(req_id):
         # FIX: notificar al emisor que fue rechazado
         send_notification(
             user_id=sender.id,
-            type="request_rejected",
+            notif_type="request_rejected",
             title="Solicitud no aceptada",
             content=f"{receiver.profile.name} no aceptó tu solicitud",
             data={"request_id": req.id},
@@ -2267,9 +2615,11 @@ def respond_request(req_id):
 @jwt_required()
 def get_pending_requests():
     user_id = int(get_jwt_identity())
-    reqs = RoommateRequest.query.filter_by(
-        target_user_id=user_id, status="pending"
-    ).order_by(RoommateRequest.created_at.desc()).all()
+    reqs = (
+        RoommateRequest.query.filter_by(target_user_id=user_id, status="pending")
+        .order_by(RoommateRequest.created_at.desc())
+        .all()
+    )
     return jsonify({"requests": [r.to_dict() for r in reqs]}), 200
 
 
@@ -2278,9 +2628,11 @@ def get_pending_requests():
 @jwt_required()
 def get_sent_requests():
     user_id = int(get_jwt_identity())
-    reqs = RoommateRequest.query.filter_by(
-        sender_user_id=user_id
-    ).order_by(RoommateRequest.created_at.desc()).all()
+    reqs = (
+        RoommateRequest.query.filter_by(sender_user_id=user_id)
+        .order_by(RoommateRequest.created_at.desc())
+        .all()
+    )
     return jsonify({"requests": [r.to_dict() for r in reqs]}), 200
 
 
@@ -2299,6 +2651,7 @@ def cancel_request(req_id):
     req.status = "cancelled"
     db.session.commit()
     return jsonify({"message": "Solicitud cancelada"}), 200
+
 ----------------------------------------
 
 FILE_PATH: .\JAIKO\backend\app\routes\review_routes.py
@@ -2952,22 +3305,31 @@ def on_send_message(data):
         emit("error", {"message": "No sos miembro de este chat"})
         return
 
-    msg = Message(
-        chat_id=chat_id,
-        sender_id=user_id,
-        content=content,
-        type=data.get("type", "text"),
-    )
-    db.session.add(msg)
-    member.last_read_at = datetime.utcnow()
-    db.session.commit()
+    # ── try/except añadido ────────────────────────────────────────────────────
+    # Por qué: el handler global de Flask no intercepta excepciones de SocketIO.
+    # Si el commit falla (DB caída, timeout), sin este bloque el mensaje se pierde
+    # en silencio y la sesión queda en estado inválido para las siguientes queries.
+    # El rollback limpia la sesión; el emit("error") avisa al cliente para que
+    # pueda reintentar o mostrar un mensaje.
+    try:
+        msg = Message(
+            chat_id=chat_id,
+            sender_id=user_id,
+            content=content,
+            type=data.get("type", "text"),
+        )
+        db.session.add(msg)
+        member.last_read_at = datetime.utcnow()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        emit("error", {"message": "No se pudo enviar el mensaje. Intentá de nuevo."})
+        return
 
     msg_dict = msg.to_dict()
 
-    # Emitir al room del chat (incluye al emisor)
     emit("receive_message", msg_dict, to=f"chat_{chat_id}")
 
-    # Emitir al room personal de cada miembro (por si no están en join_chat)
     chat = Chat.query.filter_by(id=chat_id).first()
     if not chat:
         return
@@ -2976,22 +3338,21 @@ def on_send_message(data):
         if cm.user_id != user_id:
             emit("receive_message", msg_dict, to=f"user_{cm.user_id}")
 
-    # FIX: notificación solo si el destinatario NO está activo en el chat
     sender_profile = msg.sender.profile
     sender_name = sender_profile.name if sender_profile else "Alguien"
 
     from ..services.notification_service import send_notification
+
     now = datetime.utcnow()
 
     for cm in chat.members:
         if cm.user_id == user_id:
             continue
-        # Si leyó en los últimos 30 segundos, probablemente tiene el chat abierto
         is_active = cm.last_read_at and (now - cm.last_read_at) < ACTIVE_THRESHOLD
         if not is_active:
             send_notification(
                 user_id=cm.user_id,
-                type="message",
+                notif_type="message",  # ← ya corregido en Punto 1
                 title=f"Nuevo mensaje de {sender_name}",
                 content=content[:100],
                 data={"chat_id": chat_id},
@@ -3026,6 +3387,7 @@ def on_stop_typing(data):
             to=f"chat_{chat_id}",
             include_self=False,
         )
+
 ----------------------------------------
 
 FILE_PATH: .\JAIKO\backend\app\sockets\__init__.py
@@ -3046,13 +3408,14 @@ Usage:
     url = upload_image(file_bytes, filename, bucket='profiles')
     signed = get_signed_url('verifications', 'verify_3_abc123.jpg', expires_in=3600)
 """
+
 import os
 from supabase import create_client, Client
 
 _client: Client | None = None
 
 # Buckets públicos — acceso directo por URL
-PUBLIC_BUCKETS  = {"profiles", "listings", "groups"}
+PUBLIC_BUCKETS = {"profiles", "listings", "groups"}
 # Bucket privado — requiere URL firmada
 PRIVATE_BUCKETS = {"verifications"}
 
@@ -3060,16 +3423,21 @@ PRIVATE_BUCKETS = {"verifications"}
 def _get_client(private: bool = False) -> Client:
     global _client
     url = os.environ.get("SUPABASE_URL")
-    
+
     if private:
-        # Service role key para buckets privados
         key = os.environ.get("SUPABASE_SERVICE_KEY")
-        if not key:
-            raise RuntimeError("SUPABASE_SERVICE_KEY must be set for private buckets")
+        # ── Validación añadida: url también puede ser None ────────────────────
+        # Antes solo se validaba key. Si SUPABASE_URL falta, create_client(None, key)
+        # lanza un error opaco de la librería que no dice qué variable configurar.
+        if not url or not key:
+            raise RuntimeError(
+                "SUPABASE_URL y SUPABASE_SERVICE_KEY deben estar configuradas "
+                "para acceder a buckets privados."
+            )
         return create_client(url, key)
-    
+
     # Anon key para buckets públicos
-    global _client
+    # ── global _client duplicado eliminado (era código muerto) ───────────────
     if _client is None:
         key = os.environ.get("SUPABASE_KEY")
         if not url or not key:
@@ -3139,6 +3507,7 @@ def _guess_mime(filename: str) -> str:
         "webp": "image/webp",
         "gif": "image/gif",
     }.get(ext, "application/octet-stream")
+
 ----------------------------------------
 
 FILE_PATH: .\JAIKO\backend\app\utils\__init__.py
@@ -5844,7 +6213,7 @@ export default function GroupDetailPage() {
 
   useEffect(() => {
     const loadGroup = api.get(`/groups/${id}`)
-    const loadMyGroups = api.get('/groups/my-groups').catch(() => ({ data: { groups: [] } }))
+    const loadMyGroups = api.get('/groups/my').catch(() => ({ data: { groups: [] } }))
 
     Promise.all([loadGroup, loadMyGroups])
       .then(([groupRes, myGroupsRes]) => {
