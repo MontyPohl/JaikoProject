@@ -1,8 +1,9 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required
 from ..extensions import db
 from ..models import RoommateRequest, User
 from ..services.notification_service import send_notification
+from ..utils.jwt_helpers import get_current_user_id
 
 request_bp = Blueprint("requests", __name__)
 
@@ -11,9 +12,12 @@ request_bp = Blueprint("requests", __name__)
 @request_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_request():
-    user_id = int(get_jwt_identity())
-    data = request.get_json()
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
+    data = request.get_json()
     req_type = data.get("type", "roommate")
     target = data.get("target_user_id")
     group_id = data.get("group_id")
@@ -25,11 +29,10 @@ def create_request():
             400,
         )
 
-    # FIX: no permitir solicitud a uno mismo
     if target and target == user_id:
         return jsonify({"error": "No podés enviarte una solicitud a vos mismo"}), 400
 
-    # Verificar solicitud duplicada pendiente
+    # Verificar solicitud duplicada pendiente antes de crear una nueva
     existing = RoommateRequest.query.filter_by(
         sender_user_id=user_id,
         target_user_id=target,
@@ -54,7 +57,6 @@ def create_request():
     db.session.add(req)
     db.session.flush()
 
-    # Notificar al destinatario
     if target:
         send_notification(
             user_id=target,
@@ -72,7 +74,11 @@ def create_request():
 @request_bp.route("/<int:req_id>/respond", methods=["PUT"])
 @jwt_required()
 def respond_request(req_id):
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     data = request.get_json()
     action = data.get("action")
 
@@ -100,17 +106,14 @@ def respond_request(req_id):
     if action == "accept":
         req.status = "accepted"
 
-        # FIX: asignar roomies correctamente (sender ↔ receiver)
+        # Vincular roomies mutuamente y desactivar búsqueda para ambos
         sender.profile.current_roomie_id = receiver.id
         receiver.profile.current_roomie_id = sender.id
-
-        # Ambos dejan de buscar
         sender.profile.is_looking = False
         receiver.profile.is_looking = False
 
         db.session.commit()
 
-        # FIX: notificar al EMISOR que fue aceptado
         send_notification(
             user_id=sender.id,
             notif_type="request_accepted",
@@ -123,7 +126,6 @@ def respond_request(req_id):
             },
         )
 
-        # FIX: devolver el EMISOR como roommate (no el receiver)
         return (
             jsonify(
                 {
@@ -142,7 +144,6 @@ def respond_request(req_id):
         req.status = "rejected"
         db.session.commit()
 
-        # FIX: notificar al emisor que fue rechazado
         send_notification(
             user_id=sender.id,
             notif_type="request_rejected",
@@ -158,7 +159,11 @@ def respond_request(req_id):
 @request_bp.route("/pending", methods=["GET"])
 @jwt_required()
 def get_pending_requests():
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     reqs = (
         RoommateRequest.query.filter_by(target_user_id=user_id, status="pending")
         .order_by(RoommateRequest.created_at.desc())
@@ -171,7 +176,11 @@ def get_pending_requests():
 @request_bp.route("/sent", methods=["GET"])
 @jwt_required()
 def get_sent_requests():
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     reqs = (
         RoommateRequest.query.filter_by(sender_user_id=user_id)
         .order_by(RoommateRequest.created_at.desc())
@@ -184,7 +193,11 @@ def get_sent_requests():
 @request_bp.route("/<int:req_id>/cancel", methods=["DELETE"])
 @jwt_required()
 def cancel_request(req_id):
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     req = RoommateRequest.query.get_or_404(req_id)
 
     if req.sender_user_id != user_id:

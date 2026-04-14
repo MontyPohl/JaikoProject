@@ -2,23 +2,35 @@ import random
 import string
 from functools import wraps
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required
 from ..extensions import db
 from ..models import VerificationRequest, User, Profile
 from ..utils.storage import get_signed_url
+from ..utils.jwt_helpers import get_current_user, get_current_user_id
 
 verification_bp = Blueprint("verification", __name__)
 
 
 def verifier_required(fn):
+    """
+    Decorador que verifica que el usuario autenticado tenga rol 'admin' o 'verifier'.
+
+    BUG CORREGIDO: antes usaba int(get_jwt_identity()) + get_or_404.
+    Mismo problema que admin_required: crash con ValueError si el sub del token
+    no es un entero, y 404 en lugar de 401 si el usuario fue eliminado.
+    Ahora usa get_current_user() que maneja ambos casos de forma segura.
+    """
+
     @wraps(fn)
     @jwt_required()
     def wrapper(*args, **kwargs):
-        user_id = int(get_jwt_identity())
-        user = User.query.get_or_404(user_id)
+        user, err = get_current_user()
+        if err:
+            return err
         if user.role not in ("admin", "verifier"):
             return jsonify({"error": "Verifier access required"}), 403
         return fn(*args, **kwargs)
+
     return wrapper
 
 
@@ -30,10 +42,14 @@ def _generate_code() -> str:
 @verification_bp.route("/request", methods=["POST"])
 @jwt_required()
 def request_verification():
-    user_id = int(get_jwt_identity())
-    user = User.query.get_or_404(user_id)
+    # BUG CORREGIDO: int(get_jwt_identity()) + get_or_404 → get_current_user()
+    # Aquí necesitamos el objeto User completo (para acceder a user.profile),
+    # así que usamos get_current_user() en lugar de get_current_user_id().
+    user, err = get_current_user()
+    if err:
+        return err
 
-    existing = VerificationRequest.query.filter_by(user_id=user_id).first()
+    existing = VerificationRequest.query.filter_by(user_id=user.id).first()
     if existing:
         if existing.status == "verified":
             return jsonify({"error": "Already verified"}), 400
@@ -45,7 +61,7 @@ def request_verification():
         return jsonify({"verification": existing.to_dict()}), 200
 
     code = _generate_code()
-    vr = VerificationRequest(user_id=user_id, verification_code=code)
+    vr = VerificationRequest(user_id=user.id, verification_code=code)
     db.session.add(vr)
 
     if user.profile:
@@ -59,11 +75,14 @@ def request_verification():
 @verification_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_my_verification():
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    # Solo necesitamos el id para filtrar — no hace falta traer el User completo.
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     vr = VerificationRequest.query.filter_by(user_id=user_id).first()
-    if not vr:
-        return jsonify({"verification": None}), 200
-    return jsonify({"verification": vr.to_dict()}), 200
+    return jsonify({"verification": vr.to_dict() if vr else None}), 200
 
 
 # ── Admin/Verifier: listar pendientes ────────────────────────────────────────
@@ -74,7 +93,6 @@ def get_pending():
     result = []
     for v in pending:
         d = v.to_dict()
-        # Incluir foto de perfil pública del usuario
         if v.user and v.user.profile:
             d["profile_photo_url"] = v.user.profile.profile_photo_url
             d["user_name"] = v.user.profile.name
@@ -98,8 +116,8 @@ def get_selfie_signed_url(vr_id):
     try:
         signed_url = get_signed_url(
             bucket="verifications",
-            path=vr.selfie_url,   # selfie_url guarda el path, no la URL pública
-            expires_in=3600       # expira en 1 hora
+            path=vr.selfie_url,  # selfie_url guarda el path, no la URL pública
+            expires_in=3600,  # expira en 1 hora
         )
     except Exception as e:
         return jsonify({"error": f"No se pudo generar la URL: {str(e)}"}), 500
@@ -111,7 +129,11 @@ def get_selfie_signed_url(vr_id):
 @verification_bp.route("/<int:vr_id>/review", methods=["PUT"])
 @verifier_required
 def review_verification(vr_id):
-    reviewer_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    # verifier_required ya validó que el usuario existe y tiene rol correcto,
+    # así que get_current_user_id() es suficiente — solo necesitamos el id.
+    reviewer_id = get_current_user_id()
+
     vr = VerificationRequest.query.get_or_404(vr_id)
     data = request.get_json()
 

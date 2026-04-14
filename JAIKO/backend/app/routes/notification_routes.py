@@ -1,8 +1,9 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required
 from ..extensions import db
 from ..models import Notification
 from ..services.notification_service import send_notification
+from ..utils.jwt_helpers import get_current_user_id
 
 notification_bp = Blueprint("notifications", __name__)
 
@@ -11,11 +12,15 @@ notification_bp = Blueprint("notifications", __name__)
 @notification_bp.route("/", methods=["GET"])
 @jwt_required()
 def get_notifications():
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    # FIX: paginación agregada (antes era LIMIT 50 hardcodeado)
-    page = int(request.args.get("page", 1))
-    per_page = min(int(request.args.get("per_page", 20)), 50)
+    # BUG CORREGIDO: int(request.args.get(...)) → type=int en ambos params.
+    # El min(..., 50) se mantiene para que nadie pueda pedir más de 50 a la vez.
+    page = request.args.get("page", 1, type=int) or 1
+    per_page = min(request.args.get("per_page", 20, type=int) or 20, 50)
 
     base_query = Notification.query.filter_by(user_id=user_id)
     total = base_query.count()
@@ -46,10 +51,15 @@ def get_notifications():
 @notification_bp.route("/<int:notif_id>/read", methods=["PUT"])
 @jwt_required()
 def mark_read(notif_id):
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     notif = Notification.query.get_or_404(notif_id)
     if notif.user_id != user_id:
         return jsonify({"error": "Acceso denegado"}), 403
+
     notif.read = True
     db.session.commit()
     return jsonify({"message": "Marcada como leída"}), 200
@@ -59,7 +69,11 @@ def mark_read(notif_id):
 @notification_bp.route("/read-all", methods=["PUT"])
 @jwt_required()
 def mark_all_read():
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     Notification.query.filter_by(user_id=user_id, read=False).update({"read": True})
     db.session.commit()
     return jsonify({"message": "Todas marcadas como leídas"}), 200
@@ -69,10 +83,15 @@ def mark_all_read():
 @notification_bp.route("/<int:notif_id>", methods=["DELETE"])
 @jwt_required()
 def delete_notification(notif_id):
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     notif = Notification.query.get_or_404(notif_id)
     if notif.user_id != user_id:
         return jsonify({"error": "Acceso denegado"}), 403
+
     db.session.delete(notif)
     db.session.commit()
     return jsonify({"message": "Notificación eliminada"}), 200
@@ -82,7 +101,11 @@ def delete_notification(notif_id):
 @notification_bp.route("/send-test", methods=["POST"])
 @jwt_required()
 def send_test_notification():
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     send_notification(
         user_id=user_id,
         notif_type="system",

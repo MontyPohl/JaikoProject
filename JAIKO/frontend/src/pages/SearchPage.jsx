@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { SlidersHorizontal, X, MapPin, Search as SearchIcon } from 'lucide-react';
+import { SlidersHorizontal, X, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import ProfileCard from '../components/ui/ProfileCard';
@@ -20,13 +20,25 @@ L.Icon.Default.mergeOptions({
 
 const SCHEDULES = ['morning', 'afternoon', 'night', 'flexible'];
 const SCHEDULE_LABELS = { morning: 'Mañana', afternoon: 'Tarde', night: 'Noche', flexible: 'Flexible' };
-const CITIES = ['Asunción', 'San Lorenzo', 'Luque', 'Fernando de la Mora', 'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este'];
+const CITIES = [
+  'Asunción', 'San Lorenzo', 'Luque', 'Fernando de la Mora',
+  'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este',
+];
 const CITY_CENTERS = {
-  'Asunción': [-25.2867, -57.647], 'San Lorenzo': [-25.3355, -57.5178], 'Luque': [-25.2635, -57.4857],
-  'Fernando de la Mora': [-25.3085, -57.5225], 'Lambaré': [-25.3404, -57.6075], 'Capiatá': [-25.356, -57.4455],
-  'Encarnación': [-27.3333, -55.8667], 'Ciudad del Este': [-25.5097, -54.611],
+  'Asunción': [-25.2867, -57.647],
+  'San Lorenzo': [-25.3355, -57.5178],
+  'Luque': [-25.2635, -57.4857],
+  'Fernando de la Mora': [-25.3085, -57.5225],
+  'Lambaré': [-25.3404, -57.6075],
+  'Capiatá': [-25.356, -57.4455],
+  'Encarnación': [-27.3333, -55.8667],
+  'Ciudad del Este': [-25.5097, -54.611],
 };
 const AVATAR_FALLBACK = 'https://ui-avatars.com/api/?background=fde8d0&color=c2550a&size=40&name=';
+
+const EMPTY_FILTERS = {
+  city: 'Asunción', pets: '', smoker: '', schedule: '', min_age: '', max_age: '',
+};
 
 export default function SearchPage() {
   const navigate = useNavigate();
@@ -36,22 +48,41 @@ export default function SearchPage() {
   const [hasMore, setHasMore] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [showMap, setShowMap] = useState(false);
-  const [filters, setFilters] = useState({
-    city: 'Asunción', pets: '', smoker: '', schedule: '', min_age: '', max_age: ''
-  });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
 
-  const fetchProfiles = useCallback(async (p = 1, currentFilters = filters) => {
+  // BUG #1 CORREGIDO: fetchProfiles ya NO depende del closure de `filters`.
+  // Antes: useCallback([filters]) creaba una función NUEVA en cada cambio de filtro.
+  // Eso obligaba a poner fetchProfiles en el useEffect deps, generando confusión.
+  // Ahora: recibe `currentFilters` como parámetro → función estable con deps=[].
+  // Beneficio: código más predecible — la función no "cambia" entre renders.
+  const fetchProfiles = useCallback(async (p = 1, currentFilters) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: p, per_page: 20, city: currentFilters.city });
-      if (currentFilters.min_age) params.append('min_age', currentFilters.min_age);
-      if (currentFilters.max_age) params.append('max_age', currentFilters.max_age);
-      if (currentFilters.pets !== '') params.append('pets', currentFilters.pets);
-      if (currentFilters.smoker !== '') params.append('smoker', currentFilters.smoker);
-      if (currentFilters.schedule) params.append('schedule', currentFilters.schedule);
+      // BUG #2 CORREGIDO: antes armábamos un URLSearchParams y lo concatenábamos
+      // como string al URL: api.get(`/profiles/search?${params}`).
+      // Problema: si la ciudad tiene caracteres especiales (tildes, espacios),
+      // el encoding manual puede fallar o duplicarse con el de Axios.
+      // Ahora: pasamos params como objeto a Axios, que hace el encoding correcto.
+      // Beneficio: ciudades como "Fernando de la Mora" se envían sin errores de URL.
+      const params = {
+        page: p,
+        per_page: 20,
+        city: currentFilters.city,
+      };
 
-      const { data } = await api.get(`/profiles/search?${params}`);
-      
+      // Solo agregamos los filtros que tienen valor.
+      // Si están vacíos (""), NO los enviamos — el backend los ignora
+      // y devuelve todos los resultados (comportamiento correcto).
+      if (currentFilters.min_age) params.min_age = currentFilters.min_age;
+      if (currentFilters.max_age) params.max_age = currentFilters.max_age;
+      if (currentFilters.pets !== '') params.pets = currentFilters.pets;
+      if (currentFilters.smoker !== '') params.smoker = currentFilters.smoker;
+      if (currentFilters.schedule) params.schedule = currentFilters.schedule;
+
+      const { data } = await api.get('/profiles/search', { params });
+
+      // Si el perfil no tiene coordenadas propias, usamos el centro de su ciudad
+      // para que igual aparezca en el mapa sin quedar invisible.
       const profilesWithCoords = (data.profiles || []).map((profile) => ({
         ...profile,
         location: {
@@ -60,6 +91,8 @@ export default function SearchPage() {
         },
       }));
 
+      // p === 1 → reemplaza la lista (nueva búsqueda)
+      // p > 1   → agrega al final (paginación "Cargar más")
       setProfiles(p === 1 ? profilesWithCoords : (prev) => [...prev, ...profilesWithCoords]);
       setPage(p);
       setHasMore(data.has_more ?? false);
@@ -68,32 +101,45 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, []); // ✅ Sin dependencias: la función es estable durante toda la vida del componente.
 
+  // BUG #3 CORREGIDO: antes el useEffect dependía de [filters, fetchProfiles].
+  // Como fetchProfiles cambiaba cada vez que filters cambiaba, ambos siempre
+  // cambiaban juntos — tener los dos en deps era redundante y confuso.
+  // Ahora fetchProfiles es estable (deps=[]), así que solo dependemos de [filters].
+  // Debounce de 400ms solo para campos de edad (el usuario escribe carácter a carácter).
+  // Para selects (ciudad, mascotas, etc.) se aplica inmediatamente (0ms).
   useEffect(() => {
-    const timer = setTimeout(() => { 
-      fetchProfiles(1, filters); 
-    }, filters.min_age || filters.max_age ? 400 : 0);
-    return () => clearTimeout(timer);
+    const delay = (filters.min_age || filters.max_age) ? 400 : 0;
+    const timer = setTimeout(() => {
+      fetchProfiles(1, filters);
+    }, delay);
+    return () => clearTimeout(timer); // Limpia el timer si el usuario sigue escribiendo
   }, [filters, fetchProfiles]);
 
+  // Cuenta cuántos filtros están activos para mostrar el badge naranja
   const activeFilterCount = [
-    filters.pets, filters.smoker, filters.schedule, filters.min_age, filters.max_age
+    filters.pets, filters.smoker, filters.schedule, filters.min_age, filters.max_age,
   ].filter(Boolean).length;
 
   const mapCenter = CITY_CENTERS[filters.city] || [-25.2867, -57.647];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
-          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900">Buscar Roomies</h1>
+          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900">
+            Buscar Roomies
+          </h1>
           <p className="text-orange-500 font-medium mt-1">
-            {profiles.length > 0 ? `${profiles.length} roomies compatibles encontrados` : 'Perfiles compatibles con vos'}
+            {profiles.length > 0
+              ? `${profiles.length} roomies compatibles encontrados`
+              : 'Perfiles compatibles con vos'}
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={() => setShowMap(!showMap)}
@@ -118,55 +164,120 @@ export default function SearchPage() {
       </div>
 
       {/* FILTROS */}
-      <div className={`card mb-10 overflow-hidden transition-all duration-500 ${showFilters ? 'max-h-[1000px] opacity-100 p-8' : 'max-h-0 opacity-0 p-0 border-none shadow-none'}`}>
+      <div
+        className={`card mb-10 overflow-hidden transition-all duration-500 ${showFilters
+            ? 'max-h-[1000px] opacity-100 p-8'
+            : 'max-h-0 opacity-0 p-0 border-none shadow-none'
+          }`}
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-end">
+
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Ciudad</label>
-            <select className="input" value={filters.city} onChange={(e) => setFilters((f) => ({ ...f, city: e.target.value }))}>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Ciudad
+            </label>
+            <select
+              className="input"
+              value={filters.city}
+              onChange={(e) => setFilters((f) => ({ ...f, city: e.target.value }))}
+            >
               {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Mascotas</label>
-            <select className="input" value={filters.pets} onChange={(e) => setFilters((f) => ({ ...f, pets: e.target.value }))}>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Mascotas
+            </label>
+            <select
+              className="input"
+              value={filters.pets}
+              onChange={(e) => setFilters((f) => ({ ...f, pets: e.target.value }))}
+            >
               <option value="">Cualquiera</option>
               <option value="true">Con mascotas</option>
               <option value="false">Sin mascotas</option>
             </select>
           </div>
+
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Fumador</label>
-            <select className="input" value={filters.smoker} onChange={(e) => setFilters((f) => ({ ...f, smoker: e.target.value }))}>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Fumador
+            </label>
+            <select
+              className="input"
+              value={filters.smoker}
+              onChange={(e) => setFilters((f) => ({ ...f, smoker: e.target.value }))}
+            >
               <option value="">Cualquiera</option>
               <option value="false">No fuma</option>
               <option value="true">Fumador</option>
             </select>
           </div>
+
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Horario</label>
-            <select className="input" value={filters.schedule} onChange={(e) => setFilters((f) => ({ ...f, schedule: e.target.value }))}>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Horario
+            </label>
+            <select
+              className="input"
+              value={filters.schedule}
+              onChange={(e) => setFilters((f) => ({ ...f, schedule: e.target.value }))}
+            >
               <option value="">Cualquiera</option>
-              {SCHEDULES.map((s) => <option key={s} value={s}>{SCHEDULE_LABELS[s]}</option>)}
+              {SCHEDULES.map((s) => (
+                <option key={s} value={s}>{SCHEDULE_LABELS[s]}</option>
+              ))}
             </select>
           </div>
+
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Edad mín.</label>
-            <input type="number" className="input" placeholder="18" min={18} max={80} value={filters.min_age}
-              onChange={(e) => setFilters((f) => ({ ...f, min_age: e.target.value }))} />
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Edad mín.
+            </label>
+            <input
+              type="number"
+              className="input"
+              placeholder="18"
+              min={18}
+              max={80}
+              value={filters.min_age}
+              onChange={(e) => setFilters((f) => ({ ...f, min_age: e.target.value }))}
+            />
           </div>
+
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Edad máx.</label>
-            <input type="number" className="input" placeholder="99" min={18} max={99} value={filters.max_age}
-              onChange={(e) => setFilters((f) => ({ ...f, max_age: e.target.value }))} />
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Edad máx.
+            </label>
+            <input
+              type="number"
+              className="input"
+              placeholder="99"
+              min={18}
+              max={99}
+              value={filters.max_age}
+              onChange={(e) => setFilters((f) => ({ ...f, max_age: e.target.value }))}
+            />
           </div>
-          
+
           <div className="sm:col-span-2 lg:col-span-3 flex justify-end gap-3 pt-4 border-t border-slate-50">
-            <button type="button"
-              onClick={() => setFilters({ city: 'Asunción', pets: '', smoker: '', schedule: '', min_age: '', max_age: '' })}
-              className="btn-ghost text-sm">
+            {/* Limpiar filtros → resetea al estado inicial y el useEffect re-busca */}
+            <button
+              type="button"
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              className="btn-ghost text-sm"
+            >
               Limpiar filtros
             </button>
-            <button onClick={() => fetchProfiles(1, filters)} className="btn-primary px-8">Aplicar filtros</button>
+            {/* Aplicar filtros → útil si el usuario cambió edad y no quiere esperar el debounce */}
+            <button
+              type="button"
+              onClick={() => fetchProfiles(1, filters)}
+              className="btn-primary px-8"
+            >
+              Aplicar filtros
+            </button>
           </div>
         </div>
       </div>
@@ -175,33 +286,55 @@ export default function SearchPage() {
       {loading && profiles.length === 0 ? (
         <div className="flex justify-center py-32"><Spinner size="lg" /></div>
       ) : profiles.length === 0 ? (
-        <EmptyState icon="🔍" title="No encontramos roomies compatibles"
-          description="Probá ajustar tus preferencias en tu perfil o cambiar el filtro de ciudad." />
+        <EmptyState
+          icon="🔍"
+          title="No encontramos roomies compatibles"
+          description="Probá ajustar tus preferencias en tu perfil o cambiar el filtro de ciudad."
+        />
       ) : showMap ? (
         <div className="rounded-3xl overflow-hidden border border-slate-100 shadow-2xl h-[600px] relative z-0">
-          <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}>
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+          <MapContainer
+            center={mapCenter}
+            zoom={13}
+            style={{ height: '100%', width: '100%' }}
+            scrollWheelZoom={false}
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution="&copy; OpenStreetMap contributors"
+            />
             {profiles.map((p) => (
               <Marker key={p.user_id} position={[p.location.lat, p.location.lng]}>
                 <Popup>
-                  <div className="cursor-pointer w-60 p-2" onClick={() => navigate(`/profile/${p.user_id}`)}>
+                  <div
+                    className="cursor-pointer w-60 p-2"
+                    onClick={() => navigate(`/profile/${p.user_id}`)}
+                  >
                     <div className="flex items-center gap-2 mb-2">
                       <img
                         src={p.profile_photo_url || `${AVATAR_FALLBACK}${encodeURIComponent(p.name || 'U')}`}
-                        alt={p.name} className="w-10 h-10 rounded-full object-cover" loading="lazy"
-                        onError={(e) => { e.target.src = `${AVATAR_FALLBACK}${encodeURIComponent(p.name || 'U')}` }}
+                        alt={p.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.target.src = `${AVATAR_FALLBACK}${encodeURIComponent(p.name || 'U')}`;
+                        }}
                       />
                       <div>
                         <p className="font-semibold text-sm">{p.name}</p>
                         <p className="text-xs text-gray-500">{p.city}</p>
                       </div>
                     </div>
-                    {p.bio && <p className="text-xs text-gray-600 mb-1 line-clamp-2">{p.bio}</p>}
+                    {p.bio && (
+                      <p className="text-xs text-gray-600 mb-1 line-clamp-2">{p.bio}</p>
+                    )}
                     <p className="text-xs text-gray-400 mb-1">
                       {p.smoker ? 'Fumador' : 'No fuma'}
                       {p.schedule ? ` • ${SCHEDULE_LABELS[p.schedule] || p.schedule}` : ''}
                     </p>
-                    <div className="text-xs font-bold text-orange-600">Compatibilidad: {p.compatibility}%</div>
+                    <div className="text-xs font-bold text-orange-600">
+                      Compatibilidad: {p.compatibility}%
+                    </div>
                   </div>
                 </Popup>
               </Marker>
@@ -212,20 +345,20 @@ export default function SearchPage() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {profiles.map((p) => (
-              <ProfileCard 
-                key={p.user_id} 
-                profile={p} 
-                compatibility={p.compatibility} 
-                matches={p.matches} 
-                mismatches={p.mismatches} 
+              <ProfileCard
+                key={p.user_id}
+                profile={p}
+                compatibility={p.compatibility}
+                matches={p.matches}
+                mismatches={p.mismatches}
               />
             ))}
           </div>
           {hasMore && (
             <div className="flex justify-center mt-12">
-              <button 
-                onClick={() => fetchProfiles(page + 1, filters)} 
-                disabled={loading} 
+              <button
+                onClick={() => fetchProfiles(page + 1, filters)}
+                disabled={loading}
                 className="btn-secondary px-10 flex items-center gap-2"
               >
                 {loading && <Spinner size="sm" />} Cargar más

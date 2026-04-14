@@ -15,7 +15,11 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import (
     create_access_token,
     get_jwt,
-    get_jwt_identity,
+    # BUG CORREGIDO: eliminamos get_jwt_identity de este archivo.
+    # Antes: user_id = int(get_jwt_identity()) en get_me() → crasheaba si el
+    # sub del token no era un entero válido.
+    # Ahora: usamos get_current_user() que maneja eso de forma segura y además
+    # devuelve 401 (no 404) si el usuario fue eliminado.
     jwt_required,
 )
 from google.oauth2 import id_token as google_id_token
@@ -23,10 +27,8 @@ from google.auth.transport import requests as google_requests
 
 from ..extensions import db, limiter
 from ..models import Profile, TokenBlocklist, User
+from ..utils.jwt_helpers import get_current_user
 
-# Blueprint: le dice a Flask que estas rutas pertenecen al grupo "auth".
-# __init__.py las registra con url_prefix="/api/auth", así que cada ruta
-# aquí es relativa — "/login" se convierte en "/api/auth/login".
 auth_bp = Blueprint("auth", __name__)
 
 
@@ -63,9 +65,6 @@ def _build_auth_response(user: User, is_new_user: bool = False) -> dict:
 def register():
     data = request.get_json()
 
-    # ── Validaciones de entrada ───────────────────────────────────────────────
-    # Validamos primero y devolvemos mensajes claros.
-    # Beneficio para el usuario: sabe exactamente qué falta completar.
     name = (data.get("name") or "").strip()
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
@@ -77,25 +76,13 @@ def register():
     if len(password) < 6:
         return jsonify({"error": "La contraseña debe tener al menos 6 caracteres"}), 400
 
-    # ── Verificar email duplicado ─────────────────────────────────────────────
-    # ¿Por qué verificamos antes de hacer commit?
-    # Si no chequeamos, la DB lanza IntegrityError (email es UNIQUE).
-    # Capturar esa excepción es posible pero devuelve un mensaje genérico.
-    # Este chequeo explícito nos permite devolver "El email ya está registrado"
-    # — mensaje claro que el usuario entiende.
     if User.query.filter_by(email=email).first():
         return jsonify({"error": "El email ya está registrado"}), 409
 
-    # ── Crear usuario y perfil ────────────────────────────────────────────────
-    # Creamos User y Profile en la misma transacción.
-    # ¿Por qué? Si el Profile fallara en una segunda transacción, tendríamos
-    # un User sin Profile — estado inconsistente que rompería toda la app.
     user = User(email=email)
-    user.set_password(
-        password
-    )  # bcrypt hashea internamente — nunca guardamos texto plano
+    user.set_password(password)
     db.session.add(user)
-    db.session.flush()  # flush() asigna user.id sin hacer commit todavía
+    db.session.flush()
 
     profile = Profile(user_id=user.id, name=name)
     db.session.add(profile)
@@ -121,14 +108,12 @@ def login():
 
     user = User.query.filter_by(email=email).first()
 
-    # check_password() usa bcrypt para comparar — nunca comparamos texto plano
     if not user or not user.check_password(password):
         return jsonify({"error": "Credenciales incorrectas"}), 401
 
     if user.is_blocked():
         return jsonify({"error": "Tu cuenta está suspendida. Contactá soporte."}), 403
 
-    # Actualizamos last_login para saber cuándo fue el último acceso
     user.last_login = datetime.utcnow()
     db.session.commit()
 
@@ -138,17 +123,6 @@ def login():
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/auth/google
 # ─────────────────────────────────────────────────────────────────────────────
-# ¿Cómo funciona Google OAuth con id_token?
-# 1. El frontend usa el SDK de Google → el usuario hace clic en "Login con Google"
-# 2. Google le entrega al frontend un id_token (JWT firmado por Google)
-# 3. El frontend envía ese token a NUESTRO backend
-# 4. Nuestro backend lo VERIFICA contra los servidores de Google
-# 5. Si es válido, extraemos el email y creamos/encontramos el usuario
-#
-# ¿Por qué verificamos en el backend y no confiamos en el frontend?
-# Cualquiera podría fabricar un JSON con "email: admin@jaiko.com" y enviarlo.
-# La verificación criptográfica de Google garantiza que el token es auténtico.
-#
 @auth_bp.route("/google", methods=["POST"])
 @limiter.limit("10 per minute")
 def google_login():
@@ -158,43 +132,31 @@ def google_login():
     if not token:
         return jsonify({"error": "id_token requerido"}), 400
 
-    # ── Verificar el token con Google ─────────────────────────────────────────
     try:
         client_id = current_app.config["GOOGLE_CLIENT_ID"]
-        # google_id_token.verify_oauth2_token hace una petición a los servidores
-        # de Google para validar la firma criptográfica del token
         id_info = google_id_token.verify_oauth2_token(
             token,
             google_requests.Request(),
             client_id,
         )
     except ValueError as e:
-        # ValueError significa que el token es inválido o expiró
         return jsonify({"error": f"Token de Google inválido: {str(e)}"}), 401
 
-    google_sub = id_info.get("sub")  # ID único del usuario en Google
+    google_sub = id_info.get("sub")
     email = id_info.get("email", "").lower()
     name = id_info.get("name", "Usuario")
 
     if not email:
         return jsonify({"error": "No se pudo obtener el email de Google"}), 400
 
-    # ── Buscar usuario existente o crear uno nuevo ────────────────────────────
-    # Buscamos primero por google_id (más específico), luego por email.
-    # ¿Por qué buscar por email también?
-    # Un usuario pudo haberse registrado antes con email+contraseña con el
-    # mismo email. En ese caso vinculamos su google_id a la cuenta existente
-    # en lugar de crear una cuenta duplicada.
     is_new = False
     user = User.query.filter_by(google_id=google_sub).first()
 
     if not user:
         user = User.query.filter_by(email=email).first()
         if user:
-            # Vincular cuenta existente con Google
             user.google_id = google_sub
         else:
-            # Crear cuenta nueva
             is_new = True
             user = User(email=email, google_id=google_sub)
             db.session.add(user)
@@ -225,11 +187,17 @@ def google_login():
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_me():
-    user_id = int(get_jwt_identity())
-    user = User.query.get(user_id)
-
-    if not user or user.is_blocked():
-        return jsonify({"error": "Usuario no encontrado o suspendido"}), 404
+    # BUG CORREGIDO: antes usábamos int(get_jwt_identity()) + User.query.get()
+    # y devolvíamos 404 si el usuario no existía.
+    # Problema doble:
+    #   1. int() sin try/except crasheaba con ValueError si el sub no era número.
+    #   2. 404 en un endpoint autenticado confunde al frontend — no sabe que
+    #      debe limpiar el token y redirigir al login.
+    # Ahora get_current_user() devuelve 401 en ambos casos, y el interceptor
+    # de Axios en api.js ya maneja el 401 redirigiendo al login automáticamente.
+    user, err = get_current_user()
+    if err:
+        return err
 
     return (
         jsonify(
@@ -257,9 +225,8 @@ def get_me():
 @auth_bp.route("/logout", methods=["POST"])
 @jwt_required()
 def logout():
-    jti = get_jwt()["jti"]  # jti = identificador único de ESTE token específico
+    jti = get_jwt()["jti"]
 
-    # Si por alguna razón el token ya estaba en la blocklist, no fallamos
     if not TokenBlocklist.query.filter_by(jti=jti).first():
         db.session.add(TokenBlocklist(jti=jti))
         db.session.commit()

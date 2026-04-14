@@ -1,19 +1,22 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required
 from ..extensions import db
 from ..models import Group, GroupMember, Chat, ChatMember
 from ..services.notification_service import send_notification
+from ..utils.jwt_helpers import get_current_user_id
 
 group_bp = Blueprint("groups", __name__)
 
 
-# --- Listar grupos ---
+# ── Listar grupos ─────────────────────────────────────────────────────────────
 @group_bp.route("/", methods=["GET"])
 @jwt_required()
 def list_groups():
     city = request.args.get("city", "Asunción")
-    page = int(request.args.get("page", 1))
-    per_page = int(request.args.get("per_page", 20))
+
+    # BUG CORREGIDO: int(request.args.get(...)) → type=int
+    page = request.args.get("page", 1, type=int) or 1
+    per_page = request.args.get("per_page", 20, type=int) or 20
 
     q = Group.query.filter(Group.city == city, Group.status == "open")
     total = q.count()
@@ -31,13 +34,16 @@ def list_groups():
     )
 
 
-# --- Crear grupo ---
+# ── Crear grupo ───────────────────────────────────────────────────────────────
 @group_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_group():
-    user_id = int(get_jwt_identity())
-    data = request.get_json()
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
+    data = request.get_json()
     if not data.get("name"):
         return jsonify({"error": "El nombre del grupo es requerido"}), 400
 
@@ -56,13 +62,12 @@ def create_group():
     db.session.add(group)
     db.session.flush()
 
-    # Creador entra como admin
-    member = GroupMember(
-        group_id=group.id, user_id=user_id, role="admin", status="active"
+    # El creador entra automáticamente como admin
+    db.session.add(
+        GroupMember(group_id=group.id, user_id=user_id, role="admin", status="active")
     )
-    db.session.add(member)
 
-    # Crear chat grupal
+    # Crear el chat grupal asociado
     chat = Chat(type="group", group_id=group.id)
     db.session.add(chat)
     db.session.flush()
@@ -72,14 +77,14 @@ def create_group():
     return jsonify({"group": group.to_dict()}), 201
 
 
-# --- Obtener grupo ---
+# ── Obtener grupo ─────────────────────────────────────────────────────────────
 @group_bp.route("/<int:group_id>", methods=["GET"])
 @jwt_required()
 def get_group(group_id):
     group = Group.query.get_or_404(group_id)
     group_data = group.to_dict()
 
-    # Incluir solicitudes pendientes
+    # Incluir solicitudes pendientes para que el admin las vea
     pending_members = GroupMember.query.filter_by(
         group_id=group_id, status="pending"
     ).all()
@@ -98,13 +103,16 @@ def get_group(group_id):
     return jsonify({"group": group_data}), 200
 
 
-# --- Unirse directamente al grupo ---
+# ── Unirse directamente al grupo ──────────────────────────────────────────────
 @group_bp.route("/<int:group_id>/join", methods=["POST"])
 @jwt_required()
 def join_group(group_id):
-    user_id = int(get_jwt_identity())
-    group = Group.query.get_or_404(group_id)
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
+    group = Group.query.get_or_404(group_id)
     if group.is_full:
         return jsonify({"error": "El grupo está lleno"}), 400
 
@@ -115,14 +123,15 @@ def join_group(group_id):
     if existing:
         existing.status = "active"
     else:
-        member = GroupMember(group_id=group_id, user_id=user_id, status="active")
-        db.session.add(member)
+        db.session.add(GroupMember(group_id=group_id, user_id=user_id, status="active"))
 
-    # Agregar al chat del grupo
+    # Agregar al chat del grupo si no es miembro aún
     chat = Chat.query.filter_by(group_id=group_id).first()
-    if chat:
-        if not ChatMember.query.filter_by(chat_id=chat.id, user_id=user_id).first():
-            db.session.add(ChatMember(chat_id=chat.id, user_id=user_id))
+    if (
+        chat
+        and not ChatMember.query.filter_by(chat_id=chat.id, user_id=user_id).first()
+    ):
+        db.session.add(ChatMember(chat_id=chat.id, user_id=user_id))
 
     if group.current_members + 1 >= group.max_members:
         group.status = "full"
@@ -139,14 +148,18 @@ def join_group(group_id):
     return jsonify({"message": "Te uniste al grupo", "group": group.to_dict()}), 200
 
 
-# --- Solicitud de unirse al grupo ---
+# ── Solicitar unirse al grupo ─────────────────────────────────────────────────
 @group_bp.route("/<int:group_id>/join-request", methods=["POST"])
 @jwt_required()
 def request_join_group(group_id):
-    user_id = int(get_jwt_identity())
-    group = Group.query.get_or_404(group_id)
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
+    group = Group.query.get_or_404(group_id)
     existing = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+
     if existing and existing.status in ["active", "pending"]:
         return jsonify({"error": "Ya sos miembro o ya enviaste una solicitud"}), 400
 
@@ -162,7 +175,7 @@ def request_join_group(group_id):
         db.session.rollback()
         return jsonify({"error": f"No se pudo guardar la solicitud: {str(e)}"}), 500
 
-    # Notificar a todos los miembros activos
+    # Notificar a todos los miembros activos del grupo
     active_members = GroupMember.query.filter_by(
         group_id=group_id, status="active"
     ).all()
@@ -186,13 +199,17 @@ def request_join_group(group_id):
     )
 
 
-# --- Aceptar solicitud ---
+# ── Aceptar solicitud ─────────────────────────────────────────────────────────
 @group_bp.route(
     "/<int:group_id>/join-request/<int:request_id>/accept", methods=["POST"]
 )
 @jwt_required()
 def accept_join_request(group_id, request_id):
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     admin = GroupMember.query.filter_by(
         group_id=group_id, user_id=user_id, role="admin", status="active"
     ).first()
@@ -206,12 +223,15 @@ def accept_join_request(group_id, request_id):
     if group.current_members + 1 >= group.max_members:
         group.status = "full"
 
+    # Agregar al chat del grupo
     chat = Chat.query.filter_by(group_id=group_id).first()
-    if chat:
-        if not ChatMember.query.filter_by(
+    if (
+        chat
+        and not ChatMember.query.filter_by(
             chat_id=chat.id, user_id=request_member.user_id
-        ).first():
-            db.session.add(ChatMember(chat_id=chat.id, user_id=request_member.user_id))
+        ).first()
+    ):
+        db.session.add(ChatMember(chat_id=chat.id, user_id=request_member.user_id))
 
     db.session.commit()
 
@@ -225,33 +245,28 @@ def accept_join_request(group_id, request_id):
     return jsonify({"message": "Solicitud aceptada"}), 200
 
 
-# --- Rechazar solicitud ---
-# BUG #3 CORREGIDO: se agregó Group.query.get_or_404(group_id) para definir
-# la variable 'group' antes de usarla en send_notification(). Sin esta línea,
-# Python lanzaba NameError en runtime al intentar leer group.name.
+# ── Rechazar solicitud ────────────────────────────────────────────────────────
 @group_bp.route(
     "/<int:group_id>/join-request/<int:request_id>/reject", methods=["POST"]
 )
 @jwt_required()
 def reject_join_request(group_id, request_id):
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    # 1. Verificar que quien rechaza es admin activo del grupo
     admin = GroupMember.query.filter_by(
         group_id=group_id, user_id=user_id, role="admin", status="active"
     ).first()
     if not admin:
         return jsonify({"error": "Solo un admin puede rechazar solicitudes"}), 403
 
-    # 2. Obtener la solicitud y el grupo
     request_member = GroupMember.query.get_or_404(request_id)
-    group = Group.query.get_or_404(group_id)  # ← línea que faltaba (Bug #3)
-
-    # 3. Actualizar estado y persistir
+    group = Group.query.get_or_404(group_id)
     request_member.status = "rejected"
     db.session.commit()
 
-    # 4. Notificar al usuario rechazado (ahora group.name existe y no lanza error)
     send_notification(
         user_id=request_member.user_id,
         notif_type="request_rejected",
@@ -259,15 +274,18 @@ def reject_join_request(group_id, request_id):
         content="Tu solicitud fue rechazada.",
         data={"group_id": group_id},
     )
-
     return jsonify({"message": "Solicitud rechazada"}), 200
 
 
-# --- Salir del grupo ---
+# ── Salir del grupo ───────────────────────────────────────────────────────────
 @group_bp.route("/<int:group_id>/leave", methods=["POST"])
 @jwt_required()
 def leave_group(group_id):
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
     if not member:
         return jsonify({"error": "No sos miembro de este grupo"}), 404
@@ -279,6 +297,7 @@ def leave_group(group_id):
 
     db.session.commit()
 
+    # Si no quedan miembros activos, eliminar el grupo y su chat
     active_count = GroupMember.query.filter_by(
         group_id=group_id, status="active"
     ).count()
@@ -293,28 +312,32 @@ def leave_group(group_id):
     return jsonify({"message": "Saliste del grupo"}), 200
 
 
-# --- Mis grupos ---
+# ── Mis grupos ────────────────────────────────────────────────────────────────
 @group_bp.route("/my", methods=["GET"])
 @jwt_required()
 def my_groups():
-    user_id = int(get_jwt_identity())
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+
     memberships = GroupMember.query.filter_by(user_id=user_id, status="active").all()
     groups = [m.group.to_dict() for m in memberships]
     return jsonify({"groups": groups}), 200
 
 
-# --- Actualizar grupo ---
+# ── Actualizar grupo ──────────────────────────────────────────────────────────
 @group_bp.route("/<int:group_id>", methods=["PUT"])
 @jwt_required()
 def update_group(group_id):
-    user_id = int(get_jwt_identity())
-    group = Group.query.get_or_404(group_id)
+    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    user_id = get_current_user_id()
+    if user_id is None:
+        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
+    group = Group.query.get_or_404(group_id)
     member = GroupMember.query.filter_by(
-        group_id=group_id,
-        user_id=user_id,
-        status="active",
-        role="admin",
+        group_id=group_id, user_id=user_id, status="active", role="admin"
     ).first()
     if not member:
         return jsonify({"error": "Solo el administrador del grupo puede editarlo"}), 403
