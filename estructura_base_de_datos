@@ -1,0 +1,227 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.alembic_version (
+  version_num character varying NOT NULL,
+  CONSTRAINT alembic_version_pkey PRIMARY KEY (version_num)
+);
+CREATE TABLE public.chat_members (
+  id integer NOT NULL DEFAULT nextval('chat_members_id_seq'::regclass),
+  chat_id integer NOT NULL,
+  user_id integer NOT NULL,
+  joined_at timestamp without time zone,
+  last_read_at timestamp without time zone,
+  CONSTRAINT chat_members_pkey PRIMARY KEY (id),
+  CONSTRAINT chat_members_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id),
+  CONSTRAINT chat_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.chat_participants (
+  chat_id integer NOT NULL,
+  user_id integer NOT NULL,
+  joined_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chat_participants_pkey PRIMARY KEY (chat_id, user_id),
+  CONSTRAINT chat_participants_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id),
+  CONSTRAINT chat_participants_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.chats (
+  id integer NOT NULL DEFAULT nextval('chats_id_seq'::regclass),
+  type character varying NOT NULL,
+  group_id integer,
+  listing_id integer,
+  created_at timestamp without time zone,
+  CONSTRAINT chats_pkey PRIMARY KEY (id),
+  CONSTRAINT chats_group_id_fkey FOREIGN KEY (group_id) REFERENCES public.groups(id),
+  CONSTRAINT chats_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(id)
+);
+CREATE TABLE public.group_members (
+  id integer NOT NULL DEFAULT nextval('group_members_id_seq'::regclass),
+  group_id integer NOT NULL,
+  user_id integer NOT NULL,
+  role character varying,
+  status character varying,
+  joined_at timestamp without time zone,
+  CONSTRAINT group_members_pkey PRIMARY KEY (id),
+  CONSTRAINT group_members_group_id_fkey FOREIGN KEY (group_id) REFERENCES public.groups(id),
+  CONSTRAINT group_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.groups (
+  id integer NOT NULL DEFAULT nextval('groups_id_seq'::regclass),
+  name character varying NOT NULL,
+  description text,
+  city character varying NOT NULL,
+  max_members integer NOT NULL,
+  created_by integer NOT NULL,
+  status character varying,
+  budget_max integer,
+  pets_allowed boolean,
+  smoking_allowed boolean,
+  created_at timestamp without time zone,
+  updated_at timestamp without time zone,
+  CONSTRAINT groups_pkey PRIMARY KEY (id),
+  CONSTRAINT groups_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.listing_photos (
+  id integer NOT NULL DEFAULT nextval('listing_photos_id_seq'::regclass),
+  listing_id integer NOT NULL,
+  photo_url character varying NOT NULL,
+  order integer,
+  created_at timestamp without time zone,
+  CONSTRAINT listing_photos_pkey PRIMARY KEY (id),
+  CONSTRAINT listing_photos_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(id)
+);
+CREATE TABLE public.listings (
+  id integer NOT NULL DEFAULT nextval('listings_id_seq'::regclass),
+  owner_id integer NOT NULL,
+  title character varying NOT NULL,
+  description text,
+  city character varying NOT NULL,
+  neighborhood character varying,
+  address character varying,
+  latitude double precision,
+  longitude double precision,
+  total_price integer NOT NULL,
+  rooms integer NOT NULL,
+  bathrooms integer,
+  max_people integer NOT NULL,
+  pets_allowed boolean,
+  smoking_allowed boolean,
+  furnished boolean,
+  type character varying,
+  status character varying,
+  created_at timestamp without time zone,
+  updated_at timestamp without time zone,
+  CONSTRAINT listings_pkey PRIMARY KEY (id),
+  CONSTRAINT listings_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.messages (
+  id integer NOT NULL DEFAULT nextval('messages_id_seq'::regclass),
+  chat_id integer NOT NULL,
+  sender_id integer NOT NULL,
+  content text NOT NULL,
+  type character varying,
+  created_at timestamp without time zone,
+  CONSTRAINT messages_pkey PRIMARY KEY (id),
+  CONSTRAINT messages_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id),
+  CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.notifications (
+  id integer NOT NULL DEFAULT nextval('notifications_id_seq'::regclass),
+  user_id integer NOT NULL,
+  type character varying NOT NULL,
+  title character varying NOT NULL,
+  content text,
+  data json,
+  read boolean,
+  created_at timestamp without time zone,
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.profiles (
+  id integer NOT NULL DEFAULT nextval('profiles_id_seq'::regclass),
+  user_id integer NOT NULL UNIQUE,
+  name character varying NOT NULL,
+  age integer,
+  gender character varying,
+  profession character varying,
+  bio text,
+  budget_min integer,
+  budget_max integer,
+  pets boolean,
+  smoker boolean,
+  schedule character varying,
+  diseases text,
+  profile_photo_url character varying,
+  city character varying,
+  verified boolean,
+  verification_status character varying,
+  is_looking boolean,
+  created_at timestamp without time zone,
+  updated_at timestamp without time zone,
+  lat double precision,
+  lng double precision,
+  pref_min_age integer DEFAULT 18,
+  pref_max_age integer DEFAULT 99,
+  current_roomie_id integer,
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_current_roomie_id_fkey FOREIGN KEY (current_roomie_id) REFERENCES public.users(id),
+  CONSTRAINT profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.reports (
+  id integer NOT NULL DEFAULT nextval('reports_id_seq'::regclass),
+  reporter_id integer NOT NULL,
+  reported_user_id integer,
+  reported_listing_id integer,
+  reason character varying NOT NULL,
+  description text,
+  status character varying,
+  admin_note text,
+  reviewed_by integer,
+  created_at timestamp without time zone,
+  updated_at timestamp without time zone,
+  CONSTRAINT reports_pkey PRIMARY KEY (id),
+  CONSTRAINT reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES public.users(id),
+  CONSTRAINT reports_reported_user_id_fkey FOREIGN KEY (reported_user_id) REFERENCES public.users(id),
+  CONSTRAINT reports_reported_listing_id_fkey FOREIGN KEY (reported_listing_id) REFERENCES public.listings(id),
+  CONSTRAINT reports_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.reviews (
+  id integer NOT NULL DEFAULT nextval('reviews_id_seq'::regclass),
+  reviewer_id integer NOT NULL,
+  target_user_id integer,
+  listing_id integer,
+  rating integer NOT NULL,
+  comment text,
+  created_at timestamp without time zone,
+  CONSTRAINT reviews_pkey PRIMARY KEY (id),
+  CONSTRAINT reviews_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.users(id),
+  CONSTRAINT reviews_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES public.users(id),
+  CONSTRAINT reviews_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(id)
+);
+CREATE TABLE public.roommate_requests (
+  id integer NOT NULL DEFAULT nextval('roommate_requests_id_seq'::regclass),
+  sender_user_id integer NOT NULL,
+  target_user_id integer,
+  group_id integer,
+  listing_id integer,
+  type character varying,
+  status character varying,
+  message text,
+  created_at timestamp without time zone,
+  updated_at timestamp without time zone,
+  CONSTRAINT roommate_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT roommate_requests_sender_user_id_fkey FOREIGN KEY (sender_user_id) REFERENCES public.users(id),
+  CONSTRAINT roommate_requests_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES public.users(id),
+  CONSTRAINT roommate_requests_group_id_fkey FOREIGN KEY (group_id) REFERENCES public.groups(id),
+  CONSTRAINT roommate_requests_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(id)
+);
+CREATE TABLE public.token_blocklist (
+  id integer NOT NULL DEFAULT nextval('token_blocklist_id_seq'::regclass),
+  jti character varying NOT NULL UNIQUE,
+  created_at timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT token_blocklist_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.users (
+  id integer NOT NULL DEFAULT nextval('users_id_seq'::regclass),
+  email character varying NOT NULL,
+  google_id character varying UNIQUE,
+  role character varying NOT NULL,
+  status character varying NOT NULL,
+  created_at timestamp without time zone,
+  last_login timestamp without time zone,
+  password_hash character varying,
+  CONSTRAINT users_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.verification_requests (
+  id integer NOT NULL DEFAULT nextval('verification_requests_id_seq'::regclass),
+  user_id integer NOT NULL UNIQUE,
+  selfie_url character varying,
+  verification_code character varying NOT NULL,
+  status character varying,
+  reviewed_by integer,
+  rejection_reason text,
+  created_at timestamp without time zone,
+  updated_at timestamp without time zone,
+  CONSTRAINT verification_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT verification_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT verification_requests_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.users(id)
+);
