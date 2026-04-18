@@ -66,7 +66,7 @@
   }
 }
 
-/* Leaflet overrides */
+/* ── Leaflet overrides ─────────────────────────────────────────────────────── */
 .leaflet-container {
   @apply rounded-2xl font-body;
   z-index: 0;
@@ -80,4 +80,30 @@
 
 .leaflet-control {
   z-index: 1;
+}
+
+/* ── reCAPTCHA badge ───────────────────────────────────────────────────────────
+ *
+ * PROBLEMA: la librería react-google-recaptcha inyecta un badge flotante
+ * (.grecaptcha-badge) en el <body> cuando el componente monta por primera vez.
+ * Este badge PERSISTE en todas las páginas posteriores (chat, perfil, etc.)
+ * aunque el componente de RegisterPage ya haya desmontado, porque el script
+ * de reCAPTCHA se carga globalmente y no se limpia al navegar entre rutas.
+ *
+ * SOLUCIÓN: ocultarlo con visibility:hidden.
+ * Por qué visibility:hidden y no display:none:
+ *   - Google permite ocultarlo visualmente, pero sus Términos de Servicio
+ *     requieren que el sitio informe a los usuarios de la protección reCAPTCHA
+ *     (ej: en los Términos y Privacidad). visibility:hidden cumple eso.
+ *   - display:none a veces interfiere con el funcionamiento interno del widget.
+ *
+ * BENEFICIO para el usuario: el badge de "Protected by reCAPTCHA" deja de
+ * aparecer en el chat y en todas las demás páginas.
+ * ─────────────────────────────────────────────────────────────────────────── */
+.grecaptcha-badge {
+  visibility: hidden !important;
+  /* Colapsar dimensiones para que no ocupe espacio ni tape contenido */
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
 }

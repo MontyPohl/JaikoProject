@@ -63,6 +63,7 @@ ESTRUCTURA DEL PROYECTO:
                     map/
                         JaikoMap.jsx
                     ui/
+                        BackButton.jsx
                         index.jsx
                         ListingCard.jsx
                         Logo.jsx
@@ -72,6 +73,7 @@ ESTRUCTURA DEL PROYECTO:
                     notifStore.js
                 pages/
                     AdminPage.jsx
+                    BackButton.jsx
                     BottomNav.jsx
                     ChatPage.jsx
                     CreateListingPage.jsx
@@ -1698,12 +1700,31 @@ def get_messages(chat_id):
 
 FILE_PATH: .\JAIKO\backend\app\routes\group_routes.py
 ----------------------------------------
+"""
+app/routes/group_routes.py
+───────────────────────────
+Endpoints de grupos de búsqueda de roomies.
+
+Cambios respecto a la versión anterior:
+    Solo se modificó el endpoint GET / (list_groups).
+    Todos los demás endpoints están intactos y funcionan igual.
+
+    Filtros nuevos en GET /groups/:
+        pets_allowed     → filtra por Group.pets_allowed (boolean)
+        smoking_allowed  → filtra por Group.smoking_allowed (boolean)
+        budget_max       → filtra grupos con presupuesto <= al valor enviado
+"""
+
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
+from sqlalchemy import or_
 from ..extensions import db
 from ..models import Group, GroupMember, Chat, ChatMember
 from ..services.notification_service import send_notification
 from ..utils.jwt_helpers import get_current_user_id
+
+# ✅ NUEVO: parse_bool desde el helper compartido
+from ..utils.query_helpers import parse_bool
 
 group_bp = Blueprint("groups", __name__)
 
@@ -1712,20 +1733,70 @@ group_bp = Blueprint("groups", __name__)
 @group_bp.route("/", methods=["GET"])
 @jwt_required()
 def list_groups():
-    city = request.args.get("city", "Asunción")
-
-    # BUG CORREGIDO: int(request.args.get(...)) → type=int
-    page = request.args.get("page", 1, type=int) or 1
+    # ── Parámetros existentes (sin cambios) ────────────────────────────────────
+    city     = request.args.get("city", "Asunción")
+    page     = request.args.get("page",     1,  type=int) or 1
     per_page = request.args.get("per_page", 20, type=int) or 20
 
+    # ── ✅ NUEVOS: Filtros opcionales ──────────────────────────────────────────
+    #
+    # Mapeo frontend → DB:
+    #   ?pets_allowed=true/false   → Group.pets_allowed    (BOOLEAN)
+    #   ?smoking_allowed=true/false → Group.smoking_allowed (BOOLEAN)
+    #   ?budget_max=1500000        → Group.budget_max       (INTEGER)
+    #
+    # Todos son opcionales. Si no vienen en la URL, no se aplican.
+    # parse_bool convierte "true"/"false" → True/False (ver utils/query_helpers.py)
+
+    pets_filter    = parse_bool(request.args.get("pets_allowed"))
+    smoking_filter = parse_bool(request.args.get("smoking_allowed"))
+
+    # type=int en Flask: si el valor no es un entero válido (o no viene),
+    # devuelve None sin explotar con un ValueError.
+    budget_max_filter = request.args.get("budget_max", type=int)
+
+    # ── Query base (igual que antes) ──────────────────────────────────────────
     q = Group.query.filter(Group.city == city, Group.status == "open")
-    total = q.count()
+
+    # ── ✅ Aplicar filtros booleanos ──────────────────────────────────────────
+    #
+    # Por qué "is not None" y no solo "if pets_filter":
+    #   Si el usuario pide pets_allowed=false, pets_filter == False.
+    #   `if False` no ejecutaría el filtro → bug silencioso.
+    #   `if pets_filter is not None` distingue "no enviado" de "enviado como False".
+    if pets_filter is not None:
+        q = q.filter(Group.pets_allowed == pets_filter)
+
+    if smoking_filter is not None:
+        q = q.filter(Group.smoking_allowed == smoking_filter)
+
+    # ── ✅ Aplicar filtro de presupuesto ──────────────────────────────────────
+    #
+    # Semántica: el usuario quiere grupos cuyo presupuesto max sea <= su budget.
+    # Ejemplo: si envía ?budget_max=1500000, ve grupos con budget_max ≤ 1,500,000.
+    #
+    # Por qué or_(Group.budget_max == None, ...):
+    #   Algunos grupos no tienen budget_max definido (campo nullable).
+    #   NULL en SQL nunca es <= a nada → esos grupos quedarían excluidos.
+    #   Con el or_, los grupos sin presupuesto definido siempre aparecen,
+    #   porque NULL = "sin restricción de presupuesto" (más permisivo).
+    if budget_max_filter is not None:
+        q = q.filter(
+            or_(
+                Group.budget_max == None,
+                Group.budget_max <= budget_max_filter,
+            )
+        )
+
+    # ── Paginación y respuesta (igual que antes) ───────────────────────────────
+    total  = q.count()
     groups = (
         q.order_by(Group.created_at.desc())
         .offset((page - 1) * per_page)
         .limit(per_page)
         .all()
     )
+
     return (
         jsonify(
             {"groups": [g.to_dict() for g in groups], "total": total, "page": page}
@@ -1738,7 +1809,6 @@ def list_groups():
 @group_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_group():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -1762,12 +1832,10 @@ def create_group():
     db.session.add(group)
     db.session.flush()
 
-    # El creador entra automáticamente como admin
     db.session.add(
         GroupMember(group_id=group.id, user_id=user_id, role="admin", status="active")
     )
 
-    # Crear el chat grupal asociado
     chat = Chat(type="group", group_id=group.id)
     db.session.add(chat)
     db.session.flush()
@@ -1781,10 +1849,9 @@ def create_group():
 @group_bp.route("/<int:group_id>", methods=["GET"])
 @jwt_required()
 def get_group(group_id):
-    group = Group.query.get_or_404(group_id)
+    group      = Group.query.get_or_404(group_id)
     group_data = group.to_dict()
 
-    # Incluir solicitudes pendientes para que el admin las vea
     pending_members = GroupMember.query.filter_by(
         group_id=group_id, status="pending"
     ).all()
@@ -1807,7 +1874,6 @@ def get_group(group_id):
 @group_bp.route("/<int:group_id>/join", methods=["POST"])
 @jwt_required()
 def join_group(group_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -1825,7 +1891,6 @@ def join_group(group_id):
     else:
         db.session.add(GroupMember(group_id=group_id, user_id=user_id, status="active"))
 
-    # Agregar al chat del grupo si no es miembro aún
     chat = Chat.query.filter_by(group_id=group_id).first()
     if (
         chat
@@ -1852,12 +1917,11 @@ def join_group(group_id):
 @group_bp.route("/<int:group_id>/join-request", methods=["POST"])
 @jwt_required()
 def request_join_group(group_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    group = Group.query.get_or_404(group_id)
+    group    = Group.query.get_or_404(group_id)
     existing = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
 
     if existing and existing.status in ["active", "pending"]:
@@ -1875,7 +1939,6 @@ def request_join_group(group_id):
         db.session.rollback()
         return jsonify({"error": f"No se pudo guardar la solicitud: {str(e)}"}), 500
 
-    # Notificar a todos los miembros activos del grupo
     active_members = GroupMember.query.filter_by(
         group_id=group_id, status="active"
     ).all()
@@ -1905,7 +1968,6 @@ def request_join_group(group_id):
 )
 @jwt_required()
 def accept_join_request(group_id, request_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -1923,7 +1985,6 @@ def accept_join_request(group_id, request_id):
     if group.current_members + 1 >= group.max_members:
         group.status = "full"
 
-    # Agregar al chat del grupo
     chat = Chat.query.filter_by(group_id=group_id).first()
     if (
         chat
@@ -1951,7 +2012,6 @@ def accept_join_request(group_id, request_id):
 )
 @jwt_required()
 def reject_join_request(group_id, request_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -1963,7 +2023,7 @@ def reject_join_request(group_id, request_id):
         return jsonify({"error": "Solo un admin puede rechazar solicitudes"}), 403
 
     request_member = GroupMember.query.get_or_404(request_id)
-    group = Group.query.get_or_404(group_id)
+    group          = Group.query.get_or_404(group_id)
     request_member.status = "rejected"
     db.session.commit()
 
@@ -1981,7 +2041,6 @@ def reject_join_request(group_id, request_id):
 @group_bp.route("/<int:group_id>/leave", methods=["POST"])
 @jwt_required()
 def leave_group(group_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -1997,7 +2056,6 @@ def leave_group(group_id):
 
     db.session.commit()
 
-    # Si no quedan miembros activos, eliminar el grupo y su chat
     active_count = GroupMember.query.filter_by(
         group_id=group_id, status="active"
     ).count()
@@ -2016,13 +2074,12 @@ def leave_group(group_id):
 @group_bp.route("/my", methods=["GET"])
 @jwt_required()
 def my_groups():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
     memberships = GroupMember.query.filter_by(user_id=user_id, status="active").all()
-    groups = [m.group.to_dict() for m in memberships]
+    groups      = [m.group.to_dict() for m in memberships]
     return jsonify({"groups": groups}), 200
 
 
@@ -2030,12 +2087,11 @@ def my_groups():
 @group_bp.route("/<int:group_id>", methods=["PUT"])
 @jwt_required()
 def update_group(group_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    group = Group.query.get_or_404(group_id)
+    group  = Group.query.get_or_404(group_id)
     member = GroupMember.query.filter_by(
         group_id=group_id, user_id=user_id, status="active", role="admin"
     ).first()
@@ -2043,11 +2099,11 @@ def update_group(group_id):
         return jsonify({"error": "Solo el administrador del grupo puede editarlo"}), 403
 
     data = request.get_json()
-    group.name = data.get("name", group.name)
-    group.description = data.get("description", group.description)
-    group.city = data.get("city", group.city)
-    group.budget_max = data.get("budget_max", group.budget_max)
-    group.pets_allowed = data.get("pets_allowed", group.pets_allowed)
+    group.name            = data.get("name",            group.name)
+    group.description     = data.get("description",     group.description)
+    group.city            = data.get("city",            group.city)
+    group.budget_max      = data.get("budget_max",      group.budget_max)
+    group.pets_allowed    = data.get("pets_allowed",    group.pets_allowed)
     group.smoking_allowed = data.get("smoking_allowed", group.smoking_allowed)
 
     db.session.commit()
@@ -2383,6 +2439,20 @@ def send_test_notification():
 
 FILE_PATH: .\JAIKO\backend\app\routes\profile_routes.py
 ----------------------------------------
+"""
+app/routes/profile_routes.py
+─────────────────────────────
+Endpoints de perfiles de usuario.
+
+Cambios respecto a la versión anterior:
+    1. parse_bool ahora viene de utils.query_helpers (DRY).
+       La función _parse_bool local fue reemplazada por el import compartido.
+       Comportamiento idéntico — ningún endpoint existente se ve afectado.
+
+    2. GET /profiles/search ahora acepta el parámetro `gender`.
+       El frontend (SearchPage.jsx) ya lo envía desde la sesión anterior.
+"""
+
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from sqlalchemy import or_
@@ -2391,6 +2461,10 @@ from ..models import User, Profile
 from ..services.matching_service import compute_compatibility
 from ..utils.jwt_helpers import get_current_user, get_current_user_id
 
+# ✅ CAMBIO: parse_bool ahora viene del helper compartido.
+# Antes vivía aquí como _parse_bool. Misma lógica, sin duplicación.
+from ..utils.query_helpers import parse_bool
+
 profile_bp = Blueprint("profiles", __name__)
 
 
@@ -2398,8 +2472,6 @@ profile_bp = Blueprint("profiles", __name__)
 @profile_bp.route("/me", methods=["PUT"])
 @jwt_required()
 def update_my_profile():
-    # BUG #1 y #3 CORREGIDOS: get_current_user() maneja en un solo lugar
-    # la conversion int() segura Y el caso de usuario eliminado (devuelve 401, no 404).
     user, err = get_current_user()
     if err:
         return err
@@ -2447,19 +2519,6 @@ def get_profile(user_id):
     return jsonify({"profile": user.profile.to_dict() if user.profile else None}), 200
 
 
-# ── HELPER: parsear booleano de query string ──────────────────────────────────
-def _parse_bool(value):
-    """
-    Convierte un query param string a bool o None.
-    Acepta: "true", "1", "yes" → True
-            "false", "0", "no" → False
-            None, ""           → None (sin filtro aplicado)
-    """
-    if value is None or value == "":
-        return None
-    return value.lower() in ("true", "1", "yes")
-
-
 # ── BUSCAR PERFILES COMPATIBLES ───────────────────────────────────────────────
 @profile_bp.route("/search", methods=["GET"])
 @jwt_required()
@@ -2469,43 +2528,41 @@ def search_profiles():
         return err
     my_profile = current_user.profile
 
-    # ── Leer parámetros de la URL ─────────────────────────────────────────────
-
-    city = request.args.get("city", "Asunción")
-
-    # BUG #1 CORREGIDO: antes usábamos int(...) directo, lo que lanza ValueError
-    # si el frontend manda ?page=abc o un valor vacío accidentalmente.
-    # Con type=int, Flask devuelve el default sin explotar.
-    # El "or 1" y "or 20" cubren el caso de que llegue page=0 (inválido).
-    # Beneficio para el usuario: nunca ve un error 500 por un param malformado.
-    page = request.args.get("page", 1, type=int) or 1
+    # ── Parámetros de paginación y ciudad ─────────────────────────────────────
+    city     = request.args.get("city", "Asunción")
+    page     = request.args.get("page",     1,  type=int) or 1
     per_page = request.args.get("per_page", 20, type=int) or 20
+    per_page = min(per_page, 100)  # evita requests enormes
 
-    # BUG #2 CORREGIDO: limitamos per_page para evitar que alguien pida
-    # ?per_page=9999 y sature la base de datos con una sola petición.
-    # Beneficio: la API no puede ser abusada para hacer queries enormes.
-    per_page = min(per_page, 100)
+    # ── Filtros de perfil ─────────────────────────────────────────────────────
+    min_age       = request.args.get("min_age", type=int)
+    max_age       = request.args.get("max_age", type=int)
+    pets_filter   = parse_bool(request.args.get("pets"))
+    smoker_filter = parse_bool(request.args.get("smoker"))
 
-    min_age = request.args.get("min_age", type=int)
-    max_age = request.args.get("max_age", type=int)
-    pets_filter = _parse_bool(request.args.get("pets"))
-    smoker_filter = _parse_bool(request.args.get("smoker"))
-
-    # BUG #3 CORREGIDO: "or None" convierte string vacío "" a None.
-    # Si el select de horario tiene value="" (Cualquiera), sin este fix
-    # el backend intentaba filtrar Profile.schedule == "", devolviendo 0 resultados.
-    # Beneficio: seleccionar "Cualquiera" en horario sí muestra todos los perfiles.
+    # or None convierte "" (Cualquiera en el <select>) a None → no filtra
     schedule_filter = request.args.get("schedule") or None
 
-    # BUG #4 CORREGIDO: antes float(...) sin try/except crasheaba si llegaba
-    # ?min_score=abc. Ahora cae silenciosamente al default del 50%.
-    # Beneficio: un parámetro inesperado no rompe toda la búsqueda.
+    # ✅ NUEVO: filtro por género.
+    #
+    # El frontend (SearchPage.jsx) envía ?gender=male / ?gender=female / ?gender=other
+    # alineado con el campo `profiles.gender VARCHAR(30)` en la base de datos.
+    #
+    # El "or None" convierte "" (opción "Cualquiera") a None, para que
+    # no se agregue el filtro cuando el usuario no eligió ningún género.
+    #
+    # Ejemplo de queries válidas:
+    #   GET /profiles/search?gender=male
+    #   GET /profiles/search?gender=female&city=Asunción
+    #   GET /profiles/search              ← sin gender → no filtra
+    gender_filter = request.args.get("gender") or None
+
     try:
         min_score = float(request.args.get("min_score", 50)) / 100.0
     except (ValueError, TypeError):
         min_score = 0.50
 
-    # ── Construir query base ──────────────────────────────────────────────────
+    # ── Query base ────────────────────────────────────────────────────────────
     query = Profile.query.join(User, User.id == Profile.user_id).filter(
         Profile.user_id != current_user.id,
         Profile.is_looking == True,
@@ -2513,17 +2570,14 @@ def search_profiles():
         Profile.city == city,
     )
 
-    # Filtros de edad del roomie buscado
+    # ── Filtros de edad (con manejo de NULL) ──────────────────────────────────
     if min_age:
         query = query.filter(Profile.age >= min_age)
     if max_age:
         query = query.filter(Profile.age <= max_age)
 
-    # Filtro de reciprocidad con manejo de NULL.
-    # Si pref_min_age o pref_max_age es NULL en el candidato,
-    # lo incluimos — NULL significa "acepta cualquier edad".
-    # Sin el or_(...== None), SQL evalúa NULL <= 25 como NULL (falso)
-    # y excluiría a casi todos los perfiles.
+    # Reciprocidad: si mi perfil tiene edad, que los candidatos acepten esa edad.
+    # or_(...== None): NULL en pref_min_age/pref_max_age = "acepta cualquier edad"
     if my_profile and my_profile.age:
         query = query.filter(
             or_(Profile.pref_min_age == None, Profile.pref_min_age <= my_profile.age)
@@ -2532,40 +2586,47 @@ def search_profiles():
             or_(Profile.pref_max_age == None, Profile.pref_max_age >= my_profile.age)
         )
 
+    # ── Filtros booleanos ─────────────────────────────────────────────────────
     if pets_filter is not None:
         query = query.filter(Profile.pets == pets_filter)
     if smoker_filter is not None:
         query = query.filter(Profile.smoker == smoker_filter)
+
+    # ── Filtro de horario ─────────────────────────────────────────────────────
     if schedule_filter:
         query = query.filter(Profile.schedule == schedule_filter)
 
+    # ── ✅ NUEVO: Filtro por género ────────────────────────────────────────────
+    # Aplica solo si el usuario eligió un género específico.
+    # Mapeo: frontend `gender` → DB `profiles.gender` (mismo nombre, sin mapeo).
+    if gender_filter:
+        query = query.filter(Profile.gender == gender_filter)
+
     all_profiles = query.all()
 
-    # ── Calcular compatibilidad y aplicar umbral mínimo ───────────────────────
+    # ── Compatibilidad y umbral mínimo ────────────────────────────────────────
     results = []
     for p in all_profiles:
         score, matches, mismatches = compute_compatibility(my_profile, p)
         if score >= min_score:
             d = p.to_dict()
             d["compatibility"] = round(score * 100)
-            d["matches"] = matches
-            d["mismatches"] = mismatches
+            d["matches"]       = matches
+            d["mismatches"]    = mismatches
             results.append(d)
 
-    # Ordenar por compatibilidad descendente
     results.sort(key=lambda x: x["compatibility"], reverse=True)
 
-    # Paginar DESPUÉS de filtrar (correcto: pagina sobre los resultados reales)
-    total = len(results)
-    paged = results[(page - 1) * per_page : page * per_page]
+    total    = len(results)
+    paged    = results[(page - 1) * per_page : page * per_page]
     has_more = (page * per_page) < total
 
     return (
         jsonify(
             {
                 "profiles": paged,
-                "page": page,
-                "total": total,
+                "page":     page,
+                "total":    total,
                 "has_more": has_more,
             }
         ),
@@ -4321,59 +4382,93 @@ export default function AdminRoute() {
 FILE_PATH: .\JAIKO\frontend\src\components\layout\Layout.jsx
 ----------------------------------------
 import React, { useState, useEffect } from 'react';
-// ✅ CORRECCIÓN: Importamos Outlet junto con los demás hooks de react-router-dom.
-// Outlet es el "slot" donde React Router v6 inyecta la página hija activa.
-// Sin él, el Layout no sabe dónde poner HomePage, ChatPage, etc.
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { 
-  Home, 
-  Search, 
-  Users, 
-  Bell, 
-  User, 
-  LogOut, 
-  Menu, 
-  X,
-  MessageSquare,
-  Sparkles
+import {
+  Home, Search, Users, Bell, User, LogOut, Menu, X,
+  MessageSquare, Sparkles,
 } from 'lucide-react';
 import useAuthStore from '../../context/authStore';
 import useNotifStore from '../../context/notifStore';
 import { Avatar } from '../ui';
 import Logo from '../ui/Logo';
+import BackButton from '../ui/BackButton';
 import clsx from 'clsx';
 
+// ─── Navbar ───────────────────────────────────────────────────────────────────
 const Navbar = () => {
-  const { isAuthenticated, user, profile } = useAuthStore();
+  const { isAuthenticated, user, profile, logout } = useAuthStore();
   const { unread } = useNotifStore();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [isOpen, setIsOpen] = useState(false);
+  const location  = useLocation();
+  const navigate  = useNavigate();
+  const [isOpen, setIsOpen]       = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
+  // Detecta scroll para cambiar fondo del navbar
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    const onScroll = () => setIsScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // ✅ FIX: Cierra el menú automáticamente al cambiar de ruta.
+  // Por qué: sin esto el menú quedaba abierto al navegar, cubriendo
+  // el contenido de la página destino.
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
+
+  /**
+   * ✅ NUEVO: handleLogout correctamente conectado.
+   *
+   * Antes: el botón "Salir" no tenía ninguna acción (handler vacío).
+   * Ahora:
+   *   1. Cierra el menú hamburguesa.
+   *   2. Llama a logout() del authStore → invalida el token en el backend
+   *      Y limpia todo el estado local (user, profile, token).
+   *   3. Redirige a /login.
+   *
+   * Beneficio: el usuario queda correctamente deslogueado, su token
+   * queda en la blocklist del backend y no puede reutilizarse.
+   */
+  const handleLogout = async () => {
+    setIsOpen(false);
+    await logout();
+    navigate('/login');
+  };
 
   const navLinks = [
     { to: '/', label: 'Inicio', icon: Home },
     ...(isAuthenticated() ? [
-      { to: '/search', label: 'Buscar Roomie', icon: Sparkles },
-      { to: '/listings', label: 'Departamentos', icon: Search },
-      { to: '/groups', label: 'Grupos', icon: Users },
-      { to: '/chat', label: 'Chat', icon: MessageSquare },
+      { to: '/search',        label: 'Buscar Roomie',  icon: Sparkles      },
+      { to: '/listings',      label: 'Departamentos',  icon: Search        },
+      { to: '/groups',        label: 'Grupos',         icon: Users         },
+      { to: '/chat',          label: 'Chat',           icon: MessageSquare },
     ] : []),
   ];
 
   const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className={clsx(
-      'fixed top-0 left-0 w-full z-50 transition-all duration-300 px-6 py-4',
-      isScrolled ? 'bg-white/90 backdrop-blur-lg border-b border-orange-100 py-3' : 'bg-transparent'
-    )}>
+    /**
+     * ✅ FIX MENÚ HAMBURGUESA: Fondo transparente → fondo sólido cuando está abierto.
+     *
+     * Problema anterior: navbar era bg-transparent hasta hacer scroll, entonces
+     * al abrir el menú el botón X y los links quedaban difíciles de leer
+     * sobre el contenido/imagen de fondo de la página.
+     *
+     * Solución: cuando isOpen && !isScrolled, aplicamos bg-white + shadow
+     * al navbar, garantizando legibilidad perfecta.
+     *
+     * Técnica: clsx con condición anidada para no pisar los estilos de isScrolled.
+     */
+    <nav
+      className={clsx(
+        'fixed top-0 left-0 w-full z-50 transition-all duration-300 px-6',
+        isScrolled
+          ? 'bg-white/90 backdrop-blur-lg border-b border-orange-100 py-3'
+          : clsx('py-4', isOpen && 'bg-white shadow-sm border-b border-orange-100'),
+      )}
+    >
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
           <Logo className="w-10 h-10" />
@@ -4382,12 +4477,12 @@ const Navbar = () => {
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
           {navLinks.map((link) => (
-            <Link 
-              key={link.to} 
-              to={link.to} 
+            <Link
+              key={link.to}
+              to={link.to}
               className={clsx(
                 'text-sm font-bold transition-colors hover:text-orange-500',
-                isActive(link.to) ? 'text-blue-600' : 'text-blue-900'
+                isActive(link.to) ? 'text-blue-600' : 'text-blue-900',
               )}
             >
               {link.label}
@@ -4398,23 +4493,36 @@ const Navbar = () => {
         <div className="hidden md:flex items-center gap-4">
           {isAuthenticated() ? (
             <>
-              <Link to="/notifications" className="relative p-2 text-slate-400 hover:text-orange-500 transition-colors">
+              <Link
+                to="/notifications"
+                className="relative p-2 text-slate-400 hover:text-orange-500 transition-colors"
+              >
                 <Bell size={20} />
                 {unread > 0 && (
                   <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full border-2 border-white" />
                 )}
               </Link>
-              <Link to="/profile" className="flex items-center gap-3 pl-4 border-l border-slate-100">
+              <Link
+                to="/profile"
+                className="flex items-center gap-3 pl-4 border-l border-slate-100"
+              >
                 <div className="text-right">
-                  <p className="text-xs font-bold text-slate-900">{profile?.name || user?.email}</p>
-                  <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Mi Perfil</p>
+                  <p className="text-xs font-bold text-slate-900">
+                    {profile?.name || user?.email}
+                  </p>
+                  <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">
+                    Mi Perfil
+                  </p>
                 </div>
                 <Avatar src={profile?.profile_photo_url} name={profile?.name} size="sm" />
               </Link>
             </>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="px-6 py-2.5 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">
+              <Link
+                to="/login"
+                className="px-6 py-2.5 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors"
+              >
                 Ingresar
               </Link>
               <Link to="/register" className="btn-primary py-2.5 text-sm">
@@ -4424,52 +4532,82 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Mobile Toggle */}
-        <button 
+        {/* Botón hamburguesa (mobile) */}
+        <button
           className="md:hidden p-2 text-slate-600"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => setIsOpen((o) => !o)}
+          aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
         >
           {isOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
-      {/* Mobile Menu */}
-      <div className={clsx(
-        'fixed inset-0 top-[72px] bg-white z-40 transition-transform duration-500 md:hidden p-8',
-        isOpen ? 'translate-x-0' : 'translate-x-full'
-      )}>
+      {/* ── Menú mobile deslizable ───────────────────────────────────────────── */}
+      <div
+        className={clsx(
+          'fixed inset-0 top-[72px] bg-white z-40 transition-transform duration-500 md:hidden p-8',
+          isOpen ? 'translate-x-0' : 'translate-x-full',
+        )}
+      >
         <div className="flex flex-col gap-6">
           {navLinks.map((link) => (
-            <Link 
-              key={link.to} 
-              to={link.to} 
+            <Link
+              key={link.to}
+              to={link.to}
               onClick={() => setIsOpen(false)}
               className={clsx(
                 'text-2xl font-display font-extrabold flex items-center gap-4',
-                isActive(link.to) ? 'text-orange-500' : 'text-slate-900'
+                isActive(link.to) ? 'text-orange-500' : 'text-slate-900',
               )}
             >
               <link.icon className="w-6 h-6" />
               {link.label}
             </Link>
           ))}
+
           <hr className="border-slate-100 my-4" />
+
           {isAuthenticated() ? (
             <>
-              <Link to="/profile" onClick={() => setIsOpen(false)} className="flex items-center gap-4 text-2xl font-display font-extrabold text-slate-900">
+              <Link
+                to="/profile"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-4 text-2xl font-display font-extrabold text-slate-900"
+              >
                 <User className="w-6 h-6" /> Mi Perfil
               </Link>
-              <Link to="/notifications" onClick={() => setIsOpen(false)} className="flex items-center gap-4 text-2xl font-display font-extrabold text-slate-900">
+              <Link
+                to="/notifications"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-4 text-2xl font-display font-extrabold text-slate-900"
+              >
                 <Bell className="w-6 h-6" /> Notificaciones
               </Link>
-              <button className="flex items-center gap-4 text-2xl font-display font-extrabold text-red-500 mt-4">
+
+              {/* ✅ NUEVO: Botón "Salir" ahora conectado al handler real */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-4 text-2xl font-display font-extrabold text-red-500 mt-4"
+              >
                 <LogOut className="w-6 h-6" /> Salir
               </button>
             </>
           ) : (
             <div className="flex flex-col gap-4 pt-4">
-              <Link to="/login" onClick={() => setIsOpen(false)} className="btn-secondary text-center">Ingresar</Link>
-              <Link to="/register" onClick={() => setIsOpen(false)} className="btn-primary text-center">Registrarse</Link>
+              <Link
+                to="/login"
+                onClick={() => setIsOpen(false)}
+                className="btn-secondary text-center"
+              >
+                Ingresar
+              </Link>
+              <Link
+                to="/register"
+                onClick={() => setIsOpen(false)}
+                className="btn-primary text-center"
+              >
+                Registrarse
+              </Link>
             </div>
           )}
         </div>
@@ -4478,18 +4616,19 @@ const Navbar = () => {
   );
 };
 
+// ─── BottomNav (mobile) ───────────────────────────────────────────────────────
 const BottomNav = () => {
   const { isAuthenticated } = useAuthStore();
   const location = useLocation();
-  
+
   if (!isAuthenticated()) return null;
 
   const mobileLinks = [
-    { to: '/', label: 'Inicio', icon: Home },
-    { to: '/search', label: 'Roomies', icon: Sparkles },
-    { to: '/chat', label: 'Chat', icon: MessageSquare },
-    { to: '/notifications', label: 'Notif', icon: Bell },
-    { to: '/profile', label: 'Perfil', icon: User },
+    { to: '/',              label: 'Inicio',  icon: Home         },
+    { to: '/search',        label: 'Roomies', icon: Sparkles     },
+    { to: '/chat',          label: 'Chat',    icon: MessageSquare},
+    { to: '/notifications', label: 'Notif',   icon: Bell         },
+    { to: '/profile',       label: 'Perfil',  icon: User         },
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -4498,16 +4637,21 @@ const BottomNav = () => {
     <div className="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-lg border-t border-orange-100 z-50 px-2 pb-safe">
       <div className="flex items-center justify-around py-3">
         {mobileLinks.map((link) => (
-          <Link 
-            key={link.to} 
-            to={link.to} 
+          <Link
+            key={link.to}
+            to={link.to}
             className={clsx(
               'flex flex-col items-center gap-1 transition-all duration-300',
-              isActive(link.to) ? 'text-orange-500 scale-110' : 'text-blue-900 opacity-60'
+              isActive(link.to) ? 'text-orange-500 scale-110' : 'text-blue-900 opacity-60',
             )}
           >
-            <link.icon size={20} strokeWidth={isActive(link.to) ? 2.5 : 2} />
-            <span className="text-[10px] font-bold uppercase tracking-tighter">{link.label}</span>
+            <link.icon
+              size={20}
+              strokeWidth={isActive(link.to) ? 2.5 : 2}
+            />
+            <span className="text-[10px] font-bold uppercase tracking-tighter">
+              {link.label}
+            </span>
           </Link>
         ))}
       </div>
@@ -4515,20 +4659,40 @@ const BottomNav = () => {
   );
 };
 
-// ✅ CORRECCIÓN: Eliminamos el prop { children } porque Layout ya NO lo necesita.
-// React Router v6 inyecta la página activa a través de <Outlet />, no por props.
-// Antes: Layout recibía children = undefined → main quedaba vacío → pantalla blanca.
+// ─── Layout principal ─────────────────────────────────────────────────────────
 const Layout = () => {
+  const location = useLocation();
+
+  /**
+   * ✅ NUEVO: BackButton en todas las páginas excepto la home.
+   *
+   * Por qué excluimos '/':
+   * En la home no hay "de dónde venir" de forma lógica (es el punto de entrada).
+   * En todas las demás páginas, el usuario llegó desde algún lugar del historial
+   * y tiene sentido poder volver atrás.
+   *
+   * Se agrega en el Layout (no en cada página) para cumplir la regla
+   * DRY (Don't Repeat Yourself): un solo lugar para mantenerlo.
+   */
+  const showBackButton = location.pathname !== '/';
+
   return (
-    <div className="min-h-screen flex flex-col">
+    // overflow-x-hidden: previene scroll horizontal en animaciones de entrada/salida
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       <Navbar />
+
       <main className="flex-1 pt-20 pb-20 md:pb-0">
-        {/* ✅ CORRECCIÓN CLAVE: <Outlet /> reemplaza a {children}.
-            Outlet es el punto de montaje donde React Router renderiza
-            la ruta hija activa (HomePage, ChatPage, etc.). */}
+        {showBackButton && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
+            <BackButton />
+          </div>
+        )}
+        {/* Outlet = punto donde React Router inyecta la página activa */}
         <Outlet />
       </main>
+
       <BottomNav />
+
       <footer className="hidden md:block bg-blue-950 text-white py-20 px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="md:col-span-2">
@@ -4536,15 +4700,16 @@ const Layout = () => {
               <Logo className="w-10 h-10" />
             </Link>
             <p className="text-blue-200/60 max-w-sm leading-relaxed">
-              La plataforma líder en Paraguay para encontrar el compañero de hogar ideal. Seguridad, rapidez y compatibilidad en un solo lugar.
+              La plataforma líder en Paraguay para encontrar el compañero de hogar ideal.
+              Seguridad, rapidez y compatibilidad en un solo lugar.
             </p>
           </div>
           <div>
             <h4 className="font-bold mb-6 text-lg">Plataforma</h4>
             <ul className="space-y-4 text-blue-200/60 text-sm">
-              <li><Link to="/search" className="hover:text-white transition-colors">Buscar Roomies</Link></li>
-              <li><Link to="/listings" className="hover:text-white transition-colors">Departamentos</Link></li>
-              <li><Link to="/groups" className="hover:text-white transition-colors">Grupos</Link></li>
+              <li><Link to="/search"       className="hover:text-white transition-colors">Buscar Roomies</Link></li>
+              <li><Link to="/listings"     className="hover:text-white transition-colors">Departamentos</Link></li>
+              <li><Link to="/groups"       className="hover:text-white transition-colors">Grupos</Link></li>
               <li><Link to="/verification" className="hover:text-white transition-colors">Verificación</Link></li>
             </ul>
           </div>
@@ -4725,6 +4890,47 @@ export default function JaikoMap({
 }
 ----------------------------------------
 
+FILE_PATH: .\JAIKO\frontend\src\components\ui\BackButton.jsx
+----------------------------------------
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+
+/**
+ * BackButton — Botón "Volver atrás" reutilizable
+ *
+ * ¿Por qué navigate(-1) en vez de <Link to="/alguna-ruta">?
+ * ─────────────────────────────────────────────────────────
+ * navigate(-1) usa el historial REAL del browser, igual que el botón
+ * nativo del navegador. Si el usuario llegó a /profile/:id desde
+ * /search, /groups, o desde una notificación, SIEMPRE vuelve al
+ * lugar correcto.
+ *
+ * Con un Link fijo lo mandaríamos al lugar equivocado en muchos casos.
+ *
+ * Beneficio para el usuario: navegación intuitiva, predecible y sin sorpresas.
+ */
+export default function BackButton({ className = '' }) {
+  const navigate = useNavigate();
+
+  return (
+    <button
+      onClick={() => navigate(-1)}
+      aria-label="Volver a la página anterior"
+      className={`inline-flex items-center gap-1.5 text-sm font-bold
+        text-blue-900/50 hover:text-blue-600
+        px-3 py-1.5 rounded-xl hover:bg-blue-50
+        transition-all duration-200 active:scale-95
+        ${className}`}
+    >
+      <ArrowLeft size={15} strokeWidth={2.5} />
+      <span>Volver</span>
+    </button>
+  );
+}
+
+----------------------------------------
+
 FILE_PATH: .\JAIKO\frontend\src\components\ui\index.jsx
 ----------------------------------------
 import React from 'react';
@@ -4881,22 +5087,33 @@ export default ListingCard;
 FILE_PATH: .\JAIKO\frontend\src\components\ui\Logo.jsx
 ----------------------------------------
 import React from 'react';
+// ✅ CAMBIO: Import local desde assets en vez de URL externa de OpenAI.
+//
+// Por qué importamos la imagen así (no con <img src="...url externa...">):
+// ─────────────────────────────────────────────────────────────────────────
+// 1. Las URLs externas pueden EXPIRAR o caerse (como pasaba antes).
+// 2. Vite convierte este import en una URL estable dentro del bundle final,
+//    con hash para cache busting automático.
+// 3. Carga INSTANTÁNEA, sin requests HTTP adicionales.
+//
+// Beneficio para el usuario: logo siempre visible, sin parpadeo ni broken images.
+import logoImg from '../../assets/logo.png';
 
-export default function Logo({ className = "w-10 h-10", showText = true }) {
+/**
+ * Props:
+ *   className  → tamaño de la imagen (default: "w-10 h-10")
+ *   showText   → muestra/oculta el texto "JAIKO!" al lado del ícono
+ */
+export default function Logo({ className = 'w-10 h-10', showText = true }) {
   return (
-    <div className={`flex items-center gap-2 group ${className}`}>
-      <div className="relative w-full h-full">
-        <img 
-          src="https://files.oaiusercontent.com/file-S8Z7t9v7v7v7v7v7v7v7v7v7" 
-          alt="JAIKO Logo" 
-          className="w-full h-full object-contain drop-shadow-md group-hover:scale-110 transition-transform duration-300"
-          referrerPolicy="no-referrer"
-          onError={(e) => {
-            // Fallback if the URL expires or is invalid
-            e.target.src = "https://picsum.photos/seed/jaiko/200/200";
-          }}
-        />
-      </div>
+    <div className="flex items-center gap-2 group">
+      <img
+        src={logoImg}
+        alt="JAIKO! — Plataforma para encontrar roomies en Paraguay"
+        className={`object-contain flex-shrink-0
+          drop-shadow-md group-hover:scale-110 transition-transform duration-300
+          ${className}`}
+      />
       {showText && (
         <span className="text-2xl font-display font-extrabold tracking-tighter text-slate-900">
           JAIK<span className="text-blue-600">O!</span>
@@ -5730,6 +5947,47 @@ export default function AdminPage() {
 }
 ----------------------------------------
 
+FILE_PATH: .\JAIKO\frontend\src\pages\BackButton.jsx
+----------------------------------------
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+
+/**
+ * BackButton — Botón "Volver atrás" reutilizable
+ *
+ * ¿Por qué navigate(-1) en vez de <Link to="/alguna-ruta">?
+ * ─────────────────────────────────────────────────────────
+ * navigate(-1) usa el historial REAL del browser, igual que el botón
+ * nativo del navegador. Si el usuario llegó a /profile/:id desde
+ * /search, /groups, o desde una notificación, SIEMPRE vuelve al
+ * lugar correcto.
+ *
+ * Con un Link fijo lo mandaríamos al lugar equivocado en muchos casos.
+ *
+ * Beneficio para el usuario: navegación intuitiva, predecible y sin sorpresas.
+ */
+export default function BackButton({ className = '' }) {
+  const navigate = useNavigate();
+
+  return (
+    <button
+      onClick={() => navigate(-1)}
+      aria-label="Volver a la página anterior"
+      className={`inline-flex items-center gap-1.5 text-sm font-bold
+        text-blue-900/50 hover:text-blue-600
+        px-3 py-1.5 rounded-xl hover:bg-blue-50
+        transition-all duration-200 active:scale-95
+        ${className}`}
+    >
+      <ArrowLeft size={15} strokeWidth={2.5} />
+      <span>Volver</span>
+    </button>
+  );
+}
+
+----------------------------------------
+
 FILE_PATH: .\JAIKO\frontend\src\pages\BottomNav.jsx
 ----------------------------------------
 // BottomNav.jsx — Barra de navegación inferior estilo app mobile (Tinder-style)
@@ -5819,26 +6077,46 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function ChatPage() {
   const { chatId } = useParams();
-  const { user } = useAuthStore();
-  const navigate = useNavigate();
+  const { user }   = useAuthStore();
+  const navigate   = useNavigate();
 
-  const [chats, setChats] = useState([]);
-  const [active, setActive] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [text, setText] = useState('');
-  const [typing, setTyping] = useState(false);
+  const [chats,   setChats]   = useState([]);
+  const [active,  setActive]  = useState(null);
+  const [messages,setMessages]= useState([]);
+  const [text,    setText]    = useState('');
+  const [typing,  setTyping]  = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const bottomRef = useRef(null);
-  const typingTimer = useRef(null);
-  const lastTypingEmit = useRef(0);
-  const isLoadingHistory = useRef(false);
-  const activeChatIdRef = useRef(null);
-  const socketRef = useRef(null);
-  const textareaRef = useRef(null);
+  const bottomRef          = useRef(null);
+  const typingTimer        = useRef(null);
+  const lastTypingEmit     = useRef(0);
+  const isLoadingHistory   = useRef(false);
+  const activeChatIdRef    = useRef(null);
+  const socketRef          = useRef(null);
+  const textareaRef        = useRef(null);
+  /**
+   * ✅ FIX CRÍTICO — Layout Shift (salto hacia abajo al navegar a chats)
+   *
+   * Problema anterior:
+   *   scrollIntoView({ behavior: 'instant' }) scrolleaba el DOCUMENTO ENTERO
+   *   (window), no solo el contenedor de mensajes. Esto causaba un "salto"
+   *   visible de la página completa cada vez que se cargaba un chat.
+   *
+   * Solución:
+   *   En vez de usar bottomRef con scrollIntoView, ahora referenciamos
+   *   directamente el div scrollable que contiene los mensajes y
+   *   manipulamos su scrollTop.
+   *
+   *   scrollTop = scrollHeight siempre lleva al final,
+   *   sin tocar el scroll del documento (window), eliminando el salto.
+   *
+   * Beneficio para el usuario: navegación fluida, sin saltos visuales.
+   */
+  const messagesContainerRef = useRef(null);
 
   const MAX_MESSAGES = 100;
 
+  // ── Socket: mensajes en tiempo real ────────────────────────────────────────
   useEffect(() => {
     const handleMsg = (msg) => {
       if (msg.chat_id === activeChatIdRef.current) {
@@ -5849,23 +6127,21 @@ export default function ChatPage() {
         });
       }
       setChats((cs) =>
-        cs.map((c) => (c.id === msg.chat_id ? { ...c, last_message: msg } : c))
+        cs.map((c) => (c.id === msg.chat_id ? { ...c, last_message: msg } : c)),
       );
     };
 
-    const handleTyping = ({ user_id }) => {
-      if (user_id !== user?.id) setTyping(true);
-    };
+    const handleTyping     = ({ user_id }) => { if (user_id !== user?.id) setTyping(true); };
     const handleStopTyping = () => setTyping(false);
 
     const unsub = onSocketConnect((s) => {
       socketRef.current = s;
-      s.off('receive_message', handleMsg);
-      s.off('user_typing', handleTyping);
-      s.off('user_stop_typing', handleStopTyping);
-      s.on('receive_message', handleMsg);
-      s.on('user_typing', handleTyping);
-      s.on('user_stop_typing', handleStopTyping);
+      s.off('receive_message',   handleMsg);
+      s.off('user_typing',       handleTyping);
+      s.off('user_stop_typing',  handleStopTyping);
+      s.on( 'receive_message',   handleMsg);
+      s.on( 'user_typing',       handleTyping);
+      s.on( 'user_stop_typing',  handleStopTyping);
       if (activeChatIdRef.current) {
         s.emit('join_chat', { chat_id: activeChatIdRef.current });
       }
@@ -5875,13 +6151,14 @@ export default function ChatPage() {
       unsub();
       const s = socketRef.current;
       if (s) {
-        s.off('receive_message', handleMsg);
-        s.off('user_typing', handleTyping);
+        s.off('receive_message',  handleMsg);
+        s.off('user_typing',      handleTyping);
         s.off('user_stop_typing', handleStopTyping);
       }
     };
   }, [user?.id]);
 
+  // ── Carga inicial de chats ─────────────────────────────────────────────────
   useEffect(() => {
     api.get('/chats/').then(({ data }) => {
       setChats(data.chats || []);
@@ -5892,6 +6169,7 @@ export default function ChatPage() {
     });
   }, []);
 
+  // ── Seleccionar chat ───────────────────────────────────────────────────────
   const selectChat = useCallback(
     async (chat) => {
       const s = socketRef.current;
@@ -5907,7 +6185,7 @@ export default function ChatPage() {
       try {
         const { data } = await api.get(`/chats/${chat.id}/messages`);
         setMessages(data.messages || []);
-      } catch (e) {
+      } catch {
         setMessages([]);
       } finally {
         setLoading(false);
@@ -5917,18 +6195,37 @@ export default function ChatPage() {
         s.emit('join_chat', { chat_id: chat.id });
       }
     },
-    [navigate]
+    [navigate],
   );
 
+  /**
+   * ✅ FIX: Auto-scroll al final de mensajes.
+   *
+   * Antes: scrollIntoView() en bottomRef → scrolleaba el window entero.
+   * Ahora: manipulamos scrollTop del contenedor de mensajes directamente.
+   *
+   * - Cuando se carga el historial (isLoadingHistory.current === true):
+   *   scroll instantáneo al final (sin animación, para evitar el efecto
+   *   de "rodar" todos los mensajes).
+   *
+   * - Cuando llega un mensaje nuevo:
+   *   scroll suave (behavior: 'smooth') para una experiencia más fluida.
+   */
   useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
     if (isLoadingHistory.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+      // Instantáneo al cargar historial (sin animación de scroll)
+      container.scrollTop = container.scrollHeight;
       isLoadingHistory.current = false;
     } else {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // Suave al llegar un nuevo mensaje
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]);
 
+  // ── Enviar mensaje ─────────────────────────────────────────────────────────
   const sendMessage = () => {
     const s = socketRef.current;
     if (!text.trim() || !activeChatIdRef.current || !s?.connected) return;
@@ -5940,14 +6237,11 @@ export default function ChatPage() {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
   const handleTypingInput = (e) => {
-    const s = socketRef.current;
+    const s  = socketRef.current;
     setText(e.target.value);
     const ta = e.target;
     ta.style.height = 'auto';
@@ -5962,7 +6256,7 @@ export default function ChatPage() {
       clearTimeout(typingTimer.current);
       typingTimer.current = setTimeout(
         () => s.emit('stop_typing', { chat_id: activeChatIdRef.current }),
-        1500
+        1500,
       );
     }
   };
@@ -5991,20 +6285,23 @@ export default function ChatPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 h-[calc(100vh-80px)]">
       <div className="flex h-full bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl overflow-hidden">
-        
-        {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-        <div
-          className={clsx(
-            'flex-shrink-0 border-r border-slate-50 flex flex-col transition-all duration-300',
-            'w-full md:w-80 lg:w-96',
-            active ? 'hidden md:flex' : 'flex'
-          )}
-        >
-          <div className="p-8 border-b border-slate-50">
-            <h1 className="font-display font-extrabold text-3xl text-blue-950 mb-2">Mensajes</h1>
-            <p className="text-blue-900/40 text-sm font-bold">{chats.length} conversaciones activas</p>
+
+        {/* ── Sidebar: lista de chats ──────────────────────────────────────── */}
+        <div className={clsx(
+          'w-72 lg:w-80 flex-col border-r border-slate-100',
+          active ? 'hidden md:flex' : 'flex',
+        )}>
+          {/* Header del sidebar */}
+          <div className="p-8 border-b border-slate-100">
+            <h1 className="font-display font-extrabold text-3xl text-blue-950 mb-2">
+              Mensajes
+            </h1>
+            <p className="text-blue-900/40 text-sm font-bold">
+              {chats.length} conversaciones activas
+            </p>
           </div>
-          
+
+          {/* Lista de chats */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
             {chats.length === 0 ? (
               <div className="py-20 text-center">
@@ -6016,17 +6313,36 @@ export default function ChatPage() {
                 <button
                   key={chat.id}
                   onClick={() => selectChat(chat)}
+                  /**
+                   * ✅ FIX LÍNEAS FANTASMA: Agregamos la clase `border` base.
+                   *
+                   * Problema anterior: `border-blue-100` y `border-transparent`
+                   * sin `border` solo cambiaban el COLOR pero nunca reservaban
+                   * el espacio del borde → al activar el chat, el layout
+                   * "saltaba" 1px porque el borde de repente aparecía.
+                   *
+                   * Solución: `border` siempre presente; solo cambia el color.
+                   * El espacio del borde está siempre reservado → sin saltos.
+                   */
                   className={clsx(
-                    'w-full flex items-center gap-4 p-4 rounded-3xl transition-all text-left group',
-                    active?.id === chat.id 
-                      ? 'bg-blue-50 border-blue-100' 
-                      : 'hover:bg-slate-50 border-transparent'
+                    'w-full flex items-center gap-4 p-4 rounded-3xl transition-all text-left group border',
+                    active?.id === chat.id
+                      ? 'bg-blue-50 border-blue-100'
+                      : 'hover:bg-slate-50 border-transparent',
                   )}
                 >
-                  <Avatar src={getChatPhoto(chat)} name={getChatName(chat)} size="md" className="border-2 border-white shadow-sm" />
+                  <Avatar
+                    src={getChatPhoto(chat)}
+                    name={getChatName(chat)}
+                    size="md"
+                    className="border-2 border-white shadow-sm"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-1">
-                      <p className={clsx('font-bold truncate', active?.id === chat.id ? 'text-blue-700' : 'text-blue-950')}>
+                      <p className={clsx(
+                        'font-bold truncate',
+                        active?.id === chat.id ? 'text-blue-700' : 'text-blue-950',
+                      )}>
                         {getChatName(chat)}
                       </p>
                       {chat.last_message && (
@@ -6036,9 +6352,13 @@ export default function ChatPage() {
                       )}
                     </div>
                     {chat.last_message ? (
-                      <p className="text-xs text-blue-900/40 truncate font-bold">{chat.last_message.content}</p>
+                      <p className="text-xs text-blue-900/40 truncate font-bold">
+                        {chat.last_message.content}
+                      </p>
                     ) : (
-                      <p className="text-xs text-blue-900/20 italic">Inicia una conversación</p>
+                      <p className="text-xs text-blue-900/20 italic">
+                        Inicia una conversación
+                      </p>
                     )}
                   </div>
                 </button>
@@ -6047,28 +6367,38 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* ── Chat panel ──────────────────────────────────────────────────── */}
+        {/* ── Panel de mensajes ────────────────────────────────────────────── */}
         <div className={clsx(
           'flex-col flex-1 bg-slate-50/30',
-          active ? 'flex' : 'hidden md:flex'
+          active ? 'flex' : 'hidden md:flex',
         )}>
           {active ? (
             <>
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 bg-white border-b border-slate-50">
+              {/* Header del chat activo */}
+              <div className="flex items-center justify-between p-6 bg-white border-b border-slate-100">
                 <div className="flex items-center gap-4">
                   <button
                     className="md:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-all"
                     onClick={handleBack}
+                    aria-label="Volver a la lista de chats"
                   >
                     <ArrowLeft size={20} />
                   </button>
-                  <Avatar src={getChatPhoto(active)} name={getChatName(active)} size="md" className="border-2 border-slate-100" />
+                  <Avatar
+                    src={getChatPhoto(active)}
+                    name={getChatName(active)}
+                    size="md"
+                    className="border-2 border-slate-100"
+                  />
                   <div>
-                    <p className="font-display font-extrabold text-blue-950">{getChatName(active)}</p>
+                    <p className="font-display font-extrabold text-blue-950">
+                      {getChatName(active)}
+                    </p>
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <p className="text-[10px] font-bold text-blue-900/40 uppercase tracking-widest">En línea</p>
+                      <p className="text-[10px] font-bold text-blue-900/40 uppercase tracking-widest">
+                        En línea
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -6085,8 +6415,11 @@ export default function ChatPage() {
                 </div>
               </div>
 
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-8 space-y-6">
+              {/* Área de mensajes — referenciamos el contenedor para el scroll */}
+              <div
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto p-8 space-y-6"
+              >
                 {loading && (
                   <div className="flex justify-center py-10">
                     <Spinner size="lg" />
@@ -6094,9 +6427,9 @@ export default function ChatPage() {
                 )}
                 <AnimatePresence initial={false}>
                   {messages.map((msg, i) => {
-                    const isMe = msg.sender_id === user?.id;
-                    const showAvatar = !isMe && (i === 0 || messages[i-1].sender_id !== msg.sender_id);
-                    
+                    const isMe       = msg.sender_id === user?.id;
+                    const showAvatar = !isMe && (i === 0 || messages[i - 1].sender_id !== msg.sender_id);
+
                     return (
                       <motion.div
                         key={msg.id}
@@ -6104,12 +6437,17 @@ export default function ChatPage() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         className={clsx(
                           'flex items-end gap-3',
-                          isMe ? 'flex-row-reverse' : 'flex-row'
+                          isMe ? 'flex-row-reverse' : 'flex-row',
                         )}
                       >
                         <div className="w-8 flex-shrink-0">
                           {showAvatar && (
-                            <Avatar src={msg.sender_photo} name={msg.sender_name} size="sm" className="w-8 h-8" />
+                            <Avatar
+                              src={msg.sender_photo}
+                              name={msg.sender_name}
+                              size="sm"
+                              className="w-8 h-8"
+                            />
                           )}
                         </div>
                         <div
@@ -6117,13 +6455,15 @@ export default function ChatPage() {
                             'max-w-[70%] px-5 py-3.5 rounded-[1.5rem] text-sm shadow-sm relative group',
                             isMe
                               ? 'bg-blue-600 text-white rounded-br-none'
-                              : 'bg-white text-slate-700 border border-slate-100 rounded-bl-none'
+                              : 'bg-white text-slate-700 border border-slate-100 rounded-bl-none',
                           )}
                         >
-                          <p className="leading-relaxed break-words font-medium">{msg.content}</p>
+                          <p className="leading-relaxed break-words font-medium">
+                            {msg.content}
+                          </p>
                           <p className={clsx(
                             'text-[9px] font-bold uppercase tracking-widest mt-2 opacity-0 group-hover:opacity-60 transition-opacity',
-                            isMe ? 'text-white' : 'text-slate-400'
+                            isMe ? 'text-white' : 'text-slate-400',
                           )}>
                             {formatDistanceToNow(new Date(msg.created_at), { locale: es })}
                           </p>
@@ -6132,6 +6472,7 @@ export default function ChatPage() {
                     );
                   })}
                 </AnimatePresence>
+
                 {typing && (
                   <div className="flex items-center gap-2 text-blue-600 font-bold text-[10px] uppercase tracking-widest animate-pulse ml-11">
                     <span className="flex gap-1">
@@ -6142,11 +6483,13 @@ export default function ChatPage() {
                     Escribiendo...
                   </div>
                 )}
-                <div ref={bottomRef} />
+
+                {/* ✅ FIX: div vacío con h-0 para no añadir espacio fantasma al final */}
+                <div ref={bottomRef} className="h-0" />
               </div>
 
-              {/* Input */}
-              <div className="p-6 bg-white border-t border-slate-50 flex items-end gap-4">
+              {/* Input de mensaje */}
+              <div className="p-6 bg-white border-t border-slate-100 flex items-end gap-4">
                 <div className="flex-1 relative">
                   <textarea
                     ref={textareaRef}
@@ -6169,12 +6512,17 @@ export default function ChatPage() {
               </div>
             </>
           ) : (
+            /* Estado vacío: ningún chat seleccionado */
             <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
               <div className="w-24 h-24 bg-blue-50 rounded-[2rem] flex items-center justify-center mb-6">
                 <MessageSquare size={40} className="text-blue-500" />
               </div>
-              <h2 className="text-2xl font-display font-extrabold text-slate-900 mb-2">Tus conversaciones</h2>
-              <p className="text-slate-400 max-w-xs mx-auto">Seleccioná un chat de la lista para empezar a hablar con tus futuros roomies.</p>
+              <h2 className="text-2xl font-display font-extrabold text-slate-900 mb-2">
+                Tus conversaciones
+              </h2>
+              <p className="text-slate-400 max-w-xs mx-auto">
+                Seleccioná un chat de la lista para empezar a hablar con tus futuros roomies.
+              </p>
             </div>
           )}
         </div>
@@ -6993,34 +7341,76 @@ export default function GroupDetailPage() {
 
 FILE_PATH: .\JAIKO\frontend\src\pages\GroupsPage.jsx
 ----------------------------------------
-// GroupsPage.jsx — Rediseño moderno
-import { useState, useEffect } from 'react'
+// GroupsPage.jsx — Con panel de filtros agregado
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Users, ChevronRight } from 'lucide-react'
+import { Plus, Users, ChevronRight, SlidersHorizontal } from 'lucide-react'
 import api from '../services/api'
 import { Badge, Spinner, EmptyState, Modal } from '../components/ui'
 import { toast } from 'react-hot-toast'
 
+// ✅ Mismas ciudades que SearchPage → consistencia de UX
+const CITIES = [
+  'Asunción', 'San Lorenzo', 'Luque', 'Fernando de la Mora',
+  'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este',
+]
+
+// Estado inicial de filtros → reutilizado en "Limpiar"
+const INITIAL_FILTERS = {
+  city:           'Asunción',
+  pets_allowed:   '',
+  smoking_allowed:'',
+  budget_max:     '',
+}
+
 export function GroupsPage() {
-  const [groups, setGroups] = useState([])
-  const [myGroups, setMyGroups] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ name: '', description: '', city: 'Asunción', max_members: 3 })
+  const [groups,           setGroups]           = useState([])
+  const [myGroups,         setMyGroups]         = useState([])
+  const [loading,          setLoading]          = useState(true)
+  const [showCreate,       setShowCreate]       = useState(false)
+  const [showFilters,      setShowFilters]      = useState(false)
+  const [filters,          setFilters]          = useState(INITIAL_FILTERS)
+  const [form,             setForm]             = useState({
+    name: '', description: '', city: 'Asunción', max_members: 3,
+  })
   const [requestingGroupId, setRequestingGroupId] = useState(null)
   const navigate = useNavigate()
 
-  const load = () => {
+  /**
+   * ✅ NUEVO: loadGroups ahora usa los filtros del estado.
+   *
+   * Por qué useCallback con [filters] como dependencia:
+   * Cada vez que el usuario cambia un filtro, se re-crea loadGroups
+   * con los nuevos valores. El useEffect que llama a loadGroups()
+   * detecta el cambio y dispara la nueva request automáticamente.
+   *
+   * Antes: city estaba hardcodeada como 'Asunción'. Ahora viene
+   * del estado de filtros, permitiendo buscar en cualquier ciudad.
+   *
+   * Nota sobre filtros de grupo:
+   * pets_allowed, smoking_allowed y budget_max corresponden a columnas
+   * de la tabla `groups`. El backend debe soportar estos query params
+   * en GET /groups/. Si no los soporta aún, serán ignorados silenciosamente.
+   */
+  const loadGroups = useCallback(() => {
+    setLoading(true)
+    const params = new URLSearchParams({ city: filters.city })
+    if (filters.pets_allowed    !== '') params.append('pets_allowed',    filters.pets_allowed)
+    if (filters.smoking_allowed !== '') params.append('smoking_allowed', filters.smoking_allowed)
+    if (filters.budget_max      !== '') params.append('budget_max',      filters.budget_max)
+
     Promise.all([
-      api.get('/groups/?city=Asunción'),
+      api.get(`/groups/?${params}`),
       api.get('/groups/my'),
     ]).then(([g, m]) => {
-      setGroups(g.data.groups)
-      setMyGroups(m.data.groups)
+      setGroups(g.data.groups   || [])
+      setMyGroups(m.data.groups || [])
+    }).catch(() => {
+      toast.error('Error al cargar los grupos')
     }).finally(() => setLoading(false))
-  }
+  }, [filters])
 
-  useEffect(load, [])
+  useEffect(() => { loadGroups() }, [loadGroups])
 
   const handleCreate = async () => {
     if (!form.name.trim()) { toast.error('Nombre requerido'); return }
@@ -7039,13 +7429,23 @@ export function GroupsPage() {
       setRequestingGroupId(groupId)
       const { data } = await api.post(`/groups/${groupId}/join-request`)
       toast.success(data.message || 'Solicitud enviada')
-      load()
+      loadGroups()
     } catch (e) {
       toast.error(e.response?.data?.error || 'Error al enviar solicitud')
     } finally {
       setRequestingGroupId(null)
     }
   }
+
+  const handleFilterChange = (key, value) =>
+    setFilters((f) => ({ ...f, [key]: value }))
+
+  // Cuenta filtros activos (excluyendo ciudad que siempre tiene valor)
+  const activeFilterCount = [
+    filters.pets_allowed,
+    filters.smoking_allowed,
+    filters.budget_max,
+  ].filter(Boolean).length + (filters.city !== 'Asunción' ? 1 : 0)
 
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>
 
@@ -7055,23 +7455,135 @@ export function GroupsPage() {
       {/* Header */}
       <div className="flex items-start sm:items-center justify-between mb-5 sm:mb-7 gap-3">
         <div>
-          <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[#1E293B]">Grupos</h1>
-          <p className="text-[#94A3B8] text-sm mt-0.5">Armá equipo para buscar departamento juntos</p>
+          <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[#1E293B]">
+            Grupos
+          </h1>
+          <p className="text-[#94A3B8] text-sm mt-0.5">
+            Armá equipo para buscar departamento juntos
+          </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#2563C8] text-white
-            text-sm font-bold shadow-[0_4px_12px_rgba(37,99,200,0.3)]
-            hover:bg-[#1D4ED8] active:scale-95 transition-all flex-shrink-0"
-        >
-          <Plus size={15} /> Crear grupo
-        </button>
+        <div className="flex items-center gap-2">
+          {/* ✅ NUEVO: Botón de filtros — igual UX que SearchPage */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="relative flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#E2E8F0] text-sm font-bold text-[#64748B] bg-white hover:bg-slate-50 transition-all"
+          >
+            <SlidersHorizontal size={15} />
+            <span className="hidden sm:inline">Filtros</span>
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center border border-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#2563C8] text-white
+              text-sm font-bold shadow-[0_4px_12px_rgba(37,99,200,0.3)]
+              hover:bg-[#1D4ED8] active:scale-95 transition-all flex-shrink-0"
+          >
+            <Plus size={15} /> Crear grupo
+          </button>
+        </div>
+      </div>
+
+      {/* ✅ NUEVO: Panel de filtros colapsable
+       *
+       * Reutiliza la misma lógica CSS de transición que SearchPage
+       * (max-h + opacity + overflow-hidden) para consistencia de UX.
+       */}
+      <div
+        className={`bg-white border border-[#F1F5F9] rounded-2xl mb-6 overflow-hidden transition-all duration-500 ${
+          showFilters
+            ? 'max-h-[500px] opacity-100 p-5'
+            : 'max-h-0 opacity-0 p-0 border-none shadow-none'
+        }`}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+
+          {/* Ciudad */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider">
+              Ciudad
+            </label>
+            <select
+              className="input"
+              value={filters.city}
+              onChange={(e) => handleFilterChange('city', e.target.value)}
+            >
+              {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* Mascotas permitidas */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider">
+              Mascotas
+            </label>
+            <select
+              className="input"
+              value={filters.pets_allowed}
+              onChange={(e) => handleFilterChange('pets_allowed', e.target.value)}
+            >
+              <option value="">Cualquiera</option>
+              <option value="true">Permiten mascotas</option>
+              <option value="false">Sin mascotas</option>
+            </select>
+          </div>
+
+          {/* Fumadores */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider">
+              Fumadores
+            </label>
+            <select
+              className="input"
+              value={filters.smoking_allowed}
+              onChange={(e) => handleFilterChange('smoking_allowed', e.target.value)}
+            >
+              <option value="">Cualquiera</option>
+              <option value="false">No fumadores</option>
+              <option value="true">Fumadores OK</option>
+            </select>
+          </div>
+
+          {/* Presupuesto máx. */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider">
+              Presupuesto máx. (₲)
+            </label>
+            <input
+              type="number"
+              className="input"
+              placeholder="Ej: 2000000"
+              min={0}
+              value={filters.budget_max}
+              onChange={(e) => handleFilterChange('budget_max', e.target.value)}
+            />
+          </div>
+
+          {/* Acciones */}
+          <div className="sm:col-span-2 lg:col-span-4 flex justify-end gap-3 pt-3 border-t border-[#F1F5F9]">
+            <button
+              type="button"
+              onClick={() => setFilters(INITIAL_FILTERS)}
+              className="btn-ghost text-sm"
+            >
+              Limpiar filtros
+            </button>
+            <button onClick={loadGroups} className="btn-primary">
+              Aplicar filtros
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Mis grupos */}
       {myGroups.length > 0 && (
         <div className="mb-7">
-          <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest mb-3">Mis grupos</p>
+          <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest mb-3">
+            Mis grupos
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {myGroups.map(g => (
               <GroupCard key={g.id} group={g} isOwn onView={() => navigate(`/groups/${g.id}`)} />
@@ -7082,9 +7594,15 @@ export function GroupsPage() {
 
       {/* Grupos abiertos */}
       <div>
-        <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest mb-3">Grupos abiertos</p>
+        <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest mb-3">
+          Grupos abiertos
+        </p>
         {groups.length === 0 ? (
-          <EmptyState icon="👥" title="No hay grupos abiertos" description="Creá el primero y empezá a buscar roomies." />
+          <EmptyState
+            icon="👥"
+            title="No hay grupos que coincidan"
+            description="Probá ajustar los filtros o creá el primero."
+          />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {groups.map(g => (
@@ -7103,21 +7621,36 @@ export function GroupsPage() {
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Crear grupo">
         <div className="space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-[#94A3B8] mb-1.5 uppercase tracking-wider">Nombre *</label>
-            <input className="input" value={form.name}
+            <label className="block text-[11px] font-bold text-[#94A3B8] mb-1.5 uppercase tracking-wider">
+              Nombre *
+            </label>
+            <input
+              className="input"
+              value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="Ej: Buscamos 2 roomies en Asunción" />
+              placeholder="Ej: Buscamos 2 roomies en Asunción"
+            />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-[#94A3B8] mb-1.5 uppercase tracking-wider">Descripción</label>
-            <textarea className="input h-20 resize-none" value={form.description}
+            <label className="block text-[11px] font-bold text-[#94A3B8] mb-1.5 uppercase tracking-wider">
+              Descripción
+            </label>
+            <textarea
+              className="input h-20 resize-none"
+              value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="¿Qué busca el grupo?" />
+              placeholder="¿Qué busca el grupo?"
+            />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-[#94A3B8] mb-1.5 uppercase tracking-wider">Máx. miembros</label>
-            <input className="input" type="number" min={2} max={6} value={form.max_members}
-              onChange={e => setForm(f => ({ ...f, max_members: parseInt(e.target.value) }))} />
+            <label className="block text-[11px] font-bold text-[#94A3B8] mb-1.5 uppercase tracking-wider">
+              Máx. miembros
+            </label>
+            <input
+              className="input" type="number" min={2} max={6}
+              value={form.max_members}
+              onChange={e => setForm(f => ({ ...f, max_members: parseInt(e.target.value) }))}
+            />
           </div>
           <div className="flex gap-3 justify-end pt-2 border-t border-[#F1F5F9]">
             <button onClick={() => setShowCreate(false)} className="btn-ghost">Cancelar</button>
@@ -7129,8 +7662,9 @@ export function GroupsPage() {
   )
 }
 
+// ─── GroupCard (componente interno) ───────────────────────────────────────────
 function GroupCard({ group, isOwn, onJoin, onView, requesting }) {
-  const pct = Math.round((group.current_members / group.max_members) * 100)
+  const pct    = Math.round((group.current_members / group.max_members) * 100)
   const isFull = group.current_members >= group.max_members
 
   return (
@@ -7148,10 +7682,11 @@ function GroupCard({ group, isOwn, onJoin, onView, requesting }) {
                 Mi grupo
               </span>
             )}
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide
-              ${group.status === 'open'
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${
+              group.status === 'open'
                 ? 'bg-[#F0FDF4] text-[#16A34A]'
-                : 'bg-[#F8FAFF] text-[#94A3B8]'}`}>
+                : 'bg-[#F8FAFF] text-[#94A3B8]'
+            }`}>
               {group.status === 'open' ? 'Abierto' : 'Cerrado'}
             </span>
           </div>
@@ -7164,17 +7699,23 @@ function GroupCard({ group, isOwn, onJoin, onView, requesting }) {
       </div>
 
       {group.description && (
-        <p className="text-sm text-[#64748B] mb-3 line-clamp-2 leading-relaxed">{group.description}</p>
+        <p className="text-sm text-[#64748B] mb-3 line-clamp-2 leading-relaxed">
+          {group.description}
+        </p>
       )}
 
-      {/* Progress */}
+      {/* Barra de progreso de miembros */}
       <div className="mb-3">
         <div className="flex items-center justify-between text-xs mb-1.5">
           <span className="text-[#64748B] font-medium flex items-center gap-1">
             <Users size={11} /> {group.current_members} / {group.max_members} miembros
           </span>
           <span className={`font-bold ${isFull ? 'text-[#F5A623]' : 'text-[#16A34A]'}`}>
-            {isFull ? 'Completo' : `${group.max_members - group.current_members} lugar${group.max_members - group.current_members !== 1 ? 'es' : ''} libre`}
+            {isFull
+              ? 'Completo'
+              : `${group.max_members - group.current_members} lugar${
+                  group.max_members - group.current_members !== 1 ? 'es' : ''
+                } libre`}
           </span>
         </div>
         <div className="h-1.5 bg-[#F1F5F9] rounded-full overflow-hidden">
@@ -8228,8 +8769,8 @@ FILE_PATH: .\JAIKO\frontend\src\pages\ProfilePage.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Edit2, MessageCircle, UserPlus, Flag,
-  MapPin, Briefcase, Calendar, ShieldCheck,
+  Edit2, MessageCircle, UserPlus, Flag, Star,
+  MapPin, Briefcase, Calendar, ShieldCheck, UserMinus, Lock,
 } from 'lucide-react';
 import api from '../services/api';
 import useAuthStore from '../context/authStore';
@@ -8237,30 +8778,63 @@ import { Avatar, Badge, StarRating, Modal, Spinner, EmptyState } from '../compon
 import { toast } from 'react-hot-toast';
 import { motion } from 'motion/react';
 
+// ─── Sub-componente: Input de estrellas ───────────────────────────────────────
+/**
+ * Selector de estrellas para el formulario de reseña.
+ * Componente separado por responsabilidad única (Single Responsibility).
+ */
+const StarInput = ({ value, onChange }) => (
+  <div className="flex gap-1" role="group" aria-label="Calificación">
+    {[1, 2, 3, 4, 5].map((star) => (
+      <button
+        key={star}
+        type="button"
+        onClick={() => onChange(star)}
+        aria-label={`${star} estrella${star !== 1 ? 's' : ''}`}
+        className={`text-3xl transition-all hover:scale-110 active:scale-95 ${
+          star <= value ? 'text-yellow-400' : 'text-slate-200'
+        }`}
+      >
+        ★
+      </button>
+    ))}
+  </div>
+);
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 export default function ProfilePage() {
-  const { userId } = useParams();
-  const location = useLocation();
+  const { userId }   = useParams();
+  const location     = useLocation();
   const { user: me, profile: myProfile, updateProfile } = useAuthStore();
-  const navigate = useNavigate();
+  const navigate     = useNavigate();
 
   const targetId = userId ? parseInt(userId) : me?.id;
-  const isMe = !userId || parseInt(userId) === me?.id;
+  const isMe     = !userId || parseInt(userId) === me?.id;
 
-  const [profile, setProfile] = useState(null);
-  const [reviews, setReviews] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [reportModal, setReportModal] = useState(false);
-  const [reportReason, setReportReason] = useState('fake_profile');
-  const [reportDesc, setReportDesc] = useState('');
-  const [pendingRequest, setPendingRequest] = useState(null);
-  const [verification, setVerification] = useState(null);
-  const [roommate, setRoommate] = useState(null);
-  const [requestSent, setRequestSent] = useState(false);
+  // ── Estado del perfil ──────────────────────────────────────────────────────
+  const [profile,       setProfile]       = useState(null);
+  const [reviews,       setReviews]       = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [reportModal,   setReportModal]   = useState(false);
+  const [reportReason,  setReportReason]  = useState('fake_profile');
+  const [reportDesc,    setReportDesc]    = useState('');
+  const [pendingRequest,setPendingRequest]= useState(null);
+  const [verification,  setVerification]  = useState(null);
+  const [roommate,      setRoommate]      = useState(null);
+  const [requestSent,   setRequestSent]   = useState(false);
 
+  // ── Estado del formulario de reseña ───────────────────────────────────────
+  const [showReviewForm,    setShowReviewForm]    = useState(false);
+  const [reviewRating,      setReviewRating]      = useState(5);
+  const [reviewComment,     setReviewComment]     = useState('');
+  const [submittingReview,  setSubmittingReview]  = useState(false);
+
+  // ── Carga de datos ─────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
     setPendingRequest(null);
     setRequestSent(false);
+    setShowReviewForm(false);
 
     if (!isMe && targetId) {
       api.get(`/profiles/${targetId}`)
@@ -8272,21 +8846,43 @@ export default function ProfilePage() {
         .catch(() => { toast.error('Perfil no encontrado'); navigate('/'); });
 
       const pendingIdFromState = location.state?.pendingRequestId;
-      if (pendingIdFromState) {
-        setPendingRequest({ id: pendingIdFromState });
-      }
+      if (pendingIdFromState) setPendingRequest({ id: pendingIdFromState });
     } else {
       setProfile(myProfile);
       setRoommate(myProfile?.current_roomie ?? null);
       setLoading(false);
-      api.get('/verification/me').then(({ data }) => setVerification(data.verification)).catch(() => setVerification(null));
+      api.get('/verification/me')
+        .then(({ data }) => setVerification(data.verification))
+        .catch(() => setVerification(null));
     }
 
     if (targetId) {
-      api.get(`/reviews/user/${targetId}`).then(({ data }) => setReviews(data.reviews)).catch(() => { });
+      api.get(`/reviews/user/${targetId}`)
+        .then(({ data }) => setReviews(data.reviews))
+        .catch(() => {});
     }
   }, [targetId, isMe]);
 
+  /**
+   * ✅ NUEVO: Lógica wasRoomie basada en current_roomie_id.
+   *
+   * Condición: el usuario autenticado (me) y el perfil visitado (targetId)
+   * se consideran "roomies" si alguno de los dos tiene al otro como
+   * current_roomie_id.
+   *
+   * Por qué importa: la regla de negocio dice que solo se puede reseñar
+   * a alguien con quien se fue roomie, para evitar reseñas falsas.
+   *
+   * LIMITACIÓN ACTUAL: Solo detecta roomies ACTUALES (current_roomie_id).
+   * Para detectar roomies PASADOS se necesitaría una tabla
+   * `roommate_history` (pendiente en el backend).
+   */
+  const wasRoomie = !isMe && Boolean(
+    myProfile?.current_roomie_id === targetId ||
+    profile?.current_roomie_id === me?.id,
+  );
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
   const respondRequest = async (reqId, action) => {
     try {
       const { data } = await api.put(`/requests/${reqId}/respond`, { action });
@@ -8323,29 +8919,90 @@ export default function ProfilePage() {
 
   const handleReport = async () => {
     try {
-      await api.post('/reports/', { reported_user_id: targetId, reason: reportReason, description: reportDesc });
+      await api.post('/reports/', {
+        reported_user_id: targetId,
+        reason:           reportReason,
+        description:      reportDesc,
+      });
       toast.success('Reporte enviado');
       setReportModal(false);
       setReportDesc('');
     } catch { toast.error('Error al enviar el reporte'); }
   };
 
+  /**
+   * ✅ NUEVO: Handler "Dejar de ser roomie".
+   *
+   * Solo frontend por ahora. Preparado para conectar al backend.
+   *
+   * TODO (backend): PUT /api/profiles/me con { current_roomie_id: null }
+   * IMPORTANTE: el endpoint debe también limpiar el current_roomie_id
+   * del otro usuario (transacción doble). Ver profile_routes.py.
+   */
+  const handleLeaveRoomie = () => {
+    // TODO: descomentar cuando el backend esté listo:
+    // await api.put('/profiles/me', { current_roomie_id: null });
+    // updateProfile({ ...myProfile, current_roomie: null, current_roomie_id: null });
+    // setRoommate(null);
+    toast('Esta acción estará disponible próximamente.', { icon: '🚧' });
+  };
+
+  /**
+   * ✅ NUEVO: Handler para enviar una reseña.
+   *
+   * Solo se puede llegar aquí si wasRoomie === true (la UI lo bloquea de otra forma).
+   * El endpoint /reviews/ ya existe en review_routes.py.
+   */
+  const handleSubmitReview = async () => {
+    if (reviewRating === 0) { toast.error('Seleccioná al menos 1 estrella'); return; }
+    setSubmittingReview(true);
+    try {
+      await api.post('/reviews/', {
+        target_user_id: targetId,
+        rating:         reviewRating,
+        comment:        reviewComment.trim() || null,
+      });
+      toast.success('¡Reseña enviada!');
+      setShowReviewForm(false);
+      setReviewComment('');
+      setReviewRating(5);
+      // Recargar las reseñas del perfil
+      const { data } = await api.get(`/reviews/user/${targetId}`);
+      setReviews(data.reviews);
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Error al enviar la reseña');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   if (loading) return <div className="flex justify-center py-32"><Spinner size="lg" /></div>;
   if (!profile) return <EmptyState icon="👤" title="Perfil no encontrado" />;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      {/* ── Profile header card ─────────────────────────────────────────── */}
-      <motion.div 
+
+      {/* ── Header del perfil ──────────────────────────────────────────────── */}
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="card mb-8 p-8 sm:p-10"
       >
         <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
           <div className="relative group">
-            <Avatar src={profile.profile_photo_url} name={profile.name} size="xl" verified={profile.verified} className="w-32 h-32 sm:w-40 sm:h-40 border-4 border-white shadow-xl" />
+            <Avatar
+              src={profile.profile_photo_url}
+              name={profile.name}
+              size="xl"
+              verified={profile.verified}
+              className="w-32 h-32 sm:w-40 sm:h-40 border-4 border-white shadow-xl"
+            />
             {isMe && (
-              <Link to="/profile/edit" className="absolute bottom-2 right-2 bg-orange-500 text-white p-2.5 rounded-full shadow-lg hover:bg-orange-600 transition-all">
+              <Link
+                to="/profile/edit"
+                className="absolute bottom-2 right-2 bg-orange-500 text-white p-2.5 rounded-full shadow-lg hover:bg-orange-600 transition-all"
+              >
                 <Edit2 size={16} />
               </Link>
             )}
@@ -8355,28 +9012,49 @@ export default function ProfilePage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
               <div>
                 <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start mb-2">
-                  <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-blue-950">{profile.name}</h1>
-                  {profile.verified && <Badge variant="blue" className="bg-blue-50 text-blue-600 border border-blue-100">✓ Verificado</Badge>}
-                  {profile.is_looking && !roommate && <Badge variant="orange" className="bg-orange-50 text-orange-600 border border-orange-100">Buscando</Badge>}
+                  <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-blue-950">
+                    {profile.name}
+                  </h1>
+                  {profile.verified && (
+                    <Badge variant="blue" className="bg-blue-50 text-blue-600 border border-blue-100">
+                      ✓ Verificado
+                    </Badge>
+                  )}
+                  {profile.is_looking && !roommate && (
+                    <Badge variant="orange" className="bg-orange-50 text-orange-600 border border-orange-100">
+                      Buscando
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-blue-900/60 font-bold">
-                  {profile.age && <span className="flex items-center gap-1.5"><Calendar size={16} className="text-orange-500" /> {profile.age} años</span>}
+                  {profile.age       && <span className="flex items-center gap-1.5"><Calendar size={16} className="text-orange-500" /> {profile.age} años</span>}
                   {profile.profession && <span className="flex items-center gap-1.5"><Briefcase size={16} className="text-orange-500" /> {profile.profession}</span>}
-                  {profile.city && <span className="flex items-center gap-1.5"><MapPin size={16} className="text-orange-500" /> {profile.city}</span>}
+                  {profile.city      && <span className="flex items-center gap-1.5"><MapPin size={16} className="text-orange-500" /> {profile.city}</span>}
                 </div>
               </div>
 
               {!isMe && (
                 <div className="flex items-center gap-3">
                   {!roommate && !pendingRequest && (
-                    <button onClick={handleSendRequest} disabled={requestSent} className="btn-primary flex items-center gap-2 py-2.5">
-                      <UserPlus size={18} /> {requestSent ? 'Enviada' : 'Solicitar Roomie'}
+                    <button
+                      onClick={handleSendRequest}
+                      disabled={requestSent}
+                      className="btn-primary flex items-center gap-2 py-2.5"
+                    >
+                      <UserPlus size={18} />
+                      {requestSent ? 'Enviada' : 'Solicitar Roomie'}
                     </button>
                   )}
-                  <button onClick={handleOpenChat} className="btn-secondary flex items-center gap-2 py-2.5">
+                  <button
+                    onClick={handleOpenChat}
+                    className="btn-secondary flex items-center gap-2 py-2.5"
+                  >
                     <MessageCircle size={18} /> Chat
                   </button>
-                  <button onClick={() => setReportModal(true)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all">
+                  <button
+                    onClick={() => setReportModal(true)}
+                    className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
+                  >
                     <Flag size={20} />
                   </button>
                 </div>
@@ -8384,67 +9062,132 @@ export default function ProfilePage() {
             </div>
 
             {profile.bio && (
-              <p className="text-blue-900/80 text-lg leading-relaxed max-w-2xl mb-6 font-medium">{profile.bio}</p>
+              <p className="text-blue-900/80 text-lg leading-relaxed max-w-2xl mb-6 font-medium">
+                {profile.bio}
+              </p>
             )}
 
+            {/* Banner de roomie actual */}
             {roommate && (
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl border border-emerald-100">
-                <span className="text-lg">🏠</span> {isMe ? `Soy roomie de ${roommate.name}` : `Es roomie de ${roommate.name}`}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl border border-emerald-100">
+                  <span className="text-lg">🏠</span>
+                  {isMe ? `Soy roomie de ${roommate.name}` : `Es roomie de ${roommate.name}`}
+                </div>
+
+                {/*
+                 * ✅ NUEVO: Botón "Dejar de ser roomie"
+                 *
+                 * Solo visible para el propio usuario (isMe) cuando tiene un roomie activo.
+                 * Handler conectado al mock → listo para backend.
+                 * Estilo: texto pequeño, rojo, discreto → acción destructiva poco frecuente.
+                 */}
+                {isMe && (
+                  <button
+                    onClick={handleLeaveRoomie}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-red-400
+                      hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    <UserMinus size={13} />
+                    Dejar de ser roomie
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
 
+        {/* Solicitud pendiente */}
         {!isMe && pendingRequest && !roommate && (
           <div className="mt-10 p-6 bg-blue-50 rounded-3xl border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-6">
             <div className="text-center sm:text-left">
-              <p className="text-blue-900 font-extrabold text-lg mb-1">¡Te ha enviado una solicitud de roomie!</p>
-              <p className="text-blue-600 font-medium">¿Querés que sea tu próximo compañero de hogar?</p>
+              <p className="text-blue-900 font-extrabold text-lg mb-1">
+                ¡Te ha enviado una solicitud de roomie!
+              </p>
+              <p className="text-blue-600 font-medium">
+                ¿Querés que sea tu próximo compañero de hogar?
+              </p>
             </div>
             <div className="flex gap-3 w-full sm:w-auto">
-              <button onClick={() => respondRequest(pendingRequest.id, 'accept')} className="flex-1 sm:flex-none px-8 py-3 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all">Aceptar</button>
-              <button onClick={() => respondRequest(pendingRequest.id, 'reject')} className="flex-1 sm:flex-none px-8 py-3 bg-white text-blue-600 font-bold rounded-2xl border border-blue-200 hover:bg-blue-50 transition-all">Rechazar</button>
+              <button
+                onClick={() => respondRequest(pendingRequest.id, 'accept')}
+                className="flex-1 sm:flex-none px-8 py-3 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all"
+              >
+                Aceptar
+              </button>
+              <button
+                onClick={() => respondRequest(pendingRequest.id, 'reject')}
+                className="flex-1 sm:flex-none px-8 py-3 bg-white text-blue-600 font-bold rounded-2xl border border-blue-200 hover:bg-blue-50 transition-all"
+              >
+                Rechazar
+              </button>
             </div>
           </div>
         )}
       </motion.div>
 
+      {/* ── Cuerpo: 2 columnas ────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+        {/* Columna izquierda (2/3) */}
         <div className="md:col-span-2 space-y-8">
+
+          {/* Preferencias de convivencia */}
           <div className="card">
-            <h2 className="font-display font-extrabold text-2xl text-blue-950 mb-6">Preferencias de convivencia</h2>
+            <h2 className="font-display font-extrabold text-2xl text-blue-950 mb-6">
+              Preferencias de convivencia
+            </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="p-5 bg-orange-50/50 rounded-2xl border border-orange-100">
-                <p className="text-xs font-bold text-blue-900/40 uppercase tracking-widest mb-3">Presupuesto mensual</p>
+                <p className="text-xs font-bold text-blue-900/40 uppercase tracking-widest mb-3">
+                  Presupuesto mensual
+                </p>
                 <p className="text-xl font-display font-extrabold text-blue-600">
-                  ₲ {profile.budget_min ? (profile.budget_min / 1000000).toFixed(1) + 'M' : '?'} – {profile.budget_max ? (profile.budget_max / 1000000).toFixed(1) + 'M' : '?'}
+                  ₲ {profile.budget_min ? (profile.budget_min / 1000000).toFixed(1) + 'M' : '?'}
+                  {' – '}
+                  {profile.budget_max ? (profile.budget_max / 1000000).toFixed(1) + 'M' : '?'}
                 </p>
               </div>
               <div className="p-5 bg-orange-50/50 rounded-2xl border border-orange-100">
-                <p className="text-xs font-bold text-blue-900/40 uppercase tracking-widest mb-3">Horario habitual</p>
-                <p className="text-xl font-bold text-blue-950 capitalize">{profile.schedule || 'Sin especificar'}</p>
+                <p className="text-xs font-bold text-blue-900/40 uppercase tracking-widest mb-3">
+                  Horario habitual
+                </p>
+                <p className="text-xl font-bold text-blue-950 capitalize">
+                  {profile.schedule || 'Sin especificar'}
+                </p>
               </div>
               <div className="p-5 bg-orange-50/50 rounded-2xl border border-orange-100 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-blue-900/40 uppercase tracking-widest mb-1">Mascotas</p>
-                  <p className={`font-bold ${profile.pets ? 'text-emerald-600' : 'text-blue-900/40'}`}>{profile.pets ? '✓ Tiene mascotas' : '✗ Sin mascotas'}</p>
+                  <p className={`font-bold ${profile.pets ? 'text-emerald-600' : 'text-blue-900/40'}`}>
+                    {profile.pets ? '✓ Tiene mascotas' : '✗ Sin mascotas'}
+                  </p>
                 </div>
                 <span className="text-2xl">{profile.pets ? '🐾' : '🚫'}</span>
               </div>
               <div className="p-5 bg-orange-50/50 rounded-2xl border border-orange-100 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-blue-900/40 uppercase tracking-widest mb-1">Fumador</p>
-                  <p className={`font-bold ${profile.smoker ? 'text-orange-600' : 'text-blue-900/40'}`}>{profile.smoker ? '🚬 Fumador' : '🚭 No fuma'}</p>
+                  <p className={`font-bold ${profile.smoker ? 'text-orange-600' : 'text-blue-900/40'}`}>
+                    {profile.smoker ? '🚬 Fumador' : '🚭 No fuma'}
+                  </p>
                 </div>
                 <span className="text-2xl">{profile.smoker ? '🔥' : '✨'}</span>
               </div>
             </div>
           </div>
 
+          {/* Reseñas recibidas */}
           <div className="card">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="font-display font-extrabold text-2xl text-slate-900">Reseñas ({reviews.length})</h2>
-              {reviews.length > 0 && <StarRating value={reviews.reduce((s, r) => s + r.rating, 0) / reviews.length} />}
+              <h2 className="font-display font-extrabold text-2xl text-slate-900">
+                Reseñas ({reviews.length})
+              </h2>
+              {reviews.length > 0 && (
+                <StarRating
+                  value={reviews.reduce((s, r) => s + r.rating, 0) / reviews.length}
+                />
+              )}
             </div>
             {reviews.length === 0 ? (
               <div className="text-center py-10">
@@ -8461,43 +9204,147 @@ export default function ProfilePage() {
                       </div>
                       <StarRating value={r.rating} />
                     </div>
-                    {r.comment && <p className="text-slate-600 leading-relaxed">{r.comment}</p>}
+                    {r.comment && (
+                      <p className="text-slate-600 leading-relaxed">{r.comment}</p>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/*
+           * ✅ NUEVO: Sección "Escribir reseña"
+           *
+           * Solo visible para usuarios que visitan el perfil de otra persona.
+           * Se muestra en DOS estados:
+           *   1. wasRoomie === true → formulario habilitado
+           *   2. wasRoomie === false → estado bloqueado con explicación
+           *
+           * Por qué importa esta distinción:
+           *   Previene reseñas de personas que nunca convivieron juntas,
+           *   lo que protege la reputación de los usuarios en la plataforma.
+           */}
+          {!isMe && (
+            <div className="card">
+              <h2 className="font-display font-extrabold text-2xl text-slate-900 mb-4">
+                Escribir reseña
+              </h2>
+
+              {wasRoomie ? (
+                /* ── Formulario habilitado (fueron roomies) ── */
+                showReviewForm ? (
+                  <div className="space-y-5">
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
+                        Tu calificación
+                      </p>
+                      <StarInput value={reviewRating} onChange={setReviewRating} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                        Comentario (opcional)
+                      </label>
+                      <textarea
+                        className="input resize-none h-28"
+                        placeholder="¿Cómo fue tu experiencia conviviendo con esta persona?"
+                        value={reviewComment}
+                        onChange={(e) => setReviewComment(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex gap-3 pt-2 border-t border-slate-50">
+                      <button
+                        type="button"
+                        onClick={() => setShowReviewForm(false)}
+                        className="flex-1 btn-ghost"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleSubmitReview}
+                        disabled={submittingReview}
+                        className="flex-1 btn-primary"
+                      >
+                        {submittingReview ? 'Enviando...' : 'Enviar reseña'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowReviewForm(true)}
+                    className="flex items-center gap-2 w-full justify-center py-4 rounded-2xl
+                      border-2 border-dashed border-orange-200 text-orange-500 font-bold
+                      hover:bg-orange-50 hover:border-orange-300 transition-all"
+                  >
+                    <Star size={18} />
+                    Escribir reseña sobre {profile.name?.split(' ')[0]}
+                  </button>
+                )
+              ) : (
+                /* ── Estado bloqueado (no fueron roomies) ── */
+                <div className="flex flex-col items-center gap-3 py-6 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center">
+                  <Lock size={28} className="text-slate-300" />
+                  <div>
+                    <p className="font-bold text-slate-500 mb-1">
+                      Reseña no disponible
+                    </p>
+                    <p className="text-sm text-slate-400 max-w-xs">
+                      Solo podés reseñar a alguien con quien hayas sido roomie.
+                      Si conviviste con esta persona, la opción se habilitará automáticamente.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
+        {/* Columna derecha (1/3) */}
         <div className="space-y-8">
           {isMe && !profile.verified && (
             <div className="card bg-orange-50 border-orange-100 p-8">
               <ShieldCheck className="text-orange-500 w-12 h-12 mb-4" />
-              <h3 className="font-display font-extrabold text-xl text-orange-900 mb-2">Verificá tu perfil</h3>
-              <p className="text-orange-700 text-sm mb-6">Aumentá tus chances de encontrar roomie en un 80% verificando tu identidad.</p>
-              <Link to="/verification" className="w-full btn-primary bg-orange-500 hover:bg-orange-600 flex items-center justify-center py-3">
+              <h3 className="font-display font-extrabold text-xl text-orange-900 mb-2">
+                Verificá tu perfil
+              </h3>
+              <p className="text-orange-700 text-sm mb-6">
+                Aumentá tus chances de encontrar roomie en un 80% verificando tu identidad.
+              </p>
+              <Link
+                to="/verification"
+                className="w-full btn-primary bg-orange-500 hover:bg-orange-600 flex items-center justify-center py-3"
+              >
                 Empezar ahora
               </Link>
             </div>
           )}
-          
+
           <div className="card">
-            <h3 className="font-display font-extrabold text-xl text-slate-900 mb-6">Insignias</h3>
+            <h3 className="font-display font-extrabold text-xl text-slate-900 mb-6">
+              Insignias
+            </h3>
             <div className="flex flex-wrap gap-3">
-              <Badge variant="blue" className="py-2 px-4 text-xs">Pionero</Badge>
+              <Badge variant="blue"   className="py-2 px-4 text-xs">Pionero</Badge>
               <Badge variant="purple" className="py-2 px-4 text-xs">Buen Compañero</Badge>
-              <Badge variant="green" className="py-2 px-4 text-xs">Verificado</Badge>
+              <Badge variant="green"  className="py-2 px-4 text-xs">Verificado</Badge>
             </div>
           </div>
         </div>
       </div>
 
+      {/* ── Modal: Reportar usuario ─────────────────────────────────────────── */}
       {reportModal && (
         <Modal open={reportModal} onClose={() => setReportModal(false)} title="Reportar usuario">
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Motivo</label>
-              <select className="input" value={reportReason} onChange={(e) => setReportReason(e.target.value)}>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+                Motivo
+              </label>
+              <select
+                className="input"
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+              >
                 <option value="fake_profile">Perfil falso</option>
                 <option value="inappropriate">Contenido inapropiado</option>
                 <option value="spam">Spam</option>
@@ -8506,13 +9353,23 @@ export default function ProfilePage() {
               </select>
             </div>
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Descripción (opcional)</label>
-              <textarea className="input resize-none h-32" value={reportDesc}
-                onChange={(e) => setReportDesc(e.target.value)} placeholder="Describí el problema detalladamente..." />
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+                Descripción (opcional)
+              </label>
+              <textarea
+                className="input resize-none h-32"
+                value={reportDesc}
+                onChange={(e) => setReportDesc(e.target.value)}
+                placeholder="Describí el problema detalladamente..."
+              />
             </div>
             <div className="flex gap-3 pt-4">
-              <button onClick={() => setReportModal(false)} className="flex-1 btn-ghost">Cancelar</button>
-              <button onClick={handleReport} className="flex-1 btn-primary">Enviar reporte</button>
+              <button onClick={() => setReportModal(false)} className="flex-1 btn-ghost">
+                Cancelar
+              </button>
+              <button onClick={handleReport} className="flex-1 btn-primary">
+                Enviar reporte
+              </button>
             </div>
           </div>
         </Modal>
@@ -8732,27 +9589,75 @@ import { toast } from 'react-hot-toast';
 import { motion } from 'motion/react';
 
 const SCHEDULES = ['morning', 'afternoon', 'night', 'flexible'];
-const SCHEDULE_LABELS = { morning: 'Mañana', afternoon: 'Tarde', night: 'Noche', flexible: 'Flexible' };
-const CITIES = ['Asunción', 'San Lorenzo', 'Luque', 'Fernando de la Mora', 'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este'];
+const SCHEDULE_LABELS = {
+  morning:   'Mañana',
+  afternoon: 'Tarde',
+  night:     'Noche',
+  flexible:  'Flexible',
+};
+const CITIES = [
+  'Asunción', 'San Lorenzo', 'Luque', 'Fernando de la Mora',
+  'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este',
+];
+
+/**
+ * ✅ NUEVO: Opciones del filtro por género.
+ *
+ * Valores alineados con el campo `gender VARCHAR` de la tabla `profiles`.
+ * Ver también: database_changes.sql donde se define el CHECK constraint
+ * con los valores válidos: 'male' | 'female' | 'other' | 'prefer_not_to_say'
+ */
+const GENDER_OPTIONS = [
+  { value: '',                  label: 'Cualquiera'           },
+  { value: 'male',              label: 'Hombre'               },
+  { value: 'female',            label: 'Mujer'                },
+  { value: 'other',             label: 'Otro / No especificado'},
+];
+
+// Estado inicial extraído como constante para poder reutilizarlo en "Limpiar filtros"
+const INITIAL_FILTERS = {
+  city:     'Asunción',
+  gender:   '',
+  pets:     '',
+  smoker:   '',
+  schedule: '',
+  min_age:  '',
+  max_age:  '',
+};
 
 export default function SearchPage() {
   const navigate = useNavigate();
-  const [profiles, setProfiles] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [profiles,    setProfiles]    = useState([]);
+  const [loading,     setLoading]     = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
-    city: 'Asunción', pets: '', smoker: '', schedule: '', min_age: '', max_age: ''
-  });
+  const [filters,     setFilters]     = useState(INITIAL_FILTERS);
 
   const fetchProfiles = useCallback(async (currentFilters = filters) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: 1, per_page: 20, city: currentFilters.city });
-      if (currentFilters.min_age) params.append('min_age', currentFilters.min_age);
-      if (currentFilters.max_age) params.append('max_age', currentFilters.max_age);
-      if (currentFilters.pets !== '') params.append('pets', currentFilters.pets);
+      const params = new URLSearchParams({
+        page:     1,
+        per_page: 20,
+        city:     currentFilters.city,
+      });
+
+      if (currentFilters.min_age)  params.append('min_age',  currentFilters.min_age);
+      if (currentFilters.max_age)  params.append('max_age',  currentFilters.max_age);
+      if (currentFilters.pets  !== '') params.append('pets',   currentFilters.pets);
       if (currentFilters.smoker !== '') params.append('smoker', currentFilters.smoker);
-      if (currentFilters.schedule) params.append('schedule', currentFilters.schedule);
+      if (currentFilters.schedule)      params.append('schedule', currentFilters.schedule);
+
+      /**
+       * ✅ NUEVO: Filtro por género enviado al backend.
+       *
+       * Técnicamente: se agrega el parámetro `gender` a la query.
+       * El backend debe soportarlo en /profiles/search filtrando por
+       * profiles.gender = :gender.
+       *
+       * TODO (backend): Agregar `gender` como parámetro filtrable en
+       * profile_routes.py → GET /profiles/search
+       */
+      if (currentFilters.gender) params.append('gender', currentFilters.gender);
 
       const { data } = await api.get(`/profiles/search?${params}`);
       setProfiles(data.profiles || []);
@@ -8767,18 +9672,35 @@ export default function SearchPage() {
     fetchProfiles();
   }, [filters, fetchProfiles]);
 
+  // ✅ MEJORADO: incluye `gender` en el contador de filtros activos
   const activeFilterCount = [
-    filters.pets, filters.smoker, filters.schedule, filters.min_age, filters.max_age
+    filters.gender,
+    filters.pets,
+    filters.smoker,
+    filters.schedule,
+    filters.min_age,
+    filters.max_age,
   ].filter(Boolean).length;
+
+  const handleFilterChange = (key, value) =>
+    setFilters((f) => ({ ...f, [key]: value }));
+
+  const handleClear = () => setFilters(INITIAL_FILTERS);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
-          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-blue-950">Buscar Roomies</h1>
-          <p className="text-orange-500 font-bold mt-1">{profiles.length} perfiles compatibles encontrados</p>
+          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-blue-950">
+            Buscar Roomies
+          </h1>
+          <p className="text-orange-500 font-bold mt-1">
+            {profiles.length} perfiles compatibles encontrados
+          </p>
         </div>
-        
+
         <button
           onClick={() => setShowFilters(!showFilters)}
           className="flex items-center gap-2 px-5 py-2.5 rounded-2xl border border-orange-100 text-sm font-bold text-blue-900 bg-white hover:bg-orange-50 transition-all relative shadow-sm"
@@ -8793,64 +9715,144 @@ export default function SearchPage() {
         </button>
       </div>
 
-      <div className={`card mb-10 overflow-hidden transition-all duration-500 ${showFilters ? 'max-h-[1000px] opacity-100 p-8' : 'max-h-0 opacity-0 p-0 border-none shadow-none'}`}>
+      {/* Panel de filtros colapsable */}
+      <div
+        className={`card mb-10 overflow-hidden transition-all duration-500 ${
+          showFilters
+            ? 'max-h-[1000px] opacity-100 p-8'
+            : 'max-h-0 opacity-0 p-0 border-none shadow-none'
+        }`}
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-end">
+
+          {/* Ciudad */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-blue-900/40 uppercase tracking-widest ml-1">Ciudad</label>
-            <select className="input" value={filters.city} onChange={(e) => setFilters((f) => ({ ...f, city: e.target.value }))}>
+            <label className="block text-xs font-bold text-blue-900/40 uppercase tracking-widest ml-1">
+              Ciudad
+            </label>
+            <select
+              className="input"
+              value={filters.city}
+              onChange={(e) => handleFilterChange('city', e.target.value)}
+            >
               {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+
+          {/* ✅ NUEVO: Filtro por género */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Mascotas</label>
-            <select className="input" value={filters.pets} onChange={(e) => setFilters((f) => ({ ...f, pets: e.target.value }))}>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Género
+            </label>
+            <select
+              className="input"
+              value={filters.gender}
+              onChange={(e) => handleFilterChange('gender', e.target.value)}
+            >
+              {GENDER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Mascotas */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Mascotas
+            </label>
+            <select
+              className="input"
+              value={filters.pets}
+              onChange={(e) => handleFilterChange('pets', e.target.value)}
+            >
               <option value="">Cualquiera</option>
               <option value="true">Con mascotas</option>
               <option value="false">Sin mascotas</option>
             </select>
           </div>
+
+          {/* Fumador */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Fumador</label>
-            <select className="input" value={filters.smoker} onChange={(e) => setFilters((f) => ({ ...f, smoker: e.target.value }))}>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Fumador
+            </label>
+            <select
+              className="input"
+              value={filters.smoker}
+              onChange={(e) => handleFilterChange('smoker', e.target.value)}
+            >
               <option value="">Cualquiera</option>
               <option value="false">No fuma</option>
               <option value="true">Fumador</option>
             </select>
           </div>
+
+          {/* Horario */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Horario</label>
-            <select className="input" value={filters.schedule} onChange={(e) => setFilters((f) => ({ ...f, schedule: e.target.value }))}>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Horario
+            </label>
+            <select
+              className="input"
+              value={filters.schedule}
+              onChange={(e) => handleFilterChange('schedule', e.target.value)}
+            >
               <option value="">Cualquiera</option>
-              {SCHEDULES.map((s) => <option key={s} value={s}>{SCHEDULE_LABELS[s]}</option>)}
+              {SCHEDULES.map((s) => (
+                <option key={s} value={s}>{SCHEDULE_LABELS[s]}</option>
+              ))}
             </select>
           </div>
+
+          {/* Edad mín. */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Edad mín.</label>
-            <input type="number" className="input" placeholder="18" min={18} max={80} value={filters.min_age}
-              onChange={(e) => setFilters((f) => ({ ...f, min_age: e.target.value }))} />
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Edad mín.
+            </label>
+            <input
+              type="number" className="input"
+              placeholder="18" min={18} max={80}
+              value={filters.min_age}
+              onChange={(e) => handleFilterChange('min_age', e.target.value)}
+            />
           </div>
+
+          {/* Edad máx. */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Edad máx.</label>
-            <input type="number" className="input" placeholder="99" min={18} max={99} value={filters.max_age}
-              onChange={(e) => setFilters((f) => ({ ...f, max_age: e.target.value }))} />
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Edad máx.
+            </label>
+            <input
+              type="number" className="input"
+              placeholder="99" min={18} max={99}
+              value={filters.max_age}
+              onChange={(e) => handleFilterChange('max_age', e.target.value)}
+            />
           </div>
-          
+
+          {/* Acciones */}
           <div className="sm:col-span-2 lg:col-span-3 flex justify-end gap-3 pt-4 border-t border-slate-50">
-            <button type="button"
-              onClick={() => setFilters({ city: 'Asunción', pets: '', smoker: '', schedule: '', min_age: '', max_age: '' })}
-              className="btn-ghost text-sm">
+            <button type="button" onClick={handleClear} className="btn-ghost text-sm">
               Limpiar filtros
             </button>
-            <button onClick={() => fetchProfiles()} className="btn-primary">Aplicar filtros</button>
+            <button onClick={() => fetchProfiles()} className="btn-primary">
+              Aplicar filtros
+            </button>
           </div>
         </div>
       </div>
 
+      {/* Resultados */}
       {loading ? (
-        <div className="flex justify-center py-32"><Spinner size="lg" /></div>
+        <div className="flex justify-center py-32">
+          <Spinner size="lg" />
+        </div>
       ) : profiles.length === 0 ? (
-        <EmptyState icon="🔍" title="No encontramos roomies compatibles"
-          description="Probá ajustar tus preferencias en tu perfil o cambiar el filtro de ciudad." />
+        <EmptyState
+          icon="🔍"
+          title="No encontramos roomies compatibles"
+          description="Probá ajustar tus preferencias en tu perfil o cambiar el filtro de ciudad."
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {profiles.map((p) => (
