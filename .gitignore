@@ -1,46 +1,65 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-venv/
-env/
-.venv/
-*.egg-info/
-dist/
-build/
-.pytest_cache/
+# ══════════════════════════════════════════════════════
+#  JAIKO — .gitignore
+#  Cubre: backend (Python), frontend (Vite), mobile (Expo)
+# ══════════════════════════════════════════════════════
 
-# Environment
+# ── Sistema operativo ──────────────────────────────────
+.DS_Store
+.DS_Store?
+Thumbs.db
+desktop.ini
+*~
+
+# ── Variables de entorno (NUNCA subir al repo) ─────────
 .env
 .env.local
+.env.development
+.env.production
 .env.*.local
-frontend/.env
-backend/.env
 
-# Database
+# ══════════════════════════════════════════════════════
+#  BACKEND — Python / Flask
+# ══════════════════════════════════════════════════════
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.pytest_cache/
+instance/
 *.db
 *.sqlite3
-# Flask migrations (keep the folder, ignore versions)
-# migrations/versions/
+migrations/versions/*.pyc
 
-# Node / Frontend
+# ══════════════════════════════════════════════════════
+#  FRONTEND — React / Vite
+# ══════════════════════════════════════════════════════
 node_modules/
 dist/
 .vite/
-*.local
+coverage/
 
-# IDE
-.vscode/
+# ══════════════════════════════════════════════════════
+#  MOBILE — Expo / React Native
+# ══════════════════════════════════════════════════════
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Carpetas nativas generadas por Expo (no editar a mano)
+mobile/android/
+mobile/ios/
+
+# ══════════════════════════════════════════════════════
+#  SHARED — no tiene node_modules propios
+# ══════════════════════════════════════════════════════
+shared/**/*.pyc
+
+# ── Editor ─────────────────────────────────────────────
+.vscode/settings.json
 .idea/
 *.swp
 *.swo
-.DS_Store
-Thumbs.db
-
-# DockerS
-.docker/
-
-# Logs
-*.log
