@@ -1,106 +1,137 @@
 ESTRUCTURA DEL PROYECTO:
 ./
-    JAIKO/
-        backend/
-            .env.example
-            package.json
-            run.py
-            app/
-                config.py
-                extensions.py
-                __init__.py
-                models/
-                    chat.py
-                    group.py
-                    listing.py
-                    misc.py
-                    profile.py
-                    user.py
-                    __init__.py
-                routes/
-                    admin_routes.py
-                    auth_routes.py
-                    chat_routes.py
-                    group_routes.py
-                    listing_routes.py
-                    notification_routes.py
-                    profile_routes.py
-                    report_routes.py
-                    request_routes.py
-                    review_routes.py
-                    upload_routes.py
-                    verification_routes.py
-                    __init__.py
-                    services/
-                services/
-                    matching_service.py
-                    notification_service.py
-                    __init__.py
-                sockets/
-                    chat_socket.py
-                    __init__.py
-                utils/
-                    jwt_helpers.py
-                    storage.py
-                    __init__.py
-        frontend/
-            .env.example
-            index.html
-            package.json
-            postcss.config.js
-            tailwind.config.js
-            vite.config.js
-            src/
-                App.jsx
-                index.css
-                main.jsx
-                assets/
-                components/
-                    layout/
-                        AdminRoute.jsx
-                        Layout.jsx
-                        ProtectedRoute.jsx
-                    map/
-                        JaikoMap.jsx
-                    ui/
-                        BackButton.jsx
-                        index.jsx
-                        ListingCard.jsx
-                        Logo.jsx
-                        ProfileCard.jsx
-                context/
-                    authStore.js
-                    notifStore.js
-                pages/
-                    AdminPage.jsx
-                    BackButton.jsx
-                    BottomNav.jsx
-                    ChatPage.jsx
-                    CreateListingPage.jsx
-                    EditProfilePage.jsx
-                    GroupDetailPage.jsx
-                    GroupsPage.jsx
-                    HomePage.jsx
-                    ListingDetailPage.jsx
-                    ListingsPage.jsx
-                    LoginPage.jsx
-                    NotFoundPage.jsx
-                    NotificationsPage.jsx
-                    ProfilePage.jsx
-                    RegisterPage.jsx
-                    SearchPage.jsx
-                    VerificationPage.jsx
-                services/
-                    api.js
-                    socket.js
-                    storage.js
+    backend/
+        ├── Dockerfile
+        ├── Procfile
+        ├── app
+        │   ├── __init__.py
+        │   ├── config.py
+        │   ├── extensions.py
+        │   ├── jaiko_dev.db
+        │   ├── models
+        │   │   ├── __init__.py
+        │   │   ├── chat.py
+        │   │   ├── group.py
+        │   │   ├── listing.py
+        │   │   ├── misc.py
+        │   │   ├── profile.py
+        │   │   └── user.py
+        │   ├── routes
+        │   │   ├── __init__.py
+        │   │   ├── admin_routes.py
+        │   │   ├── auth_routes.py
+        │   │   ├── chat_routes.py
+        │   │   ├── group_routes.py
+        │   │   ├── listing_routes.py
+        │   │   ├── notification_routes.py
+        │   │   ├── profile_routes.py
+        │   │   ├── report_routes.py
+        │   │   ├── request_routes.py
+        │   │   ├── review_routes.py
+        │   │   ├── upload_routes.py
+        │   │   └── verification_routes.py
+        │   ├── services
+        │   │   ├── __init__.py
+        │   │   ├── matching_service.py
+        │   │   └── notification_service.py
+        │   ├── sockets
+        │   │   ├── __init__.py
+        │   │   └── chat_socket.py
+        │   └── utils
+        │       ├── __init__.py
+        │       ├── jwt_helpers.py
+        │       ├── query_helpers.py
+        │       └── storage.py
+        ├── package.json
+        ├── requirements.txt
+        └── run.py
+    frontend/
+        ├── Dockerfile
+        ├── index.html
+        ├── package.json
+        ├── src
+        │   ├── App.jsx
+        │   ├── components
+        │   │   ├── layout
+        │   │   │   ├── AdminRoute.jsx
+        │   │   │   ├── Layout.jsx
+        │   │   │   └── ProtectedRoute.jsx
+        │   │   ├── map
+        │   │   │   └── JaikoMap.jsx
+        │   │   └── ui
+        │   │       ├── BackButton.jsx
+        │   │       ├── ListingCard.jsx
+        │   │       ├── Logo.jsx
+        │   │       ├── ProfileCard.jsx
+        │   │       └── index.jsx
+        │   ├── context
+        │   │   ├── authStore.js
+        │   │   └── notifStore.js
+        │   ├── hooks
+        │   ├── index.css
+        │   ├── main.jsx
+        │   ├── pages
+        │   │   ├── AdminPage.jsx
+        │   │   ├── BackButton.jsx
+        │   │   ├── BottomNav.jsx
+        │   │   ├── CAMBIOS.md
+        │   │   ├── ChatPage.jsx
+        │   │   ├── CreateListingPage.jsx
+        │   │   ├── EditProfilePage.jsx
+        │   │   ├── GroupDetailPage.jsx
+        │   │   ├── GroupsPage.jsx
+        │   │   ├── HomePage.jsx
+        │   │   ├── ListingDetailPage.jsx
+        │   │   ├── ListingsPage.jsx
+        │   │   ├── LoginPage.jsx
+        │   │   ├── NotFoundPage.jsx
+        │   │   ├── NotificationsPage.jsx
+        │   │   ├── ProfilePage.jsx
+        │   │   ├── RegisterPage.jsx
+        │   │   ├── SearchPage.jsx
+        │   │   └── VerificationPage.jsx
+        │   ├── services
+        │   │   ├── api.js
+        │   │   ├── socket.js
+        │   │   └── storage.js
+        │   └── utils
+        └── vite.config.js
+    mobile/
+        ├── README.md
+        ├── app
+        │   ├── (tabs)
+        │   │   ├── _layout.jsx
+        │   │   ├── chat.jsx
+        │   │   ├── groups.jsx
+        │   │   ├── index.jsx
+        │   │   └── listings.jsx
+        │   ├── _layout.jsx
+        │   ├── login.jsx
+        │   └── register.jsx
+        ├── app.json
+        ├── components
+        │   ├── ProfileCard.jsx
+        │   └── ui
+        ├── constants
+        │   └── theme.js
+        ├── hooks
+        └── package.json
+    shared/
+        ├── context
+        │   ├── authStore.js
+        │   └── notifStore.js
+        ├── services
+        │   ├── api.js
+        │   └── socket.js
+        └── utils
+            └── storage.js
 
 ==================================================
 CONTENIDO DE LOS ARCHIVOS
 ==================================================
 
 
-FILE_PATH: .\JAIKO\backend\.env.example
+FILE_PATH: .\backend\.env.example
 ----------------------------------------
 
 # ── Entorno Flask ─────────────────────────────────────────────────────────────
@@ -151,9 +182,8 @@ SUPABASE_BUCKET=
 FRONTEND_URL=FRONTEND_URL=
 
 RECAPTCHA_SECRET_KEY=
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\package.json
+FILE_PATH: .\backend\package.json
 ----------------------------------------
 {
   "dependencies": {
@@ -161,9 +191,8 @@ FILE_PATH: .\JAIKO\backend\package.json
   }
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\run.py
+FILE_PATH: .\backend\run.py
 ----------------------------------------
 import os
 import eventlet
@@ -202,110 +231,8 @@ if __name__ == "__main__":
         # y en producción usamos Gunicorn (ver Procfile y README).
     )
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\config.py
-----------------------------------------
-import os
-from dotenv import load_dotenv
-
-# Obtiene la ruta absoluta de la carpeta donde está este archivo
-basedir = os.path.abspath(os.path.dirname(__file__))
-# Carga el .env forzando la ruta para evitar errores de lectura
-load_dotenv(os.path.join(basedir, "..", ".env"))
-
-
-def _require_env(name: str) -> str:
-    """
-    Lee una variable de entorno y lanza un error explícito si no existe.
-
-    Por qué existe esta función:
-    - os.environ.get("X", "fallback") silencia el problema: el server arranca
-      con una clave conocida públicamente, lo que es un riesgo de seguridad.
-    - Con esta función el servidor NO arranca si falta la variable, lo que
-      obliga a configurarla correctamente antes de seguir.
-    """
-    value = os.environ.get(name)
-    if not value:
-        raise EnvironmentError(
-            f"\n\n[CONFIG ERROR] La variable de entorno '{name}' es obligatoria "
-            f"y no está definida.\n"
-            f"Agregá esta línea a tu archivo .env:\n"
-            f"  {name}=<tu_valor_secreto_aqui>\n"
-        )
-    return value
-
-
-class Config:
-    # ── Claves de seguridad (OBLIGATORIAS — sin fallback) ────────────────────
-    # BUG #4 CORREGIDO: antes tenían valores por defecto conocidos ("jaiko-dev-secret-123").
-    # Cualquier persona que vea el código podía fabricar JWTs válidos con esas claves.
-    # Ahora _require_env() hace que el servidor no arranque si no están configuradas.
-    SECRET_KEY = _require_env("SECRET_KEY")
-    JWT_SECRET_KEY = _require_env("JWT_SECRET_KEY")
-    JWT_ACCESS_TOKEN_EXPIRES = 86400 * 7  # 7 días
-
-    # ── Base de datos ─────────────────────────────────────────────────────────
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", f"sqlite:///{os.path.join(basedir, 'jaiko_dev.db')}"
-    )
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-    # ── Google OAuth ──────────────────────────────────────────────────────────
-    GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
-    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
-    # ── Frontend URL para redirección ─────────────────────────────────────────
-    FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
-
-    # ── Supabase ──────────────────────────────────────────────────────────────
-    SUPABASE_URL = os.environ.get("SUPABASE_URL")
-    SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-    SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "jaiko-media")
-
-    # ── Lógica de negocio ─────────────────────────────────────────────────────
-    MATCH_THRESHOLD = 0.80
-    MAX_GROUP_MEMBERS = 6
-
-
-class DevelopmentConfig(Config):
-    DEBUG = True
-
-
-class ProductionConfig(Config):
-    DEBUG = False
-    # En producción, DATABASE_URL DEBE existir (Postgres, Railway, etc.)
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
-
-
-config_map = {
-    "development": DevelopmentConfig,
-    "production": ProductionConfig,
-}
-
-----------------------------------------
-
-FILE_PATH: .\JAIKO\backend\app\extensions.py
-----------------------------------------
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_socketio import SocketIO
-from flask_jwt_extended import JWTManager
-from flask_cors import CORS
-from flask_bcrypt import Bcrypt
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-
-db = SQLAlchemy()
-migrate = Migrate()
-socketio = SocketIO()
-jwt = JWTManager()
-cors = CORS()
-bcrypt = Bcrypt()
-limiter = Limiter(key_func=get_remote_address)
-
-----------------------------------------
-
-FILE_PATH: .\JAIKO\backend\app\__init__.py
+FILE_PATH: .\backend\app\__init__.py
 ----------------------------------------
 import os
 from flask import Flask, jsonify  # ← añadí jsonify
@@ -419,9 +346,142 @@ def create_app(env: str | None = None) -> Flask:
 
     return app
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\models\chat.py
+FILE_PATH: .\backend\app\config.py
+----------------------------------------
+import os
+from dotenv import load_dotenv
+
+# Obtiene la ruta absoluta de la carpeta donde está este archivo
+basedir = os.path.abspath(os.path.dirname(__file__))
+# Carga el .env forzando la ruta para evitar errores de lectura
+load_dotenv(os.path.join(basedir, "..", ".env"))
+
+
+def _require_env(name: str) -> str:
+    """
+    Lee una variable de entorno y lanza un error explícito si no existe.
+
+    Por qué existe esta función:
+    - os.environ.get("X", "fallback") silencia el problema: el server arranca
+      con una clave conocida públicamente, lo que es un riesgo de seguridad.
+    - Con esta función el servidor NO arranca si falta la variable, lo que
+      obliga a configurarla correctamente antes de seguir.
+    """
+    value = os.environ.get(name)
+    if not value:
+        raise EnvironmentError(
+            f"\n\n[CONFIG ERROR] La variable de entorno '{name}' es obligatoria "
+            f"y no está definida.\n"
+            f"Agregá esta línea a tu archivo .env:\n"
+            f"  {name}=<tu_valor_secreto_aqui>\n"
+        )
+    return value
+
+
+class Config:
+    # ── Claves de seguridad (OBLIGATORIAS — sin fallback) ────────────────────
+    # BUG #4 CORREGIDO: antes tenían valores por defecto conocidos ("jaiko-dev-secret-123").
+    # Cualquier persona que vea el código podía fabricar JWTs válidos con esas claves.
+    # Ahora _require_env() hace que el servidor no arranque si no están configuradas.
+    SECRET_KEY = _require_env("SECRET_KEY")
+    JWT_SECRET_KEY = _require_env("JWT_SECRET_KEY")
+    JWT_ACCESS_TOKEN_EXPIRES = 86400 * 7  # 7 días
+
+    # ── Base de datos ─────────────────────────────────────────────────────────
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        "DATABASE_URL", f"sqlite:///{os.path.join(basedir, 'jaiko_dev.db')}"
+    )
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # ── Google OAuth ──────────────────────────────────────────────────────────
+    GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    # ── Frontend URL para redirección ─────────────────────────────────────────
+    FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+    # ── Supabase ──────────────────────────────────────────────────────────────
+    SUPABASE_URL = os.environ.get("SUPABASE_URL")
+    SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+    SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "jaiko-media")
+
+    # ── Lógica de negocio ─────────────────────────────────────────────────────
+    MATCH_THRESHOLD = 0.80
+    MAX_GROUP_MEMBERS = 6
+
+
+class DevelopmentConfig(Config):
+    DEBUG = True
+
+
+class ProductionConfig(Config):
+    DEBUG = False
+    # En producción, DATABASE_URL DEBE existir (Postgres, Railway, etc.)
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
+
+
+config_map = {
+    "development": DevelopmentConfig,
+    "production": ProductionConfig,
+}
+
+
+FILE_PATH: .\backend\app\extensions.py
+----------------------------------------
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_socketio import SocketIO
+from flask_jwt_extended import JWTManager
+from flask_cors import CORS
+from flask_bcrypt import Bcrypt
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+db = SQLAlchemy()
+migrate = Migrate()
+socketio = SocketIO()
+jwt = JWTManager()
+cors = CORS()
+bcrypt = Bcrypt()
+limiter = Limiter(key_func=get_remote_address)
+
+
+FILE_PATH: .\backend\app\models\__init__.py
+----------------------------------------
+from .user import User
+from .profile import Profile
+from .listing import Listing, ListingPhoto
+from .group import Group, GroupMember
+from .chat import Chat, ChatMember, Message
+from .misc import (
+    RoommateRequest,
+    Notification,
+    Review,
+    Report,
+    VerificationRequest,
+    TokenBlocklist,
+)
+
+__all__ = [
+    "User",
+    "Profile",
+    "Listing",
+    "ListingPhoto",
+    "Group",
+    "GroupMember",
+    "Chat",
+    "ChatMember",
+    "Message",
+    "RoommateRequest",
+    "Notification",
+    "Review",
+    "Report",
+    "VerificationRequest",
+    "TokenBlocklist",
+]
+
+
+FILE_PATH: .\backend\app\models\chat.py
 ----------------------------------------
 from datetime import datetime
 from ..extensions import db
@@ -524,9 +584,8 @@ class Message(db.Model):
             "created_at": self.created_at.isoformat(),
         }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\models\group.py
+FILE_PATH: .\backend\app\models\group.py
 ----------------------------------------
 from datetime import datetime
 from ..extensions import db
@@ -609,9 +668,8 @@ class GroupMember(db.Model):
             "profile": profile.to_dict() if profile else None,
         }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\models\listing.py
+FILE_PATH: .\backend\app\models\listing.py
 ----------------------------------------
 from datetime import datetime
 from ..extensions import db
@@ -685,9 +743,8 @@ class ListingPhoto(db.Model):
     def to_dict(self) -> dict:
         return {"id": self.id, "photo_url": self.photo_url, "order": self.order}
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\models\misc.py
+FILE_PATH: .\backend\app\models\misc.py
 ----------------------------------------
 from datetime import datetime
 from ..extensions import db
@@ -896,9 +953,8 @@ class TokenBlocklist(db.Model):
     jti = db.Column(db.String(36), nullable=False, unique=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\models\profile.py
+FILE_PATH: .\backend\app\models\profile.py
 ----------------------------------------
 from datetime import datetime
 from ..extensions import db
@@ -994,9 +1050,8 @@ class Profile(db.Model):
         if include_private:
             data["diseases"] = self.diseases
         return data
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\models\user.py
+FILE_PATH: .\backend\app\models\user.py
 ----------------------------------------
 from datetime import datetime
 from ..extensions import db, bcrypt  # bcrypt inicializado en extensions.py
@@ -1101,45 +1156,12 @@ class User(db.Model):
             "status": self.status,
             "created_at": self.created_at.isoformat(),
         }
+
+FILE_PATH: .\backend\app\routes\__init__.py
 ----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\models\__init__.py
-----------------------------------------
-from .user import User
-from .profile import Profile
-from .listing import Listing, ListingPhoto
-from .group import Group, GroupMember
-from .chat import Chat, ChatMember, Message
-from .misc import (
-    RoommateRequest,
-    Notification,
-    Review,
-    Report,
-    VerificationRequest,
-    TokenBlocklist,
-)
 
-__all__ = [
-    "User",
-    "Profile",
-    "Listing",
-    "ListingPhoto",
-    "Group",
-    "GroupMember",
-    "Chat",
-    "ChatMember",
-    "Message",
-    "RoommateRequest",
-    "Notification",
-    "Review",
-    "Report",
-    "VerificationRequest",
-    "TokenBlocklist",
-]
-
-----------------------------------------
-
-FILE_PATH: .\JAIKO\backend\app\routes\admin_routes.py
+FILE_PATH: .\backend\app\routes\admin_routes.py
 ----------------------------------------
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
@@ -1309,9 +1331,8 @@ def get_stats():
         200,
     )
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\auth_routes.py
+FILE_PATH: .\backend\app\routes\auth_routes.py
 ----------------------------------------
 # ─────────────────────────────────────────────────────────────────────────────
 # auth_routes.py  —  JAIKO! Backend
@@ -1548,9 +1569,8 @@ def logout():
 
     return jsonify({"message": "Sesión cerrada correctamente"}), 200
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\chat_routes.py
+FILE_PATH: .\backend\app\routes\chat_routes.py
 ----------------------------------------
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
@@ -1696,9 +1716,8 @@ def get_messages(chat_id):
     messages.reverse()  # Devolver en orden cronológico ascendente
     return ({"messages": [m.to_dict() for m in messages], "page": page}), 200
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\group_routes.py
+FILE_PATH: .\backend\app\routes\group_routes.py
 ----------------------------------------
 """
 app/routes/group_routes.py
@@ -2109,9 +2128,8 @@ def update_group(group_id):
     db.session.commit()
     return jsonify({"group": group.to_dict()}), 200
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\listing_routes.py
+FILE_PATH: .\backend\app\routes\listing_routes.py
 ----------------------------------------
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
@@ -2314,9 +2332,8 @@ def my_listings():
     )
     return jsonify({"listings": [l.to_dict() for l in listings]}), 200
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\notification_routes.py
+FILE_PATH: .\backend\app\routes\notification_routes.py
 ----------------------------------------
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
@@ -2435,9 +2452,8 @@ def send_test_notification():
     )
     return jsonify({"message": "Notificación de prueba enviada"}), 200
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\profile_routes.py
+FILE_PATH: .\backend\app\routes\profile_routes.py
 ----------------------------------------
 """
 app/routes/profile_routes.py
@@ -2633,9 +2649,8 @@ def search_profiles():
         200,
     )
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\report_routes.py
+FILE_PATH: .\backend\app\routes\report_routes.py
 ----------------------------------------
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
@@ -2702,9 +2717,8 @@ def my_reports():
     )
     return jsonify({"reports": [r.to_dict() for r in reports]}), 200
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\request_routes.py
+FILE_PATH: .\backend\app\routes\request_routes.py
 ----------------------------------------
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
@@ -2917,9 +2931,8 @@ def cancel_request(req_id):
     db.session.commit()
     return jsonify({"message": "Solicitud cancelada"}), 200
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\review_routes.py
+FILE_PATH: .\backend\app\routes\review_routes.py
 ----------------------------------------
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
@@ -3024,9 +3037,8 @@ def delete_review(review_id):
     db.session.commit()
     return jsonify({"message": "Review deleted"}), 200
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\upload_routes.py
+FILE_PATH: .\backend\app\routes\upload_routes.py
 ----------------------------------------
 import uuid
 from flask import Blueprint, request, jsonify
@@ -3233,9 +3245,8 @@ def upload_verification_selfie():
 
     return jsonify({"message": "Selfie subida correctamente"}), 200
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\verification_routes.py
+FILE_PATH: .\backend\app\routes\verification_routes.py
 ----------------------------------------
 import random
 import string
@@ -3397,14 +3408,12 @@ def review_verification(vr_id):
     db.session.commit()
     return jsonify({"verification": vr.to_dict()}), 200
 
+
+FILE_PATH: .\backend\app\services\__init__.py
 ----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\routes\__init__.py
-----------------------------------------
 
-----------------------------------------
-
-FILE_PATH: .\JAIKO\backend\app\services\matching_service.py
+FILE_PATH: .\backend\app\services\matching_service.py
 ----------------------------------------
 from typing import Tuple
 
@@ -3477,9 +3486,8 @@ def compute_compatibility(profile_a, profile_b) -> Tuple[float, list, list]:
     score = len(matches) / total if total > 0 else 0.0
 
     return score, matches, mismatches
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\services\notification_service.py
+FILE_PATH: .\backend\app\services\notification_service.py
 ----------------------------------------
 # JAIKO/backend/app/services/notification_service.py
 
@@ -3527,14 +3535,12 @@ def send_notification(
 
     return notif
 
+
+FILE_PATH: .\backend\app\sockets\__init__.py
 ----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\services\__init__.py
-----------------------------------------
 
-----------------------------------------
-
-FILE_PATH: .\JAIKO\backend\app\sockets\chat_socket.py
+FILE_PATH: .\backend\app\sockets\chat_socket.py
 ----------------------------------------
 from datetime import datetime, timedelta
 from flask import request
@@ -3719,14 +3725,12 @@ def on_stop_typing(data):
             include_self=False,
         )
 
+
+FILE_PATH: .\backend\app\utils\__init__.py
 ----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\sockets\__init__.py
-----------------------------------------
 
-----------------------------------------
-
-FILE_PATH: .\JAIKO\backend\app\utils\jwt_helpers.py
+FILE_PATH: .\backend\app\utils\jwt_helpers.py
 ----------------------------------------
 """
 Utilidades para manejar JWT de forma segura en todas las rutas.
@@ -3806,9 +3810,50 @@ def get_current_user():
 
     return user, None
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\utils\storage.py
+FILE_PATH: .\backend\app\utils\query_helpers.py
+----------------------------------------
+"""
+app/utils/query_helpers.py
+──────────────────────────
+Utilidades compartidas para construir queries dinámicas en los endpoints.
+
+Por qué existe este archivo:
+    La función parse_bool ya existía en profile_routes.py como _parse_bool.
+    Ahora group_routes.py también la necesita para los nuevos filtros.
+    En vez de copiarla (duplicar código = bug duplicado), la movemos acá.
+
+    Principio: DRY — Don't Repeat Yourself.
+    Si mañana cambia la lógica de "qué es true", se arregla en un solo lugar.
+"""
+
+
+def parse_bool(value: str | None) -> bool | None:
+    """
+    Convierte un query param de URL a bool o None.
+
+    Por qué Flask no lo hace solo:
+        request.args.get("pets") devuelve el STRING "false", no el bool False.
+        En Python, cualquier string no vacío — incluyendo "false" — es truthy.
+        Sin esta función, filtrar pets=false NO filtraría nada.
+
+    Valores aceptados:
+        "true",  "1", "yes" → True   (usuario quiere que sea True)
+        "false", "0", "no"  → False  (usuario quiere que sea False)
+        None, ""             → None  (filtro no enviado → no se aplica)
+
+    Args:
+        value: string crudo del query param (o None si no vino).
+
+    Returns:
+        True, False, o None.
+    """
+    if value is None or value == "":
+        return None
+    return value.lower() in ("true", "1", "yes")
+
+
+FILE_PATH: .\backend\app\utils\storage.py
 ----------------------------------------
 """
 Supabase Storage helper — buckets separados por tipo.
@@ -3921,14 +3966,8 @@ def _guess_mime(filename: str) -> str:
         "gif": "image/gif",
     }.get(ext, "application/octet-stream")
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\backend\app\utils\__init__.py
-----------------------------------------
-
-----------------------------------------
-
-FILE_PATH: .\JAIKO\frontend\.env.example
+FILE_PATH: .\frontend\.env.example
 ----------------------------------------
 # URL del servidor Flask (Backend)
 VITE_API_URL=
@@ -3939,37 +3978,8 @@ VITE_GOOGLE_CLIENT_ID=
 VITE_BACKEND_URL=
 
 VITE_RECAPTCHA_SITE_KEY=
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\index.html
-----------------------------------------
-<!doctype html>
-<html lang="es">
-
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/jaiko-icon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="JAIKO! – Encontrá tu roomie ideal en Paraguay" />
-  <title>JAIKO!</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com" rel="stylesheet" />
-  <link rel="stylesheet" href="https://unpkg.com" />
-
-  <!-- RECAPTCHA ENTERPRISE - LLAVE LARGA UNIFICADA -->
-  <script src="https://www.google.com/recaptcha/enterprise.js?render=6LeFE54sAAAAANoCNMtlX1CWET8BuIg6zcy4XE-8"></script>
-</head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
-</body>
-
-</html>
-----------------------------------------
-
-FILE_PATH: .\JAIKO\frontend\package.json
+FILE_PATH: .\frontend\package.json
 ----------------------------------------
 {
   "name": "jaiko-frontend",
@@ -4015,58 +4025,8 @@ FILE_PATH: .\JAIKO\frontend\package.json
   }
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\postcss.config.js
-----------------------------------------
-export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}
-
-----------------------------------------
-
-FILE_PATH: .\JAIKO\frontend\tailwind.config.js
-----------------------------------------
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: ['./index.html', './src/**/*.{js,jsx}'],
-  theme: {
-    extend: {
-      colors: {
-        primary: {
-          50:  '#fff7ed',
-          100: '#ffedd5',
-          200: '#fed7aa',
-          300: '#fdba74',
-          400: '#fb923c',
-          500: '#f97316',
-          600: '#ea580c',
-          700: '#c2410c',
-          800: '#9a3412',
-          900: '#7c2d12',
-        },
-        brand: {
-          orange: '#f97316',
-          dark:   '#1a0a00',
-          cream:  '#fff7ed',
-        },
-      },
-      fontFamily: {
-        display: ['"Poppins"', 'sans-serif'],
-        body:    ['"Nunito"', 'sans-serif'],
-        mono:    ['"JetBrains Mono"', 'monospace'],
-      },
-    },
-  },
-  plugins: [],
-}
-
-----------------------------------------
-
-FILE_PATH: .\JAIKO\frontend\vite.config.js
+FILE_PATH: .\frontend\vite.config.js
 ----------------------------------------
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -4119,9 +4079,8 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }))
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\App.jsx
+FILE_PATH: .\frontend\src\App.jsx
 ----------------------------------------
 import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
@@ -4217,97 +4176,8 @@ export default function App() {
     </Suspense>
   );
 }
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\index.css
-----------------------------------------
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    --brand-orange: #f97316;
-    --brand-orange-dark: #ea580c;
-    --brand-dark: #1a0a00;
-    --brand-cream: #fff7ed;
-    --radius: 12px;
-  }
-
-  * { box-sizing: border-box; }
-
-  html {
-    scroll-behavior: smooth;
-  }
-
-  body {
-    @apply bg-brand-cream text-brand-dark font-body antialiased;
-    min-height: 100dvh;
-  }
-
-  h1, h2, h3, h4, h5 {
-    @apply font-display;
-  }
-}
-
-@layer components {
-  .btn-primary {
-    @apply bg-primary-500 hover:bg-primary-600 text-white font-display font-semibold
-           px-5 py-2.5 rounded-xl transition-all duration-200 active:scale-95
-           disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-
-  .btn-secondary {
-    @apply border-2 border-primary-500 text-primary-600 hover:bg-primary-50
-           font-display font-semibold px-5 py-2.5 rounded-xl transition-all duration-200;
-  }
-
-  .btn-ghost {
-    @apply text-primary-600 hover:bg-primary-50 font-semibold px-4 py-2 rounded-xl transition-all;
-  }
-
-  .card {
-    @apply bg-white rounded-2xl shadow-sm border border-orange-100 p-5;
-  }
-
-  .input {
-    @apply w-full border border-orange-200 rounded-xl px-4 py-2.5 font-body
-           focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent
-           placeholder:text-orange-300 bg-white transition-all;
-  }
-
-  .badge {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
-  }
-
-  .badge-verified {
-    @apply badge bg-emerald-100 text-emerald-700;
-  }
-
-  .badge-orange {
-    @apply badge bg-primary-100 text-primary-700;
-  }
-}
-
-/* Leaflet overrides */
-.leaflet-container {
-  @apply rounded-2xl font-body;
-  z-index: 0;
-}
-
-.leaflet-pane,
-.leaflet-top,
-.leaflet-bottom {
-  z-index: 0;
-}
-
-.leaflet-control {
-  z-index: 1;
-}
-
-----------------------------------------
-
-FILE_PATH: .\JAIKO\frontend\src\main.jsx
+FILE_PATH: .\frontend\src\main.jsx
 ----------------------------------------
 import React from 'react'
 import ReactDOM from 'react-dom/client'
@@ -4343,9 +4213,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </GoogleOAuthProvider>
   </React.StrictMode>
 )
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\components\layout\AdminRoute.jsx
+FILE_PATH: .\frontend\src\components\layout\AdminRoute.jsx
 ----------------------------------------
 import { Navigate, Outlet } from 'react-router-dom'
 import useAuthStore from '../../context/authStore'
@@ -4377,9 +4246,8 @@ export default function AdminRoute() {
   return <Outlet />
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\components\layout\Layout.jsx
+FILE_PATH: .\frontend\src\components\layout\Layout.jsx
 ----------------------------------------
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
@@ -4397,39 +4265,27 @@ import clsx from 'clsx';
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 const Navbar = () => {
   const { isAuthenticated, user, profile, logout } = useAuthStore();
-  const { unread } = useNotifStore();
-  const location  = useLocation();
-  const navigate  = useNavigate();
-  const [isOpen, setIsOpen]       = useState(false);
+  const { unread }   = useNotifStore();
+  const location     = useLocation();
+  const navigate     = useNavigate();
+  const [isOpen,     setIsOpen]     = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // Detecta scroll para cambiar fondo del navbar
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', onScroll);
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // ✅ FIX: Cierra el menú automáticamente al cambiar de ruta.
-  // Por qué: sin esto el menú quedaba abierto al navegar, cubriendo
-  // el contenido de la página destino.
-  useEffect(() => {
-    setIsOpen(false);
-  }, [location.pathname]);
+  // Cierra el menú al navegar
+  useEffect(() => { setIsOpen(false); }, [location.pathname]);
 
-  /**
-   * ✅ NUEVO: handleLogout correctamente conectado.
-   *
-   * Antes: el botón "Salir" no tenía ninguna acción (handler vacío).
-   * Ahora:
-   *   1. Cierra el menú hamburguesa.
-   *   2. Llama a logout() del authStore → invalida el token en el backend
-   *      Y limpia todo el estado local (user, profile, token).
-   *   3. Redirige a /login.
-   *
-   * Beneficio: el usuario queda correctamente deslogueado, su token
-   * queda en la blocklist del backend y no puede reutilizarse.
-   */
+  // Bloquea el scroll del body mientras el menú está abierto en mobile
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
+
   const handleLogout = async () => {
     setIsOpen(false);
     await logout();
@@ -4437,135 +4293,163 @@ const Navbar = () => {
   };
 
   const navLinks = [
-    { to: '/', label: 'Inicio', icon: Home },
+    { to: '/',         label: 'Inicio',        icon: Home          },
     ...(isAuthenticated() ? [
-      { to: '/search',        label: 'Buscar Roomie',  icon: Sparkles      },
-      { to: '/listings',      label: 'Departamentos',  icon: Search        },
-      { to: '/groups',        label: 'Grupos',         icon: Users         },
-      { to: '/chat',          label: 'Chat',           icon: MessageSquare },
+      { to: '/search',   label: 'Buscar Roomie', icon: Sparkles      },
+      { to: '/listings', label: 'Departamentos', icon: Search        },
+      { to: '/groups',   label: 'Grupos',        icon: Users         },
+      { to: '/chat',     label: 'Chat',          icon: MessageSquare },
     ] : []),
   ];
 
   const isActive = (path) => location.pathname === path;
 
   return (
-    /**
-     * ✅ FIX MENÚ HAMBURGUESA: Fondo transparente → fondo sólido cuando está abierto.
-     *
-     * Problema anterior: navbar era bg-transparent hasta hacer scroll, entonces
-     * al abrir el menú el botón X y los links quedaban difíciles de leer
-     * sobre el contenido/imagen de fondo de la página.
-     *
-     * Solución: cuando isOpen && !isScrolled, aplicamos bg-white + shadow
-     * al navbar, garantizando legibilidad perfecta.
-     *
-     * Técnica: clsx con condición anidada para no pisar los estilos de isScrolled.
-     */
-    <nav
-      className={clsx(
-        'fixed top-0 left-0 w-full z-50 transition-all duration-300 px-6',
-        isScrolled
-          ? 'bg-white/90 backdrop-blur-lg border-b border-orange-100 py-3'
-          : clsx('py-4', isOpen && 'bg-white shadow-sm border-b border-orange-100'),
-      )}
-    >
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 group">
-          <Logo className="w-10 h-10" />
-        </Link>
-
-        {/* Desktop Nav */}
-        <div className="hidden md:flex items-center gap-8">
-          {navLinks.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={clsx(
-                'text-sm font-bold transition-colors hover:text-orange-500',
-                isActive(link.to) ? 'text-blue-600' : 'text-blue-900',
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-
-        <div className="hidden md:flex items-center gap-4">
-          {isAuthenticated() ? (
-            <>
-              <Link
-                to="/notifications"
-                className="relative p-2 text-slate-400 hover:text-orange-500 transition-colors"
-              >
-                <Bell size={20} />
-                {unread > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full border-2 border-white" />
-                )}
-              </Link>
-              <Link
-                to="/profile"
-                className="flex items-center gap-3 pl-4 border-l border-slate-100"
-              >
-                <div className="text-right">
-                  <p className="text-xs font-bold text-slate-900">
-                    {profile?.name || user?.email}
-                  </p>
-                  <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">
-                    Mi Perfil
-                  </p>
-                </div>
-                <Avatar src={profile?.profile_photo_url} name={profile?.name} size="sm" />
-              </Link>
-            </>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Link
-                to="/login"
-                className="px-6 py-2.5 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors"
-              >
-                Ingresar
-              </Link>
-              <Link to="/register" className="btn-primary py-2.5 text-sm">
-                Registrarse
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Botón hamburguesa (mobile) */}
-        <button
-          className="md:hidden p-2 text-slate-600"
-          onClick={() => setIsOpen((o) => !o)}
-          aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
-        >
-          {isOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
-
-      {/* ── Menú mobile deslizable ───────────────────────────────────────────── */}
-      <div
+    <>
+      {/*
+       * ── Navbar ──────────────────────────────────────────────────────────
+       *
+       * LÓGICA DE FONDO (3 estados):
+       *
+       * 1. isScrolled (cualquier dispositivo):
+       *    → bg-white/90 con blur — igual en mobile y desktop.
+       *
+       * 2. !isScrolled + mobile (< md):
+       *    → bg-white sólido SIEMPRE.
+       *    Por qué: en mobile el navbar siempre está sobre contenido
+       *    desplazable (no sobre un hero de pantalla completa). Sin fondo
+       *    sólido, el ícono ☰ y el logo quedan sobre imágenes/texto del
+       *    contenido y pueden ser ilegibles.
+       *
+       * 3. !isScrolled + desktop (≥ md):
+       *    → transparente. El hero de la homepage necesita este efecto.
+       *    Las páginas interiores hacen scroll y rápidamente pasan al
+       *    estado isScrolled, así que la transparencia dura poco.
+       *
+       * Implementación: mobile-first con override en md.
+       *   bg-white        → aplica en todos los tamaños base
+       *   md:bg-transparent → en desktop y sin scroll, se vuelve transparente
+       * Cuando isScrolled=true, la clase de Tailwind sobrescribe todo.
+       */}
+      <nav
         className={clsx(
-          'fixed inset-0 top-[72px] bg-white z-40 transition-transform duration-500 md:hidden p-8',
+          'fixed top-0 left-0 w-full z-50 transition-all duration-300 px-6',
+          isScrolled
+            ? 'bg-white/90 backdrop-blur-lg border-b border-orange-100 py-3 shadow-sm'
+            : 'py-4 bg-white border-b border-orange-100 md:bg-transparent md:border-b-0 md:shadow-none',
+        )}
+      >
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 group">
+            <Logo className="w-10 h-10" />
+          </Link>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-8">
+            {navLinks.map(link => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className={clsx(
+                  'text-sm font-bold transition-colors hover:text-orange-500',
+                  isActive(link.to) ? 'text-blue-600' : 'text-blue-900',
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="hidden md:flex items-center gap-4">
+            {isAuthenticated() ? (
+              <>
+                <Link
+                  to="/notifications"
+                  className="relative p-2 text-slate-400 hover:text-orange-500 transition-colors"
+                >
+                  <Bell size={20} />
+                  {unread > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full border-2 border-white" />
+                  )}
+                </Link>
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-3 pl-4 border-l border-slate-100"
+                >
+                  <div className="text-right">
+                    <p className="text-xs font-bold text-slate-900">{profile?.name || user?.email}</p>
+                    <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Mi Perfil</p>
+                  </div>
+                  <Avatar src={profile?.profile_photo_url} name={profile?.name} size="sm" />
+                </Link>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link to="/login" className="px-6 py-2.5 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">
+                  Ingresar
+                </Link>
+                <Link to="/register" className="btn-primary py-2.5 text-sm">
+                  Registrarse
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Botón hamburguesa */}
+          <button
+            className="md:hidden p-2 text-slate-700 hover:text-slate-900 transition-colors"
+            onClick={() => setIsOpen(o => !o)}
+            aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={isOpen}
+          >
+            {isOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+      </nav>
+
+      {/*
+       * ── Menú mobile ─────────────────────────────────────────────────────
+       *
+       * Por qué está FUERA del <nav> y usa position:fixed propio:
+       * Si lo ponemos dentro del <nav>, el contenido del menú hereda el
+       * z-index del navbar y puede quedar debajo de otros elementos. Al
+       * sacarlo al mismo nivel del DOM pero con z-index propio (z-40, menor
+       * que el navbar z-50), el navbar siempre queda encima del panel.
+       *
+       * overflow-y-auto: si el usuario tiene muchos links y la pantalla es
+       * pequeña, el menú hace scroll interno en vez de cortarse.
+       *
+       * top-[65px]: altura exacta del navbar (py-4 = 16px × 2 + logo 33px ≈ 65px).
+       * Si el navbar cambia de tamaño con isScrolled, el panel se queda donde
+       * está (el usuario solo lo abre cuando no hay scroll, con py-4 activo).
+       */}
+      <div
+        aria-hidden={!isOpen}
+        className={clsx(
+          'fixed inset-x-0 top-[65px] bottom-0 z-40',
+          'bg-white overflow-y-auto',
+          'transition-transform duration-300 ease-in-out md:hidden',
           isOpen ? 'translate-x-0' : 'translate-x-full',
         )}
       >
-        <div className="flex flex-col gap-6">
-          {navLinks.map((link) => (
+        {/* Padding inferior extra para que el último ítem no quede bajo el BottomNav */}
+        <div className="flex flex-col gap-5 p-8 pb-32">
+          {navLinks.map(link => (
             <Link
               key={link.to}
               to={link.to}
               onClick={() => setIsOpen(false)}
               className={clsx(
-                'text-2xl font-display font-extrabold flex items-center gap-4',
+                'flex items-center gap-4 text-2xl font-display font-extrabold',
                 isActive(link.to) ? 'text-orange-500' : 'text-slate-900',
               )}
             >
-              <link.icon className="w-6 h-6" />
+              <link.icon className="w-6 h-6 flex-shrink-0" />
               {link.label}
             </Link>
           ))}
 
-          <hr className="border-slate-100 my-4" />
+          <hr className="border-slate-100" />
 
           {isAuthenticated() ? (
             <>
@@ -4574,37 +4458,43 @@ const Navbar = () => {
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-4 text-2xl font-display font-extrabold text-slate-900"
               >
-                <User className="w-6 h-6" /> Mi Perfil
+                <User className="w-6 h-6 flex-shrink-0" /> Mi Perfil
               </Link>
               <Link
                 to="/notifications"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-4 text-2xl font-display font-extrabold text-slate-900"
               >
-                <Bell className="w-6 h-6" /> Notificaciones
+                <Bell className="w-6 h-6 flex-shrink-0" />
+                <span className="flex items-center gap-2">
+                  Notificaciones
+                  {unread > 0 && (
+                    <span className="text-sm bg-orange-500 text-white rounded-full px-2 py-0.5 font-bold">
+                      {unread}
+                    </span>
+                  )}
+                </span>
               </Link>
-
-              {/* ✅ NUEVO: Botón "Salir" ahora conectado al handler real */}
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-4 text-2xl font-display font-extrabold text-red-500 mt-4"
+                className="flex items-center gap-4 text-2xl font-display font-extrabold text-red-500"
               >
-                <LogOut className="w-6 h-6" /> Salir
+                <LogOut className="w-6 h-6 flex-shrink-0" /> Salir
               </button>
             </>
           ) : (
-            <div className="flex flex-col gap-4 pt-4">
+            <div className="flex flex-col gap-4 pt-2">
               <Link
                 to="/login"
                 onClick={() => setIsOpen(false)}
-                className="btn-secondary text-center"
+                className="btn-secondary text-center text-lg py-4"
               >
                 Ingresar
               </Link>
               <Link
                 to="/register"
                 onClick={() => setIsOpen(false)}
-                className="btn-primary text-center"
+                className="btn-primary text-center text-lg py-4"
               >
                 Registrarse
               </Link>
@@ -4612,82 +4502,77 @@ const Navbar = () => {
           )}
         </div>
       </div>
-    </nav>
+    </>
   );
 };
 
-// ─── BottomNav (mobile) ───────────────────────────────────────────────────────
+// ─── BottomNav ────────────────────────────────────────────────────────────────
 const BottomNav = () => {
   const { isAuthenticated } = useAuthStore();
   const location = useLocation();
-
   if (!isAuthenticated()) return null;
 
-  const mobileLinks = [
-    { to: '/',              label: 'Inicio',  icon: Home         },
-    { to: '/search',        label: 'Roomies', icon: Sparkles     },
-    { to: '/chat',          label: 'Chat',    icon: MessageSquare},
-    { to: '/notifications', label: 'Notif',   icon: Bell         },
-    { to: '/profile',       label: 'Perfil',  icon: User         },
+  const links = [
+    { to: '/',              label: 'Inicio',  icon: Home          },
+    { to: '/search',        label: 'Roomies', icon: Sparkles      },
+    { to: '/chat',          label: 'Chat',    icon: MessageSquare },
+    { to: '/notifications', label: 'Notif',   icon: Bell          },
+    { to: '/profile',       label: 'Perfil',  icon: User          },
   ];
 
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-lg border-t border-orange-100 z-50 px-2 pb-safe">
-      <div className="flex items-center justify-around py-3">
-        {mobileLinks.map((link) => (
+    <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 bg-white border-t border-orange-100 safe-area-bottom">
+      <div className="flex items-center justify-around px-2 py-2">
+        {links.map(link => (
           <Link
             key={link.to}
             to={link.to}
             className={clsx(
-              'flex flex-col items-center gap-1 transition-all duration-300',
-              isActive(link.to) ? 'text-orange-500 scale-110' : 'text-blue-900 opacity-60',
+              'flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all duration-200',
+              isActive(link.to) ? 'text-orange-500' : 'text-blue-900/50',
             )}
           >
             <link.icon
-              size={20}
-              strokeWidth={isActive(link.to) ? 2.5 : 2}
+              size={22}
+              strokeWidth={isActive(link.to) ? 2.5 : 1.8}
             />
-            <span className="text-[10px] font-bold uppercase tracking-tighter">
+            <span className="text-[10px] font-bold uppercase tracking-tight">
               {link.label}
             </span>
           </Link>
         ))}
       </div>
-    </div>
+    </nav>
   );
 };
 
-// ─── Layout principal ─────────────────────────────────────────────────────────
+// ─── Layout ───────────────────────────────────────────────────────────────────
 const Layout = () => {
   const location = useLocation();
-
-  /**
-   * ✅ NUEVO: BackButton en todas las páginas excepto la home.
-   *
-   * Por qué excluimos '/':
-   * En la home no hay "de dónde venir" de forma lógica (es el punto de entrada).
-   * En todas las demás páginas, el usuario llegó desde algún lugar del historial
-   * y tiene sentido poder volver atrás.
-   *
-   * Se agrega en el Layout (no en cada página) para cumplir la regla
-   * DRY (Don't Repeat Yourself): un solo lugar para mantenerlo.
-   */
   const showBackButton = location.pathname !== '/';
 
   return (
-    // overflow-x-hidden: previene scroll horizontal en animaciones de entrada/salida
-    <div className="min-h-screen flex flex-col overflow-x-hidden">
+    /*
+     * overflow-x-hidden: evita scroll horizontal por animaciones de slide-in.
+     * NO usamos overflow-hidden a secas porque eso bloquearía el scroll vertical
+     * de toda la página.
+     */
+    <div className="min-h-screen flex flex-col bg-brand-cream overflow-x-hidden">
       <Navbar />
 
-      <main className="flex-1 pt-20 pb-20 md:pb-0">
+      <main className="flex-1 pt-[65px] pb-20 md:pb-0">
+        {/*
+         * pt-[65px]: deja espacio exacto para la altura del navbar en mobile.
+         * pb-20: deja espacio para el BottomNav (altura ≈ 72px + safe area).
+         * md:pb-0: en desktop no hay BottomNav.
+         */}
         {showBackButton && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
             <BackButton />
           </div>
         )}
-        {/* Outlet = punto donde React Router inyecta la página activa */}
         <Outlet />
       </main>
 
@@ -4732,9 +4617,8 @@ const Layout = () => {
 
 export default Layout;
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\components\layout\ProtectedRoute.jsx
+FILE_PATH: .\frontend\src\components\layout\ProtectedRoute.jsx
 ----------------------------------------
 import { Navigate, Outlet } from 'react-router-dom'
 import useAuthStore from '../../context/authStore'
@@ -4745,9 +4629,8 @@ export default function ProtectedRoute() {
   return isAuthenticated() ? <Outlet /> : <Navigate to="/login" replace />
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\components\map\JaikoMap.jsx
+FILE_PATH: .\frontend\src\components\map\JaikoMap.jsx
 ----------------------------------------
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -4888,9 +4771,8 @@ export default function JaikoMap({
     </MapContainer>
   )
 }
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\components\ui\BackButton.jsx
+FILE_PATH: .\frontend\src\components\ui\BackButton.jsx
 ----------------------------------------
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -4929,9 +4811,138 @@ export default function BackButton({ className = '' }) {
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\components\ui\index.jsx
+FILE_PATH: .\frontend\src\components\ui\ListingCard.jsx
+----------------------------------------
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { MapPin, BedDouble, Bath } from 'lucide-react';
+import { Badge } from './index';
+
+const ListingCard = ({ listing }) => {
+  return (
+    <Link to={`/listings/${listing.id}`} className="card group overflow-hidden p-0">
+      <div className="aspect-[4/3] overflow-hidden relative">
+        <img 
+          src={listing.photos?.[0]?.photo_url || 'https://picsum.photos/seed/house/800/600'} 
+          alt={listing.title} 
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute top-4 right-4">
+          <Badge variant="dark" className="backdrop-blur-md bg-black/50 border border-white/20">
+            {listing.type}
+          </Badge>
+        </div>
+      </div>
+      <div className="p-5">
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="font-bold text-blue-950 truncate flex-1">{listing.title}</h3>
+          <p className="font-display font-extrabold text-blue-600 ml-2">
+            ₲ {(listing.total_price / 1000000).toFixed(1)}M
+          </p>
+        </div>
+        <div className="flex items-center gap-1 text-blue-900/40 text-xs mb-4 font-bold">
+          <MapPin size={12} />
+          <span className="truncate">{listing.neighborhood}, {listing.city}</span>
+        </div>
+        <div className="flex items-center gap-4 text-blue-900/60 text-xs border-t border-orange-50 pt-4 font-bold">
+          <div className="flex items-center gap-1">
+            <BedDouble size={14} className="text-orange-500" />
+            <span>{listing.rooms} hab.</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Bath size={14} className="text-orange-500" />
+            <span>{listing.bathrooms} baños</span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+};
+
+export default ListingCard;
+
+
+FILE_PATH: .\frontend\src\components\ui\Logo.jsx
+----------------------------------------
+import React from 'react';
+// ✅ CAMBIO: Import local desde assets en vez de URL externa de OpenAI.
+//
+// Por qué importamos la imagen así (no con <img src="...url externa...">):
+// ─────────────────────────────────────────────────────────────────────────
+// 1. Las URLs externas pueden EXPIRAR o caerse (como pasaba antes).
+// 2. Vite convierte este import en una URL estable dentro del bundle final,
+//    con hash para cache busting automático.
+// 3. Carga INSTANTÁNEA, sin requests HTTP adicionales.
+//
+// Beneficio para el usuario: logo siempre visible, sin parpadeo ni broken images.
+import logoImg from '../../assets/logo.png';
+
+/**
+ * Props:
+ *   className  → tamaño de la imagen (default: "w-10 h-10")
+ *   showText   → muestra/oculta el texto "JAIKO!" al lado del ícono
+ */
+export default function Logo({ className = 'w-10 h-10', showText = true }) {
+  return (
+    <div className="flex items-center gap-2 group">
+      <img
+        src={logoImg}
+        alt="JAIKO! — Plataforma para encontrar roomies en Paraguay"
+        className={`object-contain flex-shrink-0
+          drop-shadow-md group-hover:scale-110 transition-transform duration-300
+          ${className}`}
+      />
+      {showText && (
+        <span className="text-2xl font-display font-extrabold tracking-tighter text-slate-900">
+          JAIK<span className="text-blue-600">O!</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+
+FILE_PATH: .\frontend\src\components\ui\ProfileCard.jsx
+----------------------------------------
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { MapPin, Briefcase } from 'lucide-react';
+import { Avatar, Badge } from './index';
+
+const ProfileCard = ({ profile, compatibility }) => {
+  return (
+    <Link to={`/profile/${profile.user_id}`} className="card group p-6 flex flex-col items-center text-center">
+      <div className="relative mb-4">
+        <Avatar src={profile.profile_photo_url} name={profile.name} size="xl" verified={profile.verified} />
+        {compatibility && (
+          <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-lg">
+            {compatibility}% Match
+          </div>
+        )}
+      </div>
+      <h3 className="font-display font-extrabold text-lg text-blue-950 mb-1">{profile.name}, {profile.age}</h3>
+      <p className="text-blue-900/40 text-xs mb-4 flex items-center gap-1 font-bold">
+        <Briefcase size={12} /> {profile.profession || 'Sin especificar'}
+      </p>
+      <div className="flex items-center gap-1 text-blue-900/60 text-xs mb-6 font-bold">
+        <MapPin size={12} className="text-orange-500" />
+        <span>{profile.city}</span>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2 mt-auto">
+        {profile.pets && <Badge variant="orange">🐾 Mascotas</Badge>}
+        {profile.smoker && <Badge variant="blue">🚬 Fumador</Badge>}
+        {!profile.smoker && <Badge variant="gray">🚭 No fuma</Badge>}
+      </div>
+    </Link>
+  );
+};
+
+export default ProfileCard;
+
+
+FILE_PATH: .\frontend\src\components\ui\index.jsx
 ----------------------------------------
 import React from 'react';
 import { Loader2 } from 'lucide-react';
@@ -5029,142 +5040,8 @@ export const StarRating = ({ value }) => (
   </div>
 );
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\components\ui\ListingCard.jsx
-----------------------------------------
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { MapPin, BedDouble, Bath } from 'lucide-react';
-import { Badge } from './index';
-
-const ListingCard = ({ listing }) => {
-  return (
-    <Link to={`/listings/${listing.id}`} className="card group overflow-hidden p-0">
-      <div className="aspect-[4/3] overflow-hidden relative">
-        <img 
-          src={listing.photos?.[0]?.photo_url || 'https://picsum.photos/seed/house/800/600'} 
-          alt={listing.title} 
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-          referrerPolicy="no-referrer"
-        />
-        <div className="absolute top-4 right-4">
-          <Badge variant="dark" className="backdrop-blur-md bg-black/50 border border-white/20">
-            {listing.type}
-          </Badge>
-        </div>
-      </div>
-      <div className="p-5">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="font-bold text-blue-950 truncate flex-1">{listing.title}</h3>
-          <p className="font-display font-extrabold text-blue-600 ml-2">
-            ₲ {(listing.total_price / 1000000).toFixed(1)}M
-          </p>
-        </div>
-        <div className="flex items-center gap-1 text-blue-900/40 text-xs mb-4 font-bold">
-          <MapPin size={12} />
-          <span className="truncate">{listing.neighborhood}, {listing.city}</span>
-        </div>
-        <div className="flex items-center gap-4 text-blue-900/60 text-xs border-t border-orange-50 pt-4 font-bold">
-          <div className="flex items-center gap-1">
-            <BedDouble size={14} className="text-orange-500" />
-            <span>{listing.rooms} hab.</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Bath size={14} className="text-orange-500" />
-            <span>{listing.bathrooms} baños</span>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-};
-
-export default ListingCard;
-
-----------------------------------------
-
-FILE_PATH: .\JAIKO\frontend\src\components\ui\Logo.jsx
-----------------------------------------
-import React from 'react';
-// ✅ CAMBIO: Import local desde assets en vez de URL externa de OpenAI.
-//
-// Por qué importamos la imagen así (no con <img src="...url externa...">):
-// ─────────────────────────────────────────────────────────────────────────
-// 1. Las URLs externas pueden EXPIRAR o caerse (como pasaba antes).
-// 2. Vite convierte este import en una URL estable dentro del bundle final,
-//    con hash para cache busting automático.
-// 3. Carga INSTANTÁNEA, sin requests HTTP adicionales.
-//
-// Beneficio para el usuario: logo siempre visible, sin parpadeo ni broken images.
-import logoImg from '../../assets/logo.png';
-
-/**
- * Props:
- *   className  → tamaño de la imagen (default: "w-10 h-10")
- *   showText   → muestra/oculta el texto "JAIKO!" al lado del ícono
- */
-export default function Logo({ className = 'w-10 h-10', showText = true }) {
-  return (
-    <div className="flex items-center gap-2 group">
-      <img
-        src={logoImg}
-        alt="JAIKO! — Plataforma para encontrar roomies en Paraguay"
-        className={`object-contain flex-shrink-0
-          drop-shadow-md group-hover:scale-110 transition-transform duration-300
-          ${className}`}
-      />
-      {showText && (
-        <span className="text-2xl font-display font-extrabold tracking-tighter text-slate-900">
-          JAIK<span className="text-blue-600">O!</span>
-        </span>
-      )}
-    </div>
-  );
-}
-
-----------------------------------------
-
-FILE_PATH: .\JAIKO\frontend\src\components\ui\ProfileCard.jsx
-----------------------------------------
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { MapPin, Briefcase } from 'lucide-react';
-import { Avatar, Badge } from './index';
-
-const ProfileCard = ({ profile, compatibility }) => {
-  return (
-    <Link to={`/profile/${profile.user_id}`} className="card group p-6 flex flex-col items-center text-center">
-      <div className="relative mb-4">
-        <Avatar src={profile.profile_photo_url} name={profile.name} size="xl" verified={profile.verified} />
-        {compatibility && (
-          <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-lg">
-            {compatibility}% Match
-          </div>
-        )}
-      </div>
-      <h3 className="font-display font-extrabold text-lg text-blue-950 mb-1">{profile.name}, {profile.age}</h3>
-      <p className="text-blue-900/40 text-xs mb-4 flex items-center gap-1 font-bold">
-        <Briefcase size={12} /> {profile.profession || 'Sin especificar'}
-      </p>
-      <div className="flex items-center gap-1 text-blue-900/60 text-xs mb-6 font-bold">
-        <MapPin size={12} className="text-orange-500" />
-        <span>{profile.city}</span>
-      </div>
-      <div className="flex flex-wrap justify-center gap-2 mt-auto">
-        {profile.pets && <Badge variant="orange">🐾 Mascotas</Badge>}
-        {profile.smoker && <Badge variant="blue">🚬 Fumador</Badge>}
-        {!profile.smoker && <Badge variant="gray">🚭 No fuma</Badge>}
-      </div>
-    </Link>
-  );
-};
-
-export default ProfileCard;
-
-----------------------------------------
-
-FILE_PATH: .\JAIKO\frontend\src\context\authStore.js
+FILE_PATH: .\frontend\src\context\authStore.js
 ----------------------------------------
 import { create } from 'zustand'
 import api from '../services/api'
@@ -5341,9 +5218,8 @@ const useAuthStore = create((set, get) => ({
 }))
 
 export default useAuthStore
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\context\notifStore.js
+FILE_PATH: .\frontend\src\context\notifStore.js
 ----------------------------------------
 import { create } from 'zustand'
 import api from '../services/api'
@@ -5385,9 +5261,8 @@ const useNotifStore = create((set, get) => ({
 
 export default useNotifStore
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\AdminPage.jsx
+FILE_PATH: .\frontend\src\pages\AdminPage.jsx
 ----------------------------------------
 import { useState, useEffect } from 'react'
 import {
@@ -5945,9 +5820,8 @@ export default function AdminPage() {
     </div>
   )
 }
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\BackButton.jsx
+FILE_PATH: .\frontend\src\pages\BackButton.jsx
 ----------------------------------------
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -5986,9 +5860,8 @@ export default function BackButton({ className = '' }) {
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\BottomNav.jsx
+FILE_PATH: .\frontend\src\pages\BottomNav.jsx
 ----------------------------------------
 // BottomNav.jsx — Barra de navegación inferior estilo app mobile (Tinder-style)
 // Incluir en el Layout principal, visible solo en mobile (md:hidden)
@@ -6059,9 +5932,79 @@ export default function BottomNav() {
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\ChatPage.jsx
+FILE_PATH: .\frontend\src\pages\CAMBIOS.md
+----------------------------------------
+# JAIKO — Cambios realizados
+
+## Archivos entregados
+
+### 1. `HomePage.jsx`
+- Slides mobile **sin stats, sin barra de compatibilidad, sin avatares** — solo emoji + pill + título + subtítulo, limpio y directo
+- Botón en **mobile**: "REGISTRATE AHORA" → redirige a `/register`
+- Botón en **desktop**: "EMPIEZA AHORA" → redirige a `/login` (sin cambios)
+
+---
+
+### 2. `BottomNav.jsx` ⭐ NUEVO
+Barra de navegación inferior estilo app mobile (Tinder-style).
+
+**Integración:** Agregarlo en tu archivo `Layout.jsx` (o el componente raíz que envuelve todas las páginas):
+
+```jsx
+import BottomNav from './components/BottomNav'  // ajustá el path
+
+// En el return del Layout:
+<div>
+  <Navbar />         {/* tu navbar existente */}
+  <main>{children}</main>
+  <BottomNav />      {/* ← agregar acá */}
+</div>
+```
+
+- **4 tabs**: Buscar (🔍), Dptos (🏢), Grupos (👥), Chat (💬)
+- Ícono activo: fondo azul con sombra
+- Badge naranja en Chat si hay mensajes sin leer
+- Se oculta automáticamente en `/`, `/login`, `/register`
+- Visible solo en mobile (`md:hidden`)
+
+**Importante:** Todas las páginas tienen `pb-24 md:pb-8` para no quedar tapadas por el BottomNav.
+
+---
+
+### 3. `ProfilePage.jsx`
+- Botón **"Cerrar sesión"** con ícono `LogOut` en la parte inferior del card de perfil propio
+- Al hacer click llama a `logout()` del authStore y redirige a `/` (HomePage)
+- Solo visible en el perfil propio (no en perfiles de otros usuarios)
+
+---
+
+### 4-7. `SearchPage.jsx`, `ChatPage.jsx`, `GroupsPage.jsx`, `ListingsPage.jsx`
+Rediseño estético moderno manteniendo los colores de marca:
+- Cards más limpios con bordes sutiles `#F1F5F9`
+- Ciudad seleccionable mediante **pills horizontales** con scroll (reemplaza el select en SearchPage y ListingsPage)
+- Filtros como panel desplegable colapsable
+- Tipografía y espaciado más refinados
+- Estados activos más claros en navegación y selección
+- Mejor jerarquía visual en cada sección
+- Todos con `pb-24 md:pb-8` para compatibilidad con el BottomNav
+
+---
+
+## Archivos NO modificados
+- `AdminPage.jsx`
+- `CreateListingPage.jsx`
+- `EditProfilePage.jsx`
+- `GroupDetailPage.jsx`
+- `ListingDetailPage.jsx`
+- `LoginPage.jsx`
+- `NotFoundPage.jsx`
+- `NotificationsPage.jsx`
+- `RegisterPage.jsx`
+- `VerificationPage.jsx`
+
+
+FILE_PATH: .\frontend\src\pages\ChatPage.jsx
 ----------------------------------------
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -6531,9 +6474,8 @@ export default function ChatPage() {
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\CreateListingPage.jsx
+FILE_PATH: .\frontend\src\pages\CreateListingPage.jsx
 ----------------------------------------
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -6746,9 +6688,8 @@ export function CreateListingPage() {
 
 export default CreateListingPage
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\EditProfilePage.jsx
+FILE_PATH: .\frontend\src\pages\EditProfilePage.jsx
 ----------------------------------------
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -7019,9 +6960,8 @@ export default function EditProfilePage() {
     </div>
   )
 }
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\GroupDetailPage.jsx
+FILE_PATH: .\frontend\src\pages\GroupDetailPage.jsx
 ----------------------------------------
 // GroupDetailPage.jsx — Responsive
 import { useState, useEffect } from 'react'
@@ -7337,9 +7277,8 @@ export default function GroupDetailPage() {
   )
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\GroupsPage.jsx
+FILE_PATH: .\frontend\src\pages\GroupsPage.jsx
 ----------------------------------------
 // GroupsPage.jsx — Con panel de filtros agregado
 import { useState, useEffect, useCallback } from 'react'
@@ -7742,9 +7681,8 @@ function GroupCard({ group, isOwn, onJoin, onView, requesting }) {
 
 export default GroupsPage
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\HomePage.jsx
+FILE_PATH: .\frontend\src\pages\HomePage.jsx
 ----------------------------------------
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -8026,27 +7964,29 @@ const HomePage = () => {
 
 export default HomePage;
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\ListingDetailPage.jsx
+FILE_PATH: .\frontend\src\pages\ListingDetailPage.jsx
 ----------------------------------------
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { MapPin, BedDouble, Bath, Users, PawPrint, Sofa, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  MapPin, BedDouble, Bath, Users, PawPrint, Sofa,
+  MessageCircle, ChevronLeft, ChevronRight,
+} from 'lucide-react'
 import api from '../services/api'
 import { Badge, Avatar, StarRating, Spinner } from '../components/ui'
 import useAuthStore from '../context/authStore'
 import { toast } from 'react-hot-toast'
 
 export default function ListingDetailPage() {
-  const { id } = useParams()
-  const navigate = useNavigate()
+  const { id }       = useParams()
+  const navigate     = useNavigate()
   const { isAuthenticated, user } = useAuthStore()
-  const [listing, setListing] = useState(null)
-  const [reviews, setReviews] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [photo, setPhoto] = useState(0)
-  const [MapComp, setMapComp] = useState(null)
+  const [listing,  setListing]  = useState(null)
+  const [reviews,  setReviews]  = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [photo,    setPhoto]    = useState(0)
+  const [MapComp,  setMapComp]  = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -8072,56 +8012,77 @@ export default function ListingDetailPage() {
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>
   if (!listing) return null
 
-  const photos = listing.photos || []
+  const photos  = listing.photos || []
   const isOwner = user?.id === listing.owner_id
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
-      <Link to="/listings" className="flex items-center gap-1 text-orange-400 hover:text-primary-600 mb-4 text-sm font-semibold transition-colors">
+      <Link
+        to="/listings"
+        className="flex items-center gap-1 text-orange-400 hover:text-primary-600 mb-4 text-sm font-semibold transition-colors"
+      >
         <ChevronLeft size={15} /> Volver a publicaciones
       </Link>
 
-      {/* Photo gallery */}
+      {/* Galería de fotos */}
       {photos.length > 0 ? (
         <div className="relative h-56 sm:h-72 md:h-96 rounded-2xl overflow-hidden mb-4 sm:mb-6 bg-orange-100">
-          <img src={photos[photo]?.photo_url} alt={listing.title} className="w-full h-full object-cover" />
+          <img
+            src={photos[photo]?.photo_url}
+            alt={listing.title}
+            className="w-full h-full object-cover"
+          />
           {photos.length > 1 && (
             <>
-              <button onClick={() => setPhoto(p => (p - 1 + photos.length) % photos.length)}
-                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1.5 sm:p-2 hover:bg-white transition-colors">
+              <button
+                onClick={() => setPhoto(p => (p - 1 + photos.length) % photos.length)}
+                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1.5 sm:p-2 hover:bg-white transition-colors"
+              >
                 <ChevronLeft size={16} />
               </button>
-              <button onClick={() => setPhoto(p => (p + 1) % photos.length)}
-                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1.5 sm:p-2 hover:bg-white transition-colors">
+              <button
+                onClick={() => setPhoto(p => (p + 1) % photos.length)}
+                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1.5 sm:p-2 hover:bg-white transition-colors"
+              >
                 <ChevronRight size={16} />
               </button>
               <div className="absolute bottom-2 sm:bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                 {photos.map((_, i) => (
-                  <button key={i} onClick={() => setPhoto(i)}
-                    className={`w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full transition-colors ${i === photo ? 'bg-white' : 'bg-white/50'}`} />
+                  <button
+                    key={i}
+                    onClick={() => setPhoto(i)}
+                    className={`w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full transition-colors ${
+                      i === photo ? 'bg-white' : 'bg-white/50'
+                    }`}
+                  />
                 ))}
               </div>
             </>
           )}
         </div>
       ) : (
-        <div className="h-44 sm:h-56 rounded-2xl bg-orange-100 flex items-center justify-center text-5xl sm:text-6xl mb-4 sm:mb-6">🏠</div>
+        <div className="h-44 sm:h-56 rounded-2xl bg-orange-100 flex items-center justify-center text-5xl sm:text-6xl mb-4 sm:mb-6">
+          🏠
+        </div>
       )}
 
-      {/* Content grid — 1 col on mobile, 3 col (2+1) on lg */}
+      {/* Grid principal: 1 col mobile, 3 col desktop */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
 
-        {/* Main info */}
+        {/* ── Info principal ──────────────────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-4 sm:space-y-5">
           <div className="card">
-            {/* Title + price */}
             <div className="flex items-start justify-between flex-wrap gap-3 mb-3 sm:mb-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <Badge variant="dark">{listing.type}</Badge>
-                  <Badge variant={listing.status === 'active' ? 'green' : 'gray'}>{listing.status}</Badge>
+                  <Badge variant={listing.status === 'active' ? 'green' : 'gray'}>
+                    {listing.status}
+                  </Badge>
                 </div>
-                <h1 className="font-display font-extrabold text-xl sm:text-2xl">{listing.title}</h1>
+                <h1 className="font-display font-extrabold text-xl sm:text-2xl">
+                  {listing.title}
+                </h1>
                 <div className="flex items-center gap-1 text-orange-400 text-sm mt-1">
                   <MapPin size={13} />
                   {listing.neighborhood ? `${listing.neighborhood}, ` : ''}{listing.city}
@@ -8135,14 +8096,17 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
-            {/* Stats — 2 col on mobile, 4 col on md */}
+            {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
               {[
-                { icon: BedDouble, label: `${listing.rooms} hab.` },
-                { icon: Bath, label: `${listing.bathrooms} baños` },
-                { icon: Users, label: `Máx. ${listing.max_people}` },
+                { icon: BedDouble, label: `${listing.rooms} hab.`      },
+                { icon: Bath,      label: `${listing.bathrooms} baños` },
+                { icon: Users,     label: `Máx. ${listing.max_people}` },
               ].map(({ icon: Icon, label }) => (
-                <div key={label} className="bg-orange-50 rounded-xl p-2.5 sm:p-3 flex flex-col items-center gap-1">
+                <div
+                  key={label}
+                  className="bg-orange-50 rounded-xl p-2.5 sm:p-3 flex flex-col items-center gap-1"
+                >
                   <Icon size={15} className="text-primary-500" />
                   <span className="text-xs font-semibold text-center">{label}</span>
                 </div>
@@ -8156,7 +8120,7 @@ export default function ListingDetailPage() {
             </div>
 
             <div className="flex flex-wrap gap-2 mb-3 sm:mb-4">
-              {listing.pets_allowed && <Badge variant="orange"><PawPrint size={11} className="inline" /> Mascotas ok</Badge>}
+              {listing.pets_allowed    && <Badge variant="orange"><PawPrint size={11} className="inline" /> Mascotas ok</Badge>}
               {listing.smoking_allowed && <Badge variant="gray">🚬 Fumadores ok</Badge>}
             </div>
 
@@ -8165,19 +8129,43 @@ export default function ListingDetailPage() {
             )}
           </div>
 
-          {/* Map */}
+          {/*
+           * ── Mapa ─────────────────────────────────────────────────────────
+           *
+           * ✅ FIX: Antes se usaba `markers` (prop de roomies) pasándole un
+           * objeto de listing, pero JaikoMap filtra los markers-de-roomie
+           * exigiendo que cada marcador tenga la propiedad `profile`.
+           * Como un listing no tiene `profile`, se filtraba todo y el mapa
+           * aparecía vacío (o no aparecía el pin).
+           *
+           * Solución: usar `listingMarkers` — la prop correcta para pins de
+           * departamentos. JaikoMap la filtra con isValidCoord() solamente,
+           * sin exigir `profile`.
+           *
+           * Estructura esperada por listingMarkers:
+           *   { lat, lng, id, title, price, neighborhood }
+           */}
           {listing.latitude && listing.longitude && MapComp && (
             <div>
-              <h2 className="font-display font-bold text-base sm:text-lg mb-2 sm:mb-3">Ubicación</h2>
+              <h2 className="font-display font-bold text-base sm:text-lg mb-2 sm:mb-3">
+                Ubicación
+              </h2>
               <MapComp
                 center={[listing.latitude, listing.longitude]}
-                markers={[{ lat: listing.latitude, lng: listing.longitude, title: listing.title }]}
+                listingMarkers={[{
+                  lat:          listing.latitude,
+                  lng:          listing.longitude,
+                  id:           listing.id,
+                  title:        listing.title,
+                  price:        listing.total_price,
+                  neighborhood: listing.neighborhood,
+                }]}
                 height="240px"
               />
             </div>
           )}
 
-          {/* Reviews */}
+          {/* Reseñas */}
           {reviews.length > 0 && (
             <div className="card">
               <h2 className="font-display font-bold text-base sm:text-lg mb-3 sm:mb-4">
@@ -8190,34 +8178,54 @@ export default function ListingDetailPage() {
                     <span className="font-semibold text-sm">{r.reviewer_name}</span>
                     <StarRating value={r.rating} />
                   </div>
-                  {r.comment && <p className="text-xs text-gray-500 ml-10">{r.comment}</p>}
+                  {r.comment && (
+                    <p className="text-xs text-gray-500 ml-10">{r.comment}</p>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Sidebar — on mobile shows after main content, on lg sticks to the side */}
+        {/* ── Sidebar ─────────────────────────────────────────────────────── */}
         <div className="space-y-4">
           <div className="card lg:sticky lg:top-20">
-            <h3 className="font-display font-bold text-sm sm:text-base mb-3 sm:mb-4">Publicado por</h3>
+            <h3 className="font-display font-bold text-sm sm:text-base mb-3 sm:mb-4">
+              Publicado por
+            </h3>
             {listing.owner && (
-              <Link to={`/profile/${listing.owner_id}`}
-                className="flex items-center gap-3 mb-3 sm:mb-4 hover:opacity-80 transition-opacity">
-                <Avatar src={listing.owner.profile_photo_url} name={listing.owner.name} size="md" verified={listing.owner.verified} />
+              <Link
+                to={`/profile/${listing.owner_id}`}
+                className="flex items-center gap-3 mb-3 sm:mb-4 hover:opacity-80 transition-opacity"
+              >
+                <Avatar
+                  src={listing.owner.profile_photo_url}
+                  name={listing.owner.name}
+                  size="md"
+                  verified={listing.owner.verified}
+                />
                 <div className="min-w-0">
                   <p className="font-semibold truncate">{listing.owner.name}</p>
-                  {listing.owner.profession && <p className="text-xs text-orange-400 truncate">{listing.owner.profession}</p>}
+                  {listing.owner.profession && (
+                    <p className="text-xs text-orange-400 truncate">
+                      {listing.owner.profession}
+                    </p>
+                  )}
                 </div>
               </Link>
             )}
             {!isOwner && (
-              <button onClick={handleContact} className="btn-primary w-full flex items-center justify-center gap-2 text-sm">
+              <button
+                onClick={handleContact}
+                className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
+              >
                 <MessageCircle size={15} /> Contactar
               </button>
             )}
             {isOwner && (
-              <Badge variant="orange" className="w-full text-center py-2">Tu publicación</Badge>
+              <Badge variant="orange" className="w-full text-center py-2">
+                Tu publicación
+              </Badge>
             )}
           </div>
         </div>
@@ -8226,9 +8234,8 @@ export default function ListingDetailPage() {
   )
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\ListingsPage.jsx
+FILE_PATH: .\frontend\src\pages\ListingsPage.jsx
 ----------------------------------------
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -8244,39 +8251,50 @@ const CITIES = [
 ];
 
 const CITY_CENTERS = {
-  'Asunción': [-25.2867, -57.647],
-  'San Lorenzo': [-25.3355, -57.5178],
-  'Luque': [-25.2635, -57.4857],
-  'Fernando de la Mora': [-25.3085, -57.5225],
-  'Lambaré': [-25.3404, -57.6075],
-  'Capiatá': [-25.356, -57.4455],
-  'Encarnación': [-27.3333, -55.8667],
-  'Ciudad del Este': [-25.5097, -54.611],
+  'Asunción':           [-25.2867, -57.647 ],
+  'San Lorenzo':        [-25.3355, -57.5178],
+  'Luque':              [-25.2635, -57.4857],
+  'Fernando de la Mora':[-25.3085, -57.5225],
+  'Lambaré':            [-25.3404, -57.6075],
+  'Capiatá':            [-25.356,  -57.4455],
+  'Encarnación':        [-27.3333, -55.8667],
+  'Ciudad del Este':    [-25.5097, -54.611 ],
 };
 
 export default function ListingsPage() {
   const { isAuthenticated } = useAuthStore();
-  const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('grid');
-  const [showFilters, setShowFilters] = useState(false);
+  const [listings,   setListings]   = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [view,       setView]       = useState('grid');
+  const [showFilters,setShowFilters]= useState(false);
+
+  /**
+   * ✅ NUEVO: estado para el componente del mapa.
+   *
+   * JaikoMap usa react-leaflet (que no soporta SSR y es pesado).
+   * Lo cargamos de forma dinámica con import() solamente cuando el
+   * usuario activa la vista de mapa — no antes.
+   * Esto evita que leaflet se incluya en el bundle inicial de la página.
+   */
+  const [MapComp, setMapComp] = useState(null);
 
   const [filters, setFilters] = useState({
-    city: 'Asunción',
-    min_price: '',
-    max_price: '',
-    pets_allowed: '',
+    city:            'Asunción',
+    min_price:       '',
+    max_price:       '',
+    pets_allowed:    '',
     smoking_allowed: '',
-    type: '',
+    type:            '',
   });
 
+  // ── Cargar listados ────────────────────────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams({ page: 1, per_page: 24, city: filters.city });
-    if (filters.min_price) params.set('min_price', filters.min_price);
-    if (filters.max_price) params.set('max_price', filters.max_price);
-    if (filters.pets_allowed) params.set('pets_allowed', filters.pets_allowed);
+    if (filters.min_price)       params.set('min_price',       filters.min_price);
+    if (filters.max_price)       params.set('max_price',       filters.max_price);
+    if (filters.pets_allowed)    params.set('pets_allowed',    filters.pets_allowed);
     if (filters.smoking_allowed) params.set('smoking_allowed', filters.smoking_allowed);
-    if (filters.type) params.set('type', filters.type);
+    if (filters.type)            params.set('type',            filters.type);
 
     setLoading(true);
     api.get(`/listings/?${params}`)
@@ -8285,32 +8303,76 @@ export default function ListingsPage() {
       .finally(() => setLoading(false));
   }, [filters]);
 
+  /**
+   * ✅ NUEVO: cargar JaikoMap de forma dinámica al activar la vista mapa.
+   *
+   * Por qué no lo cargamos al montar el componente:
+   *   react-leaflet incluye todo Leaflet (~40kb gzipped) más el CSS del mapa.
+   *   Si el usuario nunca toca "Mapa", pagaría ese costo sin necesidad.
+   *   Con import() diferido, el chunk solo se descarga si se activa la vista.
+   *
+   * Por qué setMapComp(() => m.default) y no setMapComp(m.default):
+   *   Si pasás una función directamente a setState, React la llama como
+   *   "updater function". Al envolverla en () => m.default le indicamos
+   *   que el nuevo estado ES esa función, no el resultado de llamarla.
+   */
+  const handleViewChange = (newView) => {
+    setView(newView);
+    if (newView === 'map' && !MapComp) {
+      import('../components/map/JaikoMap')
+        .then(m => setMapComp(() => m.default))
+        .catch(() => {}); // silencioso: si falla, la vista queda vacía
+    }
+  };
+
+  // Convertir listings a formato listingMarkers que acepta JaikoMap
+  const listingMarkers = listings
+    .filter(l => l.latitude != null && l.longitude != null)
+    .map(l => ({
+      lat:          l.latitude,
+      lng:          l.longitude,
+      id:           l.id,
+      title:        l.title,
+      price:        l.total_price,
+      neighborhood: l.neighborhood,
+    }));
+
   const activeFilterCount = [
     filters.min_price, filters.max_price, filters.pets_allowed,
-    filters.smoking_allowed, filters.type
+    filters.smoking_allowed, filters.type,
   ].filter(Boolean).length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
-          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900">Departamentos</h1>
-          <p className="text-orange-500 font-medium mt-1">{listings.length} publicaciones disponibles</p>
+          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900">
+            Departamentos
+          </h1>
+          <p className="text-orange-500 font-medium mt-1">
+            {listings.length} publicaciones disponibles
+          </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Toggle Grid / Mapa */}
           <div className="flex bg-slate-100 p-1 rounded-2xl">
             <button
-              onClick={() => setView('grid')}
+              onClick={() => handleViewChange('grid')}
               className={`px-4 py-2 flex items-center gap-2 text-sm font-bold rounded-xl transition-all
-                ${view === 'grid' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                ${view === 'grid'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-600'}`}
             >
               <LayoutGrid size={16} /> Grid
             </button>
             <button
-              onClick={() => setView('map')}
+              onClick={() => handleViewChange('map')}
               className={`px-4 py-2 flex items-center gap-2 text-sm font-bold rounded-xl transition-all
-                ${view === 'map' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                ${view === 'map'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-600'}`}
             >
               <Map size={16} /> Mapa
             </button>
@@ -8338,10 +8400,16 @@ export default function ListingsPage() {
       </div>
 
       {/* ── Filters ───────────────────────────────────────────────────────── */}
-      <div className={`card mb-10 overflow-hidden transition-all duration-500 ${showFilters ? 'max-h-[1000px] opacity-100 p-8' : 'max-h-0 opacity-0 p-0 border-none shadow-none'}`}>
+      <div className={`card mb-10 overflow-hidden transition-all duration-500 ${
+        showFilters
+          ? 'max-h-[1000px] opacity-100 p-8'
+          : 'max-h-0 opacity-0 p-0 border-none shadow-none'
+      }`}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Ciudad</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Ciudad
+            </label>
             <select
               className="input"
               value={filters.city}
@@ -8352,7 +8420,9 @@ export default function ListingsPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Tipo</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Tipo
+            </label>
             <select
               className="input"
               value={filters.type}
@@ -8366,35 +8436,35 @@ export default function ListingsPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Precio mín</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Precio mín
+            </label>
             <input
-              type="number"
-              className="input"
-              value={filters.min_price}
-              placeholder="0"
+              type="number" className="input" value={filters.min_price} placeholder="0"
               onChange={e => setFilters(f => ({ ...f, min_price: e.target.value }))}
             />
           </div>
 
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Precio máx</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Precio máx
+            </label>
             <input
-              type="number"
-              className="input"
-              value={filters.max_price}
-              placeholder="Sin límite"
+              type="number" className="input" value={filters.max_price} placeholder="Sin límite"
               onChange={e => setFilters(f => ({ ...f, max_price: e.target.value }))}
             />
           </div>
 
           <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap gap-3 pt-4 border-t border-slate-50">
             {[
-              ['pets_allowed', '🐾 Mascotas'],
-              ['smoking_allowed', '🚬 Fumadores']
+              ['pets_allowed',    '🐾 Mascotas' ],
+              ['smoking_allowed', '🚬 Fumadores'],
             ].map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => setFilters(f => ({ ...f, [key]: f[key] === 'true' ? '' : 'true' }))}
+                onClick={() => setFilters(f => ({
+                  ...f, [key]: f[key] === 'true' ? '' : 'true',
+                }))}
                 className={`px-4 py-2 rounded-xl border-2 text-sm font-bold transition-all
                   ${filters[key] === 'true'
                     ? 'border-blue-500 bg-blue-50 text-blue-600'
@@ -8404,7 +8474,10 @@ export default function ListingsPage() {
               </button>
             ))}
             <button
-              onClick={() => setFilters({ city: 'Asunción', min_price: '', max_price: '', pets_allowed: '', smoking_allowed: '', type: '' })}
+              onClick={() => setFilters({
+                city: 'Asunción', min_price: '', max_price: '',
+                pets_allowed: '', smoking_allowed: '', type: '',
+              })}
               className="ml-auto text-sm font-bold text-red-400 hover:text-red-500 flex items-center gap-1"
             >
               <X size={14} /> Limpiar filtros
@@ -8413,23 +8486,80 @@ export default function ListingsPage() {
         </div>
       </div>
 
-      {/* ── Content ───────────────────────────────────────────────────────── */}
+      {/* ── Contenido: Grid o Mapa ────────────────────────────────────────── */}
       {loading ? (
         <div className="flex justify-center py-32"><Spinner size="lg" /></div>
+
       ) : listings.length === 0 ? (
-        <EmptyState icon="🏠" title="No hay publicaciones" description="Sé el primero en publicar en esta ciudad." />
-      ) : (
+        <EmptyState
+          icon="🏠"
+          title="No hay publicaciones"
+          description="Sé el primero en publicar en esta ciudad."
+        />
+
+      ) : view === 'grid' ? (
+        /* ── Vista grilla ─────────────────────────────────────────────────── */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {listings.map(l => <ListingCard key={l.id} listing={l} />)}
+        </div>
+
+      ) : (
+        /* ── Vista mapa ───────────────────────────────────────────────────────
+         *
+         * ✅ FIX: Esta sección no existía antes.
+         *
+         * El botón "Mapa" cambiaba view a 'map' pero el JSX no tenía
+         * ninguna rama para ese estado — el contenido desaparecía por completo.
+         *
+         * Ahora:
+         *  1. Si MapComp aún no cargó (import() en curso) → muestra spinner.
+         *  2. Si no hay departamentos con coords → muestra mensaje informativo.
+         *  3. Si todo está listo → renderiza JaikoMap con listingMarkers.
+         *
+         * Por qué un contenedor con altura fija (h-[500px]):
+         *   JaikoMap necesita que el padre tenga altura definida.
+         *   Con height: '100%' sin un padre con altura, el mapa queda en 0px.
+         *   500px en mobile, 600px en sm+ da una experiencia cómoda.
+         */
+        <div>
+          {/* Contador de pins disponibles */}
+          {listingMarkers.length < listings.length && (
+            <p className="text-sm text-slate-400 mb-3">
+              Mostrando {listingMarkers.length} de {listings.length} departamentos en el mapa
+              (los demás no tienen coordenadas registradas).
+            </p>
+          )}
+
+          <div className="h-[500px] sm:h-[600px] w-full rounded-2xl overflow-hidden shadow-lg">
+            {!MapComp ? (
+              // Mapa aún cargando (import() en progreso)
+              <div className="flex items-center justify-center h-full bg-slate-50 rounded-2xl border border-slate-100">
+                <Spinner size="lg" />
+              </div>
+            ) : listingMarkers.length === 0 ? (
+              // Ningún listing tiene coordenadas
+              <div className="flex flex-col items-center justify-center h-full bg-slate-50 rounded-2xl border border-dashed border-slate-200 gap-4">
+                <span className="text-5xl opacity-30">🗺️</span>
+                <p className="text-slate-400 font-medium text-center max-w-xs">
+                  Ningún departamento de esta ciudad tiene coordenadas registradas todavía.
+                </p>
+              </div>
+            ) : (
+              <MapComp
+                center={CITY_CENTERS[filters.city] || [-25.2867, -57.647]}
+                listingMarkers={listingMarkers}
+                height="100%"
+              />
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\LoginPage.jsx
+FILE_PATH: .\frontend\src\pages\LoginPage.jsx
 ----------------------------------------
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
@@ -8627,9 +8757,8 @@ export default function LoginPage() {
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\NotFoundPage.jsx
+FILE_PATH: .\frontend\src\pages\NotFoundPage.jsx
 ----------------------------------------
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -8669,9 +8798,8 @@ export default function NotFoundPage() {
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\NotificationsPage.jsx
+FILE_PATH: .\frontend\src\pages\NotificationsPage.jsx
 ----------------------------------------
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8762,9 +8890,8 @@ export default function NotificationsPage() {
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\ProfilePage.jsx
+FILE_PATH: .\frontend\src\pages\ProfilePage.jsx
 ----------------------------------------
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
@@ -9378,9 +9505,8 @@ export default function ProfilePage() {
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\RegisterPage.jsx
+FILE_PATH: .\frontend\src\pages\RegisterPage.jsx
 ----------------------------------------
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
@@ -9575,19 +9701,17 @@ export default function RegisterPage() {
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\SearchPage.jsx
+FILE_PATH: .\frontend\src\pages\SearchPage.jsx
 ----------------------------------------
 import React, { useState, useEffect, useCallback } from 'react';
-import { SlidersHorizontal, X, MapPin, Search as SearchIcon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { SlidersHorizontal, Map, LayoutGrid, MapPin } from 'lucide-react';
 import api from '../services/api';
 import ProfileCard from '../components/ui/ProfileCard';
 import { Spinner, EmptyState } from '../components/ui';
 import { toast } from 'react-hot-toast';
-import { motion } from 'motion/react';
 
+// ─── Constantes ───────────────────────────────────────────────────────────────
 const SCHEDULES = ['morning', 'afternoon', 'night', 'flexible'];
 const SCHEDULE_LABELS = {
   morning:   'Mañana',
@@ -9599,65 +9723,52 @@ const CITIES = [
   'Asunción', 'San Lorenzo', 'Luque', 'Fernando de la Mora',
   'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este',
 ];
-
-/**
- * ✅ NUEVO: Opciones del filtro por género.
- *
- * Valores alineados con el campo `gender VARCHAR` de la tabla `profiles`.
- * Ver también: database_changes.sql donde se define el CHECK constraint
- * con los valores válidos: 'male' | 'female' | 'other' | 'prefer_not_to_say'
- */
+const CITY_CENTERS = {
+  'Asunción':            [-25.2867, -57.647 ],
+  'San Lorenzo':         [-25.3355, -57.5178],
+  'Luque':               [-25.2635, -57.4857],
+  'Fernando de la Mora': [-25.3085, -57.5225],
+  'Lambaré':             [-25.3404, -57.6075],
+  'Capiatá':             [-25.356,  -57.4455],
+  'Encarnación':         [-27.3333, -55.8667],
+  'Ciudad del Este':     [-25.5097, -54.611 ],
+};
 const GENDER_OPTIONS = [
-  { value: '',                  label: 'Cualquiera'           },
-  { value: 'male',              label: 'Hombre'               },
-  { value: 'female',            label: 'Mujer'                },
-  { value: 'other',             label: 'Otro / No especificado'},
+  { value: '',       label: 'Cualquiera'            },
+  { value: 'male',   label: 'Hombre'                },
+  { value: 'female', label: 'Mujer'                 },
+  { value: 'other',  label: 'Otro / No especificado'},
 ];
-
-// Estado inicial extraído como constante para poder reutilizarlo en "Limpiar filtros"
 const INITIAL_FILTERS = {
-  city:     'Asunción',
-  gender:   '',
-  pets:     '',
-  smoker:   '',
-  schedule: '',
-  min_age:  '',
-  max_age:  '',
+  city: 'Asunción', gender: '', pets: '', smoker: '', schedule: '',
+  min_age: '', max_age: '',
 };
 
+// ─── Página principal ─────────────────────────────────────────────────────────
 export default function SearchPage() {
-  const navigate = useNavigate();
-  const [profiles,    setProfiles]    = useState([]);
-  const [loading,     setLoading]     = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters,     setFilters]     = useState(INITIAL_FILTERS);
+  const [profiles,     setProfiles]    = useState([]);
+  const [loading,      setLoading]     = useState(false);
+  const [showFilters,  setShowFilters] = useState(false);
+  const [filters,      setFilters]     = useState(INITIAL_FILTERS);
 
+  // ── Vista: 'grid' | 'map' ────────────────────────────────────────────────
+  const [view,    setView]    = useState('grid');
+  // MapComp se carga de forma diferida solo cuando el usuario activa el mapa
+  const [MapComp, setMapComp] = useState(null);
+
+  // ─── Fetch perfiles ────────────────────────────────────────────────────────
   const fetchProfiles = useCallback(async (currentFilters = filters) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page:     1,
-        per_page: 20,
-        city:     currentFilters.city,
+        page: 1, per_page: 100, city: currentFilters.city,
       });
-
-      if (currentFilters.min_age)  params.append('min_age',  currentFilters.min_age);
-      if (currentFilters.max_age)  params.append('max_age',  currentFilters.max_age);
-      if (currentFilters.pets  !== '') params.append('pets',   currentFilters.pets);
-      if (currentFilters.smoker !== '') params.append('smoker', currentFilters.smoker);
+      if (currentFilters.min_age)       params.append('min_age',  currentFilters.min_age);
+      if (currentFilters.max_age)       params.append('max_age',  currentFilters.max_age);
+      if (currentFilters.pets  !== '')  params.append('pets',     currentFilters.pets);
+      if (currentFilters.smoker !== '') params.append('smoker',   currentFilters.smoker);
       if (currentFilters.schedule)      params.append('schedule', currentFilters.schedule);
-
-      /**
-       * ✅ NUEVO: Filtro por género enviado al backend.
-       *
-       * Técnicamente: se agrega el parámetro `gender` a la query.
-       * El backend debe soportarlo en /profiles/search filtrando por
-       * profiles.gender = :gender.
-       *
-       * TODO (backend): Agregar `gender` como parámetro filtrable en
-       * profile_routes.py → GET /profiles/search
-       */
-      if (currentFilters.gender) params.append('gender', currentFilters.gender);
+      if (currentFilters.gender)        params.append('gender',   currentFilters.gender);
 
       const { data } = await api.get(`/profiles/search?${params}`);
       setProfiles(data.profiles || []);
@@ -9668,29 +9779,54 @@ export default function SearchPage() {
     }
   }, [filters]);
 
-  useEffect(() => {
-    fetchProfiles();
-  }, [filters, fetchProfiles]);
+  useEffect(() => { fetchProfiles(); }, [filters, fetchProfiles]);
 
-  // ✅ MEJORADO: incluye `gender` en el contador de filtros activos
+  // ─── Cambio de vista con carga diferida del mapa ───────────────────────────
+  /*
+   * Por qué cargamos JaikoMap con import() solo cuando se pide:
+   * react-leaflet pesa ~40 kb gzipped. Si el usuario nunca abre la vista de
+   * mapa, no tiene sentido incluirlo en el bundle inicial de la página.
+   * Al hacer import() en el momento exacto que se necesita, el chunk se
+   * descarga una sola vez y queda en caché.
+   */
+  const handleViewChange = (newView) => {
+    setView(newView);
+    if (newView === 'map' && !MapComp) {
+      import('../components/map/JaikoMap')
+        .then(m => setMapComp(() => m.default))
+        .catch(() => toast.error('No se pudo cargar el mapa'));
+    }
+  };
+
+  // ─── Convertir profiles → markers para JaikoMap ───────────────────────────
+  /*
+   * JaikoMap espera para roomies: { lat, lng, profile, compatibility, matches, mismatches }
+   * Solo incluimos los que tienen coordenadas válidas.
+   */
+  const roomieMarkers = profiles
+    .filter(p => p.lat != null && p.lng != null && isFinite(p.lat) && isFinite(p.lng))
+    .map(p => ({
+      lat:           p.lat,
+      lng:           p.lng,
+      profile:       p,
+      compatibility: p.compatibility ?? null,
+      matches:       p.matches    || [],
+      mismatches:    p.mismatches || [],
+    }));
+
   const activeFilterCount = [
-    filters.gender,
-    filters.pets,
-    filters.smoker,
-    filters.schedule,
-    filters.min_age,
-    filters.max_age,
+    filters.gender, filters.pets, filters.smoker,
+    filters.schedule, filters.min_age, filters.max_age,
   ].filter(Boolean).length;
 
   const handleFilterChange = (key, value) =>
-    setFilters((f) => ({ ...f, [key]: value }));
+    setFilters(f => ({ ...f, [key]: value }));
 
-  const handleClear = () => setFilters(INITIAL_FILTERS);
-
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
           <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-blue-950">
@@ -9701,138 +9837,114 @@ export default function SearchPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-2xl border border-orange-100 text-sm font-bold text-blue-900 bg-white hover:bg-orange-50 transition-all relative shadow-sm"
-        >
-          <SlidersHorizontal size={16} />
-          Filtros
-          {activeFilterCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white shadow-sm">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
+        {/* Controles: toggle vista + filtros */}
+        <div className="flex items-center gap-3 flex-wrap">
+
+          {/* Toggle Grid / Mapa — igual al de ListingsPage */}
+          <div className="flex bg-slate-100 p-1 rounded-2xl">
+            <button
+              onClick={() => handleViewChange('grid')}
+              className={`px-4 py-2 flex items-center gap-2 text-sm font-bold rounded-xl transition-all
+                ${view === 'grid'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <LayoutGrid size={16} /> Lista
+            </button>
+            <button
+              onClick={() => handleViewChange('map')}
+              className={`px-4 py-2 flex items-center gap-2 text-sm font-bold rounded-xl transition-all
+                ${view === 'map'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Map size={16} /> Mapa
+            </button>
+          </div>
+
+          {/* Botón Filtros */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl border border-orange-100 text-sm font-bold text-blue-900 bg-white hover:bg-orange-50 transition-all relative shadow-sm"
+          >
+            <SlidersHorizontal size={16} />
+            Filtros
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white shadow-sm">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Panel de filtros colapsable */}
-      <div
-        className={`card mb-10 overflow-hidden transition-all duration-500 ${
-          showFilters
-            ? 'max-h-[1000px] opacity-100 p-8'
-            : 'max-h-0 opacity-0 p-0 border-none shadow-none'
-        }`}
-      >
+      {/* ── Panel de filtros colapsable ──────────────────────────────────────── */}
+      <div className={`card mb-10 overflow-hidden transition-all duration-500 ${
+        showFilters
+          ? 'max-h-[1000px] opacity-100 p-8'
+          : 'max-h-0 opacity-0 p-0 border-none shadow-none'
+      }`}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-end">
 
-          {/* Ciudad */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-blue-900/40 uppercase tracking-widest ml-1">
-              Ciudad
-            </label>
-            <select
-              className="input"
-              value={filters.city}
-              onChange={(e) => handleFilterChange('city', e.target.value)}
-            >
-              {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            <label className="block text-xs font-bold text-blue-900/40 uppercase tracking-widest ml-1">Ciudad</label>
+            <select className="input" value={filters.city}
+              onChange={e => handleFilterChange('city', e.target.value)}>
+              {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
 
-          {/* ✅ NUEVO: Filtro por género */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-              Género
-            </label>
-            <select
-              className="input"
-              value={filters.gender}
-              onChange={(e) => handleFilterChange('gender', e.target.value)}
-            >
-              {GENDER_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Género</label>
+            <select className="input" value={filters.gender}
+              onChange={e => handleFilterChange('gender', e.target.value)}>
+              {GENDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
 
-          {/* Mascotas */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-              Mascotas
-            </label>
-            <select
-              className="input"
-              value={filters.pets}
-              onChange={(e) => handleFilterChange('pets', e.target.value)}
-            >
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Mascotas</label>
+            <select className="input" value={filters.pets}
+              onChange={e => handleFilterChange('pets', e.target.value)}>
               <option value="">Cualquiera</option>
               <option value="true">Con mascotas</option>
               <option value="false">Sin mascotas</option>
             </select>
           </div>
 
-          {/* Fumador */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-              Fumador
-            </label>
-            <select
-              className="input"
-              value={filters.smoker}
-              onChange={(e) => handleFilterChange('smoker', e.target.value)}
-            >
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Fumador</label>
+            <select className="input" value={filters.smoker}
+              onChange={e => handleFilterChange('smoker', e.target.value)}>
               <option value="">Cualquiera</option>
               <option value="false">No fuma</option>
               <option value="true">Fumador</option>
             </select>
           </div>
 
-          {/* Horario */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-              Horario
-            </label>
-            <select
-              className="input"
-              value={filters.schedule}
-              onChange={(e) => handleFilterChange('schedule', e.target.value)}
-            >
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Horario</label>
+            <select className="input" value={filters.schedule}
+              onChange={e => handleFilterChange('schedule', e.target.value)}>
               <option value="">Cualquiera</option>
-              {SCHEDULES.map((s) => (
-                <option key={s} value={s}>{SCHEDULE_LABELS[s]}</option>
-              ))}
+              {SCHEDULES.map(s => <option key={s} value={s}>{SCHEDULE_LABELS[s]}</option>)}
             </select>
           </div>
 
-          {/* Edad mín. */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-              Edad mín.
-            </label>
-            <input
-              type="number" className="input"
-              placeholder="18" min={18} max={80}
-              value={filters.min_age}
-              onChange={(e) => handleFilterChange('min_age', e.target.value)}
-            />
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Edad mín.</label>
+            <input type="number" className="input" placeholder="18" min={18} max={80}
+              value={filters.min_age} onChange={e => handleFilterChange('min_age', e.target.value)} />
           </div>
 
-          {/* Edad máx. */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-              Edad máx.
-            </label>
-            <input
-              type="number" className="input"
-              placeholder="99" min={18} max={99}
-              value={filters.max_age}
-              onChange={(e) => handleFilterChange('max_age', e.target.value)}
-            />
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Edad máx.</label>
+            <input type="number" className="input" placeholder="99" min={18} max={99}
+              value={filters.max_age} onChange={e => handleFilterChange('max_age', e.target.value)} />
           </div>
 
-          {/* Acciones */}
           <div className="sm:col-span-2 lg:col-span-3 flex justify-end gap-3 pt-4 border-t border-slate-50">
-            <button type="button" onClick={handleClear} className="btn-ghost text-sm">
+            <button type="button" onClick={() => setFilters(INITIAL_FILTERS)} className="btn-ghost text-sm">
               Limpiar filtros
             </button>
             <button onClick={() => fetchProfiles()} className="btn-primary">
@@ -9842,31 +9954,76 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {/* Resultados */}
+      {/* ── Contenido: lista o mapa ──────────────────────────────────────────── */}
       {loading ? (
-        <div className="flex justify-center py-32">
-          <Spinner size="lg" />
-        </div>
-      ) : profiles.length === 0 ? (
-        <EmptyState
-          icon="🔍"
-          title="No encontramos roomies compatibles"
-          description="Probá ajustar tus preferencias en tu perfil o cambiar el filtro de ciudad."
-        />
+        <div className="flex justify-center py-32"><Spinner size="lg" /></div>
+
+      ) : view === 'grid' ? (
+        /* ── Vista lista de perfiles ── */
+        profiles.length === 0 ? (
+          <EmptyState
+            icon="🔍"
+            title="No encontramos roomies compatibles"
+            description="Probá ajustar tus preferencias en tu perfil o cambiar el filtro de ciudad."
+          />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {profiles.map(p => (
+              <ProfileCard key={p.user_id} profile={p} compatibility={p.compatibility} />
+            ))}
+          </div>
+        )
+
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {profiles.map((p) => (
-            <ProfileCard key={p.user_id} profile={p} compatibility={p.compatibility} />
-          ))}
+        /* ── Vista mapa ──────────────────────────────────────────────────────
+         *
+         * Muestra todos los roomies que tienen coordenadas (lat/lng) como
+         * marcadores naranja sobre el mapa de la ciudad seleccionada.
+         * Al hacer clic en un marcador, aparece la ProfileCard del roomie.
+         */
+        <div>
+          {/* Aviso si algunos perfiles no tienen ubicación */}
+          {profiles.length > 0 && roomieMarkers.length < profiles.length && (
+            <p className="text-sm text-slate-400 mb-3 flex items-center gap-1.5">
+              <MapPin size={13} />
+              Mostrando {roomieMarkers.length} de {profiles.length} roomies en el mapa
+              (los demás no tienen ubicación registrada).
+            </p>
+          )}
+
+          {/* Contenedor del mapa con altura fija — leaflet necesita altura definida */}
+          <div className="h-[420px] sm:h-[560px] w-full rounded-2xl overflow-hidden shadow-lg border border-slate-100">
+            {!MapComp ? (
+              /* Mapa aún cargando el chunk de leaflet */
+              <div className="flex items-center justify-center h-full bg-slate-50 rounded-2xl">
+                <Spinner size="lg" />
+              </div>
+
+            ) : roomieMarkers.length === 0 ? (
+              /* Sin roomies con coordenadas */
+              <div className="flex flex-col items-center justify-center h-full bg-slate-50 rounded-2xl border border-dashed border-slate-200 gap-4">
+                <span className="text-5xl opacity-30">📍</span>
+                <p className="text-slate-400 font-medium text-center max-w-xs leading-relaxed">
+                  Ningún roomie de esta ciudad tiene su ubicación registrada todavía.
+                </p>
+              </div>
+
+            ) : (
+              <MapComp
+                center={CITY_CENTERS[filters.city] || [-25.2867, -57.647]}
+                markers={roomieMarkers}
+                height="100%"
+              />
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\pages\VerificationPage.jsx
+FILE_PATH: .\frontend\src\pages\VerificationPage.jsx
 ----------------------------------------
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Upload, Clock, CheckCircle2, XCircle, Camera, Loader2, Info } from 'lucide-react';
@@ -10091,9 +10248,8 @@ export default function VerificationPage() {
   );
 }
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\services\api.js
+FILE_PATH: .\frontend\src\services\api.js
 ----------------------------------------
 import axios from 'axios'
 
@@ -10184,9 +10340,8 @@ export async function updateProfile(data) {
 
 export default api
 
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\services\socket.js
+FILE_PATH: .\frontend\src\services\socket.js
 ----------------------------------------
 import { io } from 'socket.io-client'
 
@@ -10249,9 +10404,8 @@ export const disconnectSocket = () => {
   // Limpiar listeners para evitar memory leaks al cerrar sesión
   connectListeners.clear()
 }
-----------------------------------------
 
-FILE_PATH: .\JAIKO\frontend\src\services\storage.js
+FILE_PATH: .\frontend\src\services\storage.js
 ----------------------------------------
 /**
  * Servicio de upload de imágenes.
@@ -10316,4 +10470,1829 @@ export async function uploadVerificationSelfie(file) {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
+
+FILE_PATH: .\mobile\README.md
 ----------------------------------------
+# Welcome to your Expo app 👋
+
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+
+## Get started
+
+1. Install dependencies
+
+   ```bash
+   npm install
+   ```
+
+2. Start the app
+
+   ```bash
+   npx expo start
+   ```
+
+In the output, you'll find options to open the app in a
+
+- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+
+You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+
+## Get a fresh project
+
+When you're ready, run:
+
+```bash
+npm run reset-project
+```
+
+This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+
+## Learn more
+
+To learn more about developing your project with Expo, look at the following resources:
+
+- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+
+## Join the community
+
+Join our community of developers creating universal apps.
+
+- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+
+FILE_PATH: .\mobile\app.json
+----------------------------------------
+{
+  "expo": {
+    "name": "mobile",
+    "slug": "mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "mobile",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
+
+
+FILE_PATH: .\mobile\package.json
+----------------------------------------
+{
+  "name": "mobile",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "expo start",
+    "reset-project": "node ./scripts/reset-project.js",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "expo lint"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/bottom-tabs": "^7.4.0",
+    "@react-navigation/elements": "^2.6.3",
+    "@react-navigation/native": "^7.1.8",
+    "axios": "^1.15.0",
+    "expo": "~54.0.33",
+    "expo-constants": "~18.0.13",
+    "expo-font": "~14.0.11",
+    "expo-haptics": "~15.0.8",
+    "expo-image": "~3.0.11",
+    "expo-linking": "~8.0.11",
+    "expo-router": "~6.0.23",
+    "expo-splash-screen": "~31.0.13",
+    "expo-status-bar": "~3.0.9",
+    "expo-symbols": "~1.0.8",
+    "expo-system-ui": "~6.0.9",
+    "expo-web-browser": "~15.0.10",
+    "lucide-react-native": "^1.8.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
+    "react-native-web": "~0.21.0",
+    "react-native-worklets": "0.5.1",
+    "socket.io-client": "^4.8.3",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "babel-plugin-module-resolver": "^5.0.3",
+    "eslint": "^9.25.0",
+    "eslint-config-expo": "~10.0.0",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
+
+
+FILE_PATH: .\mobile\app\_layout.jsx
+----------------------------------------
+// mobile/app/_layout.jsx
+import { useEffect, useRef } from 'react'
+import { Stack, useRouter, useSegments } from 'expo-router'
+import { ActivityIndicator, View, StyleSheet } from 'react-native'
+import useAuthStore from '@shared/context/authStore'
+
+export default function RootLayout() {
+  const router   = useRouter()
+  const segments = useSegments()
+  const { fetchMe, token, loading } = useAuthStore()
+
+  // Guardamos el timer para poder cancelarlo si el componente
+  // se desmonta antes de que se ejecute — evita memory leaks
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    fetchMe()
+  }, [])
+
+  useEffect(() => {
+    if (loading) return
+
+    const enTabsProtegidas  = segments[0] === '(tabs)'
+    const enPantallaPublica = !enTabsProtegidas && segments[0] !== 'profile'
+
+    let destino = null
+
+    if (!token && enTabsProtegidas) {
+      destino = '/login'
+    } else if (token && enPantallaPublica) {
+      destino = '/(tabs)'
+    }
+
+    if (!destino) return
+
+    // ¿Por qué setTimeout con 0ms?
+    // Los useEffect corren JUSTO después del render, pero Expo Router
+    // necesita un tick más para registrar internamente su navegador.
+    // Con setTimeout(fn, 0) le damos ese tick extra — la función corre
+    // en el siguiente ciclo del event loop, cuando todo ya está listo.
+    timerRef.current = setTimeout(() => {
+      router.replace(destino)
+    }, 0)
+
+    // Cleanup: si el componente se desmonta antes del timeout, lo cancelamos
+    return () => clearTimeout(timerRef.current)
+
+  }, [token, segments, loading])
+
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }} />
+
+      {loading && (
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color="#F97316" />
+        </View>
+      )}
+    </>
+  )
+}
+
+const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+})
+
+FILE_PATH: .\mobile\app\login.jsx
+----------------------------------------
+// mobile/app/login.jsx
+import { useState } from 'react'
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native'
+import { useRouter } from 'expo-router'
+import useAuthStore from '@shared/context/authStore'
+
+// KeyboardAvoidingView: cuando el teclado aparece en el celular,
+// empuja el formulario hacia arriba para que no quede tapado.
+// Platform.OS: en iOS el comportamiento es 'padding', en Android 'height'.
+
+export default function LoginScreen() {
+  const router = useRouter()
+  const { login } = useAuthStore()
+
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [loading,  setLoading]  = useState(false)
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Completá todos los campos')
+      return
+    }
+
+    setLoading(true)
+    const result = await login({ email, password })
+    setLoading(false)
+
+    if (result.success) {
+      router.replace('/(tabs)')
+    } else {
+      Alert.alert('Error', result.error || 'Credenciales incorrectas')
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.inner}>
+
+        {/* Logo / Título */}
+        <View style={styles.header}>
+          <Text style={styles.logo}>JAIKO!</Text>
+          <Text style={styles.subtitle}>Encontrá tu roomie ideal</Text>
+        </View>
+
+        {/* Formulario */}
+        <View style={styles.form}>
+
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="tu@email.com"
+            placeholderTextColor="#94A3B8"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            returnKeyType="next"
+          />
+
+          <Text style={styles.label}>Contraseña</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Tu contraseña"
+            placeholderTextColor="#94A3B8"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+            // onSubmitEditing: al tocar "listo" en el teclado, envía el form
+          />
+
+          {/* Botón principal */}
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.buttonText}>INICIAR SESIÓN</Text>
+            }
+          </TouchableOpacity>
+
+          {/* ── Link a Registro ── */}
+          {/* router.replace en vez de push: reemplaza la pantalla actual en el
+              historial. Si el usuario va a Registro y toca "atrás", no vuelve
+              a Login sino que sale de la app — evita loops de navegación. */}
+          <TouchableOpacity
+            style={styles.registerLink}
+            onPress={() => router.replace('/register')}
+          >
+            <Text style={styles.registerLinkText}>
+              ¿No tenés cuenta?{' '}
+              <Text style={styles.registerLinkBold}>Registrate</Text>
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  )
+}
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  inner: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+  },
+
+  // Header
+  header: {
+    alignItems: 'center',
+    marginBottom: 36,
+  },
+  logo: {
+    fontSize: 40,
+    fontWeight: '900',
+    color: '#F97316',
+    letterSpacing: -1,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#64748B',
+    marginTop: 6,
+  },
+
+  // Formulario
+  form: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 6,
+    marginTop: 14,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#1E293B',
+    backgroundColor: '#F8FAFC',
+  },
+
+  // Botón
+  button: {
+    backgroundColor: '#F97316',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 24,
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  // Link a registro
+  registerLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  registerLinkText: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  registerLinkBold: {
+    color: '#F97316',
+    fontWeight: '700',
+  },
+})
+
+FILE_PATH: .\mobile\app\register.jsx
+----------------------------------------
+// mobile/app/register.jsx
+//
+// Pantalla de Registro — JAIKO!
+//
+// Estructura:
+//   validateForm()   → valida los campos antes de tocar la red
+//   handleRegister() → llama al authStore y maneja la respuesta
+//   JSX              → solo se ocupa de mostrar, no de lógica
+//
+// ¿Por qué separar validateForm()?
+// Si en el futuro querés agregar más reglas (ej: contraseña mínimo 8 chars),
+// solo tocás esa función. No tenés que buscar entre el JSX.
+
+import { useState } from 'react'
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ScrollView,
+} from 'react-native'
+import { useRouter } from 'expo-router'
+import useAuthStore from '@shared/context/authStore'
+
+// ─── Validación ───────────────────────────────────────────────────────────────
+// Función pura: recibe datos, devuelve un mensaje de error o null.
+// "Función pura" = no modifica nada afuera, siempre devuelve lo mismo
+// con los mismos parámetros. Eso la hace fácil de testear y de leer.
+
+function validateForm({ name, email, password, confirmPassword }) {
+  if (!name.trim() || !email.trim() || !password || !confirmPassword) {
+    return 'Completá todos los campos'
+  }
+  if (!email.includes('@')) {
+    return 'El email no es válido'
+  }
+  if (password.length < 6) {
+    return 'La contraseña debe tener al menos 6 caracteres'
+  }
+  if (password !== confirmPassword) {
+    return 'Las contraseñas no coinciden'
+  }
+  return null // null = sin errores
+}
+
+// ─── Pantalla principal ───────────────────────────────────────────────────────
+
+export default function RegisterScreen() {
+  const router  = useRouter()
+  const { register } = useAuthStore()
+
+  // Estado del formulario — cada campo tiene su propio estado.
+  // ¿Por qué no un solo objeto { name, email, ... }?
+  // Con campos separados, React solo re-renderiza cuando cambia ESE campo.
+  // Con un objeto, cualquier cambio re-renderiza todo. Para un form pequeño
+  // no importa mucho, pero es buena práctica desde el principio.
+  const [name,            setName]            = useState('')
+  const [email,           setEmail]           = useState('')
+  const [password,        setPassword]        = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [loading,         setLoading]         = useState(false)
+
+  // ─── Lógica de envío ────────────────────────────────────────────────────────
+  const handleRegister = async () => {
+    // Paso 1: validar localmente (sin red)
+    const error = validateForm({ name, email, password, confirmPassword })
+    if (error) {
+      Alert.alert('Error', error)
+      return
+    }
+
+    // Paso 2: llamar al backend a través del authStore
+    // captcha_token: null → el backend lo acepta, lo ignoramos en mobile por ahora
+    setLoading(true)
+    const result = await register({
+      name:          name.trim(),
+      email:         email.trim().toLowerCase(),
+      password,
+      captcha_token: null,
+    })
+    setLoading(false)
+
+    if (result.success) {
+      // El authStore ya guardó el token y el user en el estado global.
+      // replace() en lugar de push() para que el usuario no pueda volver
+      // atrás con el botón back y terminar en el form de registro estando logueado.
+      router.replace('/(tabs)')
+    } else {
+      Alert.alert('Error al registrarse', result.error || 'Intentá de nuevo')
+    }
+  }
+
+  // ─── JSX ────────────────────────────────────────────────────────────────────
+  // KeyboardAvoidingView: cuando el teclado aparece, empuja el formulario
+  // hacia arriba para que no quede tapado. Mismo patrón que login.jsx.
+  // ScrollView adentro: si la pantalla es chica (ej: SE), el form no queda cortado.
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        // keyboardShouldPersistTaps="handled": permite tocar el botón
+        // "Registrarse" aunque el teclado esté abierto, sin cerrarlo primero.
+      >
+
+        {/* Logo / Título */}
+        <View style={styles.header}>
+          <Text style={styles.logo}>JAIKO!</Text>
+          <Text style={styles.subtitle}>Creá tu cuenta gratis</Text>
+        </View>
+
+        {/* Formulario */}
+        <View style={styles.form}>
+
+          {/* Nombre completo */}
+          <Text style={styles.label}>Nombre completo</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ej: María García"
+            placeholderTextColor="#94A3B8"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+            // autoCapitalize="words": pone mayúscula en cada palabra del nombre
+            returnKeyType="next"
+          />
+
+          {/* Email */}
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="tu@email.com"
+            placeholderTextColor="#94A3B8"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            returnKeyType="next"
+          />
+
+          {/* Contraseña */}
+          <Text style={styles.label}>Contraseña</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Mínimo 6 caracteres"
+            placeholderTextColor="#94A3B8"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            // secureTextEntry: oculta los caracteres con puntos (••••)
+            returnKeyType="next"
+          />
+
+          {/* Confirmar contraseña */}
+          <Text style={styles.label}>Confirmar contraseña</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Repetí tu contraseña"
+            placeholderTextColor="#94A3B8"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            returnKeyType="done"
+            onSubmitEditing={handleRegister}
+            // onSubmitEditing: cuando el usuario toca "listo" en el teclado
+            // del último campo, envía el formulario automáticamente.
+          />
+
+          {/* Botón principal */}
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleRegister}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.buttonText}>CREAR CUENTA</Text>
+            }
+          </TouchableOpacity>
+
+          {/* Link a Login */}
+          <TouchableOpacity
+            style={styles.loginLink}
+            onPress={() => router.replace('/login')}
+          >
+            <Text style={styles.loginLinkText}>
+              ¿Ya tenés cuenta?{' '}
+              <Text style={styles.loginLinkBold}>Iniciá sesión</Text>
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
+}
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+// StyleSheet.create() compila los estilos una sola vez al cargar el módulo.
+// Si usáramos objetos literales ({ color: 'red' }) dentro del JSX, React Native
+// los recrearía en cada render. Con StyleSheet eso no pasa → mejor performance.
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scroll: {
+    flexGrow: 1,
+    // flexGrow: 1 hace que el ScrollView ocupe toda la pantalla disponible
+    // aunque el contenido sea corto. Necesario para centrar verticalmente.
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+  },
+
+  // Header
+  header: {
+    alignItems: 'center',
+    marginBottom: 36,
+  },
+  logo: {
+    fontSize: 40,
+    fontWeight: '900',
+    color: '#F97316',   // naranja JAIKO
+    letterSpacing: -1,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#64748B',
+    marginTop: 6,
+  },
+
+  // Formulario
+  form: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    // Sombra — en iOS y Android se configura diferente
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,   // elevation es la sombra en Android
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E293B',   // slate JAIKO
+    marginBottom: 6,
+    marginTop: 14,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#1E293B',
+    backgroundColor: '#F8FAFC',
+  },
+
+  // Botón
+  button: {
+    backgroundColor: '#F97316',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 24,
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+    // Cuando está cargando, bajamos la opacidad para indicar
+    // visualmente que no se puede tocar de nuevo.
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  // Link a login
+  loginLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  loginLinkText: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  loginLinkBold: {
+    color: '#F97316',
+    fontWeight: '700',
+  },
+})
+
+FILE_PATH: .\mobile\app\(tabs)\_layout.jsx
+----------------------------------------
+// mobile/app/(tabs)/_layout.jsx
+import { Tabs } from 'expo-router'
+import { Search, Building2, Users, MessageSquare } from 'lucide-react-native'
+
+export default function TabsLayout() {
+  return (
+    <Tabs screenOptions={{
+      headerShown: false,
+      tabBarActiveTintColor: '#F97316',
+      tabBarInactiveTintColor: '#94A3B8',
+      tabBarStyle: {
+        borderTopColor: '#F1F5F9',
+        backgroundColor: '#fff',
+      },
+    }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Buscar',
+          tabBarIcon: ({ color }) => <Search size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="listings"
+        options={{
+          title: 'Dptos',
+          tabBarIcon: ({ color }) => <Building2 size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="groups"
+        options={{
+          title: 'Grupos',
+          tabBarIcon: ({ color }) => <Users size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Chat',
+          tabBarIcon: ({ color }) => <MessageSquare size={22} color={color} />,
+        }}
+      />
+    </Tabs>
+  )
+}
+
+FILE_PATH: .\mobile\app\(tabs)\chat.jsx
+----------------------------------------
+import { View, Text, StyleSheet } from 'react-native'
+
+export default function ChatScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.text}>Chat 💬</Text>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  text: { fontSize: 18, fontWeight: 'bold' },
+})
+
+FILE_PATH: .\mobile\app\(tabs)\groups.jsx
+----------------------------------------
+import { View, Text, StyleSheet } from 'react-native'
+
+export default function GroupsScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.text}>Grupos 👥</Text>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  text: { fontSize: 18, fontWeight: 'bold' },
+})
+
+FILE_PATH: .\mobile\app\(tabs)\index.jsx
+----------------------------------------
+// mobile/app/(tabs)/index.jsx
+import { useState, useEffect, useCallback } from 'react'
+import {
+  View, Text, FlatList, TouchableOpacity,
+  StyleSheet, ActivityIndicator, ScrollView,
+} from 'react-native'
+// ← LogOut agregado al import
+import { SlidersHorizontal, LogOut } from 'lucide-react-native'
+import api from '@shared/services/api'
+import useAuthStore from '@shared/context/authStore'
+import ProfileCard from '../../components/ProfileCard'
+
+const CITIES = [
+  'Asunción', 'San Lorenzo', 'Luque', 'Fernando de la Mora',
+  'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este',
+]
+
+const INITIAL_FILTERS = {
+  city: 'Asunción',
+  gender: '',
+  pets: '',
+  smoker: '',
+  schedule: '',
+}
+
+export default function SearchScreen() {
+  // ← logout agregado al destructuring
+  const { token, logout } = useAuthStore()
+  const [profiles,    setProfiles]    = useState([])
+  const [loading,     setLoading]     = useState(false)
+  const [filters,     setFilters]     = useState(INITIAL_FILTERS)
+  const [showFilters, setShowFilters] = useState(false)
+
+  const fetchProfiles = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: 1,
+        per_page: 50,
+        city: filters.city,
+      })
+      if (filters.gender)   params.append('gender',   filters.gender)
+      if (filters.pets)     params.append('pets',     filters.pets)
+      if (filters.smoker)   params.append('smoker',   filters.smoker)
+      if (filters.schedule) params.append('schedule', filters.schedule)
+
+      const { data } = await api.get(`/profiles/search?${params}`)
+      setProfiles(data.profiles || [])
+    } catch {
+      // silencioso
+    } finally {
+      setLoading(false)
+    }
+  }, [filters])
+
+  useEffect(() => {
+    if (token) {
+      fetchProfiles()
+    }
+  }, [filters, token])
+
+  // ← función logout: llama al authStore y deja que el auth guard
+  // en _layout.jsx detecte token=null y redirija a /login automáticamente.
+  // No necesitamos router.replace() acá — el guard lo hace solo.
+  const handleLogout = async () => {
+    await logout()
+  }
+
+  const activeFilterCount = [
+    filters.gender, filters.pets,
+    filters.smoker, filters.schedule,
+  ].filter(Boolean).length
+
+  return (
+    <View style={styles.container}>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Buscar Roomie</Text>
+          <Text style={styles.subtitle}>
+            {loading ? 'Buscando...' : `${profiles.length} perfiles encontrados`}
+          </Text>
+        </View>
+
+        {/* Botones del header: filtros + logout */}
+        <View style={styles.headerActions}>
+
+          {/* Botón filtros — igual que antes */}
+          <TouchableOpacity
+            style={styles.filterBtn}
+            onPress={() => setShowFilters(f => !f)}
+          >
+            <SlidersHorizontal size={18} color="#64748B" />
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Botón logout — temporal hasta tener pantalla de Perfil */}
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            onPress={handleLogout}
+          >
+            <LogOut size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+        </View>
+      </View>
+
+      {/* Selector de ciudad */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.cityScroll}
+        contentContainerStyle={styles.cityScrollContent}
+      >
+        {CITIES.map(city => (
+          <TouchableOpacity
+            key={city}
+            style={[
+              styles.cityChip,
+              filters.city === city && styles.cityChipActive,
+            ]}
+            onPress={() => setFilters(f => ({ ...f, city }))}
+          >
+            <Text style={[
+              styles.cityChipText,
+              filters.city === city && styles.cityChipTextActive,
+            ]}>
+              {city}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Panel de filtros expandible */}
+      {showFilters && (
+        <View style={styles.filterPanel}>
+          <FilterRow
+            label="Género"
+            options={[
+              { value: '', label: 'Cualquiera' },
+              { value: 'male', label: 'Hombre' },
+              { value: 'female', label: 'Mujer' },
+              { value: 'other', label: 'Otro' },
+            ]}
+            value={filters.gender}
+            onChange={v => setFilters(f => ({ ...f, gender: v }))}
+          />
+          <FilterRow
+            label="Mascotas"
+            options={[
+              { value: '', label: 'Cualquiera' },
+              { value: 'true', label: 'Con mascotas' },
+              { value: 'false', label: 'Sin mascotas' },
+            ]}
+            value={filters.pets}
+            onChange={v => setFilters(f => ({ ...f, pets: v }))}
+          />
+          <FilterRow
+            label="Fumador"
+            options={[
+              { value: '', label: 'Cualquiera' },
+              { value: 'false', label: 'No fuma' },
+              { value: 'true', label: 'Fuma' },
+            ]}
+            value={filters.smoker}
+            onChange={v => setFilters(f => ({ ...f, smoker: v }))}
+          />
+          <FilterRow
+            label="Horario"
+            options={[
+              { value: '', label: 'Cualquiera' },
+              { value: 'morning', label: 'Mañana' },
+              { value: 'afternoon', label: 'Tarde' },
+              { value: 'night', label: 'Noche' },
+              { value: 'flexible', label: 'Flexible' },
+            ]}
+            value={filters.schedule}
+            onChange={v => setFilters(f => ({ ...f, schedule: v }))}
+          />
+          <TouchableOpacity
+            style={styles.clearBtn}
+            onPress={() => setFilters(INITIAL_FILTERS)}
+          >
+            <Text style={styles.clearBtnText}>Limpiar filtros</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Lista de perfiles */}
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#F97316" />
+        </View>
+      ) : profiles.length === 0 ? (
+        <View style={styles.centered}>
+          <Text style={styles.emptyIcon}>🔍</Text>
+          <Text style={styles.emptyTitle}>No encontramos roomies</Text>
+          <Text style={styles.emptyDesc}>
+            Probá cambiando la ciudad o los filtros
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={profiles}
+          keyExtractor={p => String(p.user_id)}
+          renderItem={({ item }) => (
+            <ProfileCard profile={item} compatibility={item.compatibility} />
+          )}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+    </View>
+  )
+}
+
+// ─── Componente FilterRow ─────────────────────────────────────────────────────
+// Separado en su propia función porque se repite 4 veces.
+// Clean Code: si copiás y pegás código más de 2 veces, extraelo en una función.
+
+function FilterRow({ label, options, value, onChange }) {
+  return (
+    <View style={styles.filterRow}>
+      <Text style={styles.filterLabel}>{label}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.filterOptions}>
+          {options.map(opt => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.filterOption,
+                value === opt.value && styles.filterOptionActive,
+              ]}
+              onPress={() => onChange(opt.value)}
+            >
+              <Text style={[
+                styles.filterOptionText,
+                value === opt.value && styles.filterOptionTextActive,
+              ]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  )
+}
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    paddingTop: 52,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#F97316',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  // ← nuevo: agrupa los dos botones del header en fila
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  filterBtn: {
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    backgroundColor: '#F97316',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+
+  // ← nuevo: mismo estilo que filterBtn pero sin borde activo
+  logoutBtn: {
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+
+  cityScroll: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    flexGrow: 0,
+  },
+  cityScrollContent: {
+    gap: 8,
+    paddingRight: 16,
+  },
+  cityChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cityChipActive: {
+    backgroundColor: '#F97316',
+    borderColor: '#F97316',
+  },
+  cityChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  cityChipTextActive: {
+    color: '#fff',
+  },
+  filterPanel: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    gap: 12,
+  },
+  filterRow: {
+    gap: 6,
+  },
+  filterLabel: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  filterOptions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  filterOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  filterOptionActive: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#F97316',
+  },
+  filterOptionText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  filterOptionTextActive: {
+    color: '#F97316',
+    fontWeight: '700',
+  },
+  clearBtn: {
+    alignSelf: 'flex-end',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  clearBtnText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  list: {
+    paddingHorizontal: 16,
+    paddingBottom: 100,
+  },
+  row: {
+    gap: 12,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  emptyIcon: {
+    fontSize: 48,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  emptyDesc: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+})
+
+FILE_PATH: .\mobile\app\(tabs)\listings.jsx
+----------------------------------------
+import { View, Text, StyleSheet } from 'react-native'
+
+export default function ListingsScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.text}>Departamentos 🏠</Text>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  text: { fontSize: 18, fontWeight: 'bold' },
+})
+
+FILE_PATH: .\mobile\components\ProfileCard.jsx
+----------------------------------------
+// mobile/components/ProfileCard.jsx
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
+import { useRouter } from 'expo-router'
+
+export default function ProfileCard({ profile, compatibility }) {
+  const router = useRouter()
+
+  const compatPct = compatibility != null
+    ? Math.round(compatibility * 100)
+    : null
+
+  const compatColor = compatPct >= 80
+    ? '#16A34A'
+    : compatPct >= 60
+    ? '#F97316'
+    : '#94A3B8'
+
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => router.push(`/profile/${profile.user_id}`)}
+      activeOpacity={0.85}
+    >
+      {/* Foto */}
+      <View style={styles.photoContainer}>
+        {profile.profile_photo_url ? (
+          <Image
+            source={{ uri: profile.profile_photo_url }}
+            style={styles.photo}
+          />
+        ) : (
+          <View style={styles.photoPlaceholder}>
+            <Text style={styles.photoInitial}>
+              {profile.name?.[0]?.toUpperCase() || '?'}
+            </Text>
+          </View>
+        )}
+
+        {/* Badge de compatibilidad */}
+        {compatPct != null && (
+          <View style={[styles.compatBadge, { backgroundColor: compatColor }]}>
+            <Text style={styles.compatText}>{compatPct}%</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Info */}
+      <View style={styles.info}>
+        <Text style={styles.name} numberOfLines={1}>
+          {profile.name || 'Sin nombre'}
+        </Text>
+
+        {profile.profession && (
+          <Text style={styles.profession} numberOfLines={1}>
+            {profile.profession}
+          </Text>
+        )}
+
+        <View style={styles.tags}>
+          {profile.age && (
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{profile.age} años</Text>
+            </View>
+          )}
+          {profile.city && (
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{profile.city}</Text>
+            </View>
+          )}
+        </View>
+
+        {profile.budget_max && (
+          <Text style={styles.budget}>
+            Hasta ₲ {(profile.budget_max / 1000000).toFixed(1)}M
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  )
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+  },
+  photoContainer: {
+    position: 'relative',
+  },
+  photo: {
+    width: '100%',
+    height: 180,
+  },
+  photoPlaceholder: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoInitial: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#94A3B8',
+  },
+  compatBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  compatText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  info: {
+    padding: 12,
+    gap: 4,
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  profession: {
+    fontSize: 13,
+    color: '#F97316',
+    fontWeight: '600',
+  },
+  tags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  tag: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  budget: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 4,
+  },
+})
+
+FILE_PATH: .\mobile\constants\theme.js
+----------------------------------------
+
+
+FILE_PATH: .\shared\context\authStore.js
+----------------------------------------
+import { create } from 'zustand'
+import api from '../services/api'
+import storage from '../utils/storage'
+import { connectSocket, disconnectSocket } from '../services/socket'
+
+function isTokenExpired(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.exp * 1000 < Date.now()
+  } catch {
+    return true
+  }
+}
+
+const useAuthStore = create((set, get) => ({
+  user: null,
+  profile: null,
+  token: null,
+  loading: false,
+  isNewUser: false,
+
+  register: async ({ name, email, password, captcha_token }) => {
+    set({ loading: true })
+    try {
+      const { data } = await api.post('/auth/register', {
+        name, email, password, captcha_token,
+      })
+      await storage.setItem('jaiko_token', data.access_token)
+      set({
+        token: data.access_token,
+        user: data.user,
+        profile: data.profile || null,
+        loading: false,
+      })
+      connectSocket()
+      return { success: true }
+    } catch (err) {
+      set({ loading: false })
+      const mensaje = err.response?.status === 429
+        ? 'Demasiados intentos. Esperá un minuto e intentá de nuevo.'
+        : err.response?.data?.error
+      return { success: false, error: mensaje }
+    }
+  },
+
+  login: async ({ email, password }) => {
+    set({ loading: true })
+    try {
+      const { data } = await api.post('/auth/login', { email, password })
+      await storage.setItem('jaiko_token', data.access_token)
+      set({
+        token: data.access_token,
+        user: data.user,
+        profile: data.profile || null,
+        loading: false,
+      })
+      connectSocket()
+      return { success: true, role: data.user?.role }
+    } catch (err) {
+      set({ loading: false })
+      const mensaje = err.response?.status === 429
+        ? 'Demasiados intentos. Esperá un minuto e intentá de nuevo.'
+        : err.response?.data?.error
+      return { success: false, error: mensaje }
+    }
+  },
+
+  loginWithGoogle: async (idToken) => {
+    set({ loading: true })
+    try {
+      const { data } = await api.post('/auth/google', { id_token: idToken })
+      await storage.setItem('jaiko_token', data.access_token)
+      set({
+        token: data.access_token,
+        user: data.user,
+        profile: data.profile,
+        isNewUser: data.is_new_user,
+        loading: false,
+      })
+      connectSocket()
+      return { success: true, isNewUser: data.is_new_user, role: data.user?.role }
+    } catch (err) {
+      set({ loading: false })
+      return { success: false, error: err.response?.data?.error }
+    }
+  },
+
+  fetchMe: async () => {
+    const token = await storage.getItem('jaiko_token')
+
+    if (!token || isTokenExpired(token)) {
+      await storage.removeItem('jaiko_token')
+      set({ token: null, user: null, profile: null, loading: false })
+      return
+    }
+
+    set({ loading: true })
+    try {
+      const { data } = await api.get('/auth/me')
+      set({
+        token,
+        user: data.user,
+        profile: data.profile,
+        loading: false,
+      })
+      connectSocket()
+    } catch {
+      await storage.removeItem('jaiko_token')
+      set({ loading: false })
+    }
+  },
+
+  logout: async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // silencioso
+    } finally {
+      await storage.removeItem('jaiko_token')
+      disconnectSocket()
+      set({ user: null, profile: null, token: null })
+    }
+  },
+
+  updateProfile: (profile) => set({ profile }),
+
+  isAuthenticated: () => {
+    const token = get().token
+    if (!token) return false
+    if (isTokenExpired(token)) {
+      storage.removeItem('jaiko_token')
+      set({ token: null, user: null, profile: null })
+      return false
+    }
+    return true
+  },
+
+  isAdmin: () => get().user?.role === 'admin',
+  isVerifier: () => ['admin', 'verifier'].includes(get().user?.role),
+}))
+
+export default useAuthStore
+
+FILE_PATH: .\shared\context\notifStore.js
+----------------------------------------
+import { create } from 'zustand'
+import api from '../services/api'
+
+const useNotifStore = create((set, get) => ({
+  notifications: [],
+  unread: 0,
+
+  fetch: async () => {
+    try {
+      const { data } = await api.get('/notifications/')
+      set({ notifications: data.notifications, unread: data.unread })
+    } catch { /* noop */ }
+  },
+
+  markRead: async (id) => {
+    await api.put(`/notifications/${id}/read`)
+    set((s) => ({
+      notifications: s.notifications.map((n) => n.id === id ? { ...n, read: true } : n),
+      unread: Math.max(0, s.unread - 1),
+    }))
+  },
+
+  markAllRead: async () => {
+    await api.put('/notifications/read-all')
+    set((s) => ({
+      notifications: s.notifications.map((n) => ({ ...n, read: true })),
+      unread: 0,
+    }))
+  },
+
+  addRealtime: (notif) => {
+    set((s) => ({
+      notifications: [notif, ...s.notifications],
+      unread: s.unread + 1,
+    }))
+  },
+}))
+
+export default useNotifStore
+
+
+FILE_PATH: .\shared\services\api.js
+----------------------------------------
+import axios from 'axios'
+import storage from '../utils/storage'
+
+let onUnauthorized = () => {}
+export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn }
+
+const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL
+  ? `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`
+  : 'http://192.168.0.17:5000/api'
+
+const api = axios.create({
+  baseURL: BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+})
+
+api.interceptors.request.use(async (config) => {
+  try {
+    const token = await storage.getItem('jaiko_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  } catch (e) {
+    // silencioso
+  }
+  return config
+})
+
+api.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    if (err.response?.status === 401) {
+      await storage.removeItem('jaiko_token')
+      onUnauthorized()
+    }
+    return Promise.reject(err)
+  }
+)
+
+export async function getRoomies(city = 'Asunción') {
+  const token = await storage.getItem('jaiko_token')
+  if (!token) return []
+
+  try {
+    const response = await api.get('/profiles/search', {
+      params: { city, per_page: 100, page: 1 },
+    })
+
+    return (response.data.profiles || [])
+      .filter((r) => r.lat != null && r.lng != null && isFinite(r.lat) && isFinite(r.lng))
+      .map((r) => ({
+        id: r.user_id,
+        lat: r.lat,
+        lng: r.lng,
+        profile: r,
+        compatibility: r.compatibility ?? null,
+        matches: r.matches || [],
+        mismatches: r.mismatches || [],
+      }))
+  } catch (error) {
+    return []
+  }
+}
+
+export async function updateProfile(data) {
+  try {
+    const response = await api.put('/profiles/me', data)
+    return response.data
+  } catch (err) {
+    throw err
+  }
+}
+
+export default api
+
+FILE_PATH: .\shared\services\socket.js
+----------------------------------------
+// shared/services/socket.js
+import { io } from 'socket.io-client'
+import storage from '../utils/storage'
+
+let socket = null
+const connectListeners = new Set()
+
+export const connectSocket = async () => {
+  const token = await storage.getItem('jaiko_token')  // ← usa storage
+  if (!token || socket) return
+
+  const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL
+    || process.env.VITE_BACKEND_URL
+    || 'http://localhost:5000'
+
+  socket = io(backendUrl, {
+    query: { token },
+    transports: ['websocket'],
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+  })
+
+  socket.on('connect', () => {
+    console.log('🟢 Socket connected')
+    connectListeners.forEach(fn => fn(socket))
+  })
+
+  socket.on('reconnect', () => {
+    console.log('🔄 Socket reconnected')
+    connectListeners.forEach(fn => fn(socket))
+  })
+
+  socket.on('disconnect', (reason) => console.log('🔴 Socket disconnected:', reason))
+  socket.on('connect_error', (e) => console.error('Socket error:', e.message))
+
+  return socket
+}
+
+export const getSocket = () => socket
+
+export const onSocketConnect = (fn) => {
+  connectListeners.add(fn)
+  if (socket?.connected) fn(socket)
+  return () => connectListeners.delete(fn)
+}
+
+export const disconnectSocket = () => {
+  socket?.disconnect()
+  socket = null
+}
+
+FILE_PATH: .\shared\utils\storage.js
+----------------------------------------
+import { Platform } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+
+const isWeb = Platform.OS === 'web'
+
+const storage = {
+  getItem: async (key) => {
+    if (isWeb) return localStorage.getItem(key)
+    return AsyncStorage.getItem(key)
+  },
+  setItem: async (key, value) => {
+    if (isWeb) {
+      localStorage.setItem(key, value)
+      return
+    }
+    return AsyncStorage.setItem(key, value)
+  },
+  removeItem: async (key) => {
+    if (isWeb) {
+      localStorage.removeItem(key)
+      return
+    }
+    return AsyncStorage.removeItem(key)
+  },
+}
+
+export default storage

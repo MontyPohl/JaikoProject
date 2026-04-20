@@ -26,26 +26,22 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [loading,  setLoading]  = useState(false)
 
-const handleLogin = async () => {
-  if (!email || !password) {
-    Alert.alert('Error', 'Completá todos los campos')
-    return
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Completá todos los campos')
+      return
+    }
+
+    setLoading(true)
+    const result = await login({ email, password })
+    setLoading(false)
+
+    if (result.success) {
+      router.replace('/(tabs)')
+    } else {
+      Alert.alert('Error', result.error || 'Credenciales incorrectas')
+    }
   }
-
-  setLoading(true)
-  const result = await login({ email, password })
-  setLoading(false)
-
-  // ← agregá estos logs
-  console.log('resultado login:', JSON.stringify(result))
-
-  if (result.success) {
-    console.log('login exitoso, redirigiendo...')
-    router.replace('/(tabs)')
-  } else {
-    Alert.alert('Error', result.error || 'Credenciales incorrectas')
-  }
-}
 
   return (
     <KeyboardAvoidingView
@@ -54,117 +50,167 @@ const handleLogin = async () => {
     >
       <View style={styles.inner}>
 
-        {/* Título */}
-        <Text style={styles.title}>JAIKO</Text>
-        <Text style={styles.subtitle}>Encontrá tu roomie ideal</Text>
+        {/* Logo / Título */}
+        <View style={styles.header}>
+          <Text style={styles.logo}>JAIKO!</Text>
+          <Text style={styles.subtitle}>Encontrá tu roomie ideal</Text>
+        </View>
 
         {/* Formulario */}
         <View style={styles.form}>
+
+          <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder="tu@email.com"
             placeholderTextColor="#94A3B8"
-            keyboardType="email-address"
-            autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Contraseña"
-            placeholderTextColor="#94A3B8"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            returnKeyType="next"
           />
 
+          <Text style={styles.label}>Contraseña</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Tu contraseña"
+            placeholderTextColor="#94A3B8"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+            // onSubmitEditing: al tocar "listo" en el teclado, envía el form
+          />
+
+          {/* Botón principal */}
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}
+            activeOpacity={0.85}
           >
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.buttonText}>Ingresar</Text>
+              : <Text style={styles.buttonText}>INICIAR SESIÓN</Text>
             }
           </TouchableOpacity>
+
+          {/* ── Link a Registro ── */}
+          {/* router.replace en vez de push: reemplaza la pantalla actual en el
+              historial. Si el usuario va a Registro y toca "atrás", no vuelve
+              a Login sino que sale de la app — evita loops de navegación. */}
+          <TouchableOpacity
+            style={styles.registerLink}
+            onPress={() => router.replace('/register')}
+          >
+            <Text style={styles.registerLinkText}>
+              ¿No tenés cuenta?{' '}
+              <Text style={styles.registerLinkBold}>Registrate</Text>
+            </Text>
+          </TouchableOpacity>
+
         </View>
-
-        {/* Link a registro */}
-        <TouchableOpacity onPress={() => router.push('/register')}>
-          <Text style={styles.link}>
-            ¿No tenés cuenta?{' '}
-            <Text style={styles.linkBold}>Registrate</Text>
-          </Text>
-        </TouchableOpacity>
-
       </View>
     </KeyboardAvoidingView>
   )
 }
 
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8FAFC',
   },
   inner: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
-    gap: 16,
+    paddingVertical: 40,
   },
-  title: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: '#F97316',  // naranja JAIKO
-    letterSpacing: 2,
+
+  // Header
+  header: {
+    alignItems: 'center',
+    marginBottom: 36,
+  },
+  logo: {
+    fontSize: 40,
+    fontWeight: '900',
+    color: '#F97316',
+    letterSpacing: -1,
   },
   subtitle: {
     fontSize: 16,
     color: '#64748B',
-    marginBottom: 16,
+    marginTop: 6,
   },
+
+  // Formulario
   form: {
-    width: '100%',
-    gap: 12,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 6,
+    marginTop: 14,
   },
   input: {
-    width: '100%',
-    height: 52,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
     borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
     color: '#1E293B',
     backgroundColor: '#F8FAFC',
   },
+
+  // Botón
   button: {
-    width: '100%',
-    height: 52,
     backgroundColor: '#F97316',
-    borderRadius: 12,
+    borderRadius: 14,
+    paddingVertical: 15,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
+    marginTop: 24,
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  link: {
+
+  // Link a registro
+  registerLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  registerLinkText: {
     fontSize: 14,
     color: '#64748B',
-    marginTop: 8,
   },
-  linkBold: {
+  registerLinkBold: {
     color: '#F97316',
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
 })

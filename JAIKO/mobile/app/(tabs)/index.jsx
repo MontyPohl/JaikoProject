@@ -4,7 +4,8 @@ import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, ActivityIndicator, ScrollView,
 } from 'react-native'
-import { SlidersHorizontal } from 'lucide-react-native'
+// ← LogOut agregado al import
+import { SlidersHorizontal, LogOut } from 'lucide-react-native'
 import api from '@shared/services/api'
 import useAuthStore from '@shared/context/authStore'
 import ProfileCard from '../../components/ProfileCard'
@@ -23,7 +24,8 @@ const INITIAL_FILTERS = {
 }
 
 export default function SearchScreen() {
-  const { token } = useAuthStore()
+  // ← logout agregado al destructuring
+  const { token, logout } = useAuthStore()
   const [profiles,    setProfiles]    = useState([])
   const [loading,     setLoading]     = useState(false)
   const [filters,     setFilters]     = useState(INITIAL_FILTERS)
@@ -57,6 +59,13 @@ export default function SearchScreen() {
     }
   }, [filters, token])
 
+  // ← función logout: llama al authStore y deja que el auth guard
+  // en _layout.jsx detecte token=null y redirija a /login automáticamente.
+  // No necesitamos router.replace() acá — el guard lo hace solo.
+  const handleLogout = async () => {
+    await logout()
+  }
+
   const activeFilterCount = [
     filters.gender, filters.pets,
     filters.smoker, filters.schedule,
@@ -73,17 +82,32 @@ export default function SearchScreen() {
             {loading ? 'Buscando...' : `${profiles.length} perfiles encontrados`}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.filterBtn}
-          onPress={() => setShowFilters(f => !f)}
-        >
-          <SlidersHorizontal size={18} color="#64748B" />
-          {activeFilterCount > 0 && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+
+        {/* Botones del header: filtros + logout */}
+        <View style={styles.headerActions}>
+
+          {/* Botón filtros — igual que antes */}
+          <TouchableOpacity
+            style={styles.filterBtn}
+            onPress={() => setShowFilters(f => !f)}
+          >
+            <SlidersHorizontal size={18} color="#64748B" />
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Botón logout — temporal hasta tener pantalla de Perfil */}
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            onPress={handleLogout}
+          >
+            <LogOut size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+        </View>
       </View>
 
       {/* Selector de ciudad */}
@@ -197,6 +221,10 @@ export default function SearchScreen() {
   )
 }
 
+// ─── Componente FilterRow ─────────────────────────────────────────────────────
+// Separado en su propia función porque se repite 4 veces.
+// Clean Code: si copiás y pegás código más de 2 veces, extraelo en una función.
+
 function FilterRow({ label, options, value, onChange }) {
   return (
     <View style={styles.filterRow}>
@@ -226,6 +254,7 @@ function FilterRow({ label, options, value, onChange }) {
   )
 }
 
+// ─── Estilos ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -250,6 +279,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
+
+  // ← nuevo: agrupa los dos botones del header en fila
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
   filterBtn: {
     padding: 10,
     backgroundColor: '#fff',
@@ -273,6 +310,16 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: 'bold',
   },
+
+  // ← nuevo: mismo estilo que filterBtn pero sin borde activo
+  logoutBtn: {
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+
   cityScroll: {
     paddingHorizontal: 16,
     marginBottom: 8,
