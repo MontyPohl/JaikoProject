@@ -42,16 +42,18 @@ export default function ProfilePage() {
   const isMe     = !userId || parseInt(userId) === me?.id;
 
   // ── Estado del perfil ──────────────────────────────────────────────────────
-  const [profile,       setProfile]       = useState(null);
-  const [reviews,       setReviews]       = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [reportModal,   setReportModal]   = useState(false);
-  const [reportReason,  setReportReason]  = useState('fake_profile');
-  const [reportDesc,    setReportDesc]    = useState('');
-  const [pendingRequest,setPendingRequest]= useState(null);
-  const [verification,  setVerification]  = useState(null);
-  const [roommate,      setRoommate]      = useState(null);
-  const [requestSent,   setRequestSent]   = useState(false);
+  const [profile,          setProfile]          = useState(null);
+  const [reviews,          setReviews]          = useState([]);
+  const [loading,          setLoading]          = useState(true);
+  const [reportModal,      setReportModal]      = useState(false);
+  const [reportReason,     setReportReason]     = useState('fake_profile');
+  const [reportDesc,       setReportDesc]       = useState('');
+  const [pendingRequest,   setPendingRequest]   = useState(null);
+  const [verification,     setVerification]     = useState(null);
+  const [roommate,         setRoommate]         = useState(null);
+  const [requestSent,      setRequestSent]      = useState(false);
+  // Historial: true si alguna vez fueron roomies (persiste aunque dejen de serlo)
+  const [wasRoomieHistory, setWasRoomieHistory] = useState(false);
 
   // ── Estado del formulario de reseña ───────────────────────────────────────
   const [showReviewForm,    setShowReviewForm]    = useState(false);
@@ -71,12 +73,23 @@ export default function ProfilePage() {
         .then(({ data }) => {
           setProfile(data.profile);
           setRoommate(data.profile?.current_roomie ?? null);
+
+          // ── pendingRequest viene del backend, no de location.state ─────────
+          // El backend verifica si existe una solicitud PENDIENTE real de ese
+          // usuario al actual. Así evitamos mostrar el banner de solicitudes
+          // viejas que ya fueron aceptadas o rechazadas.
+          if (data.pending_request_id) {
+            setPendingRequest({ id: data.pending_request_id });
+          }
+
+          // ── Historial de roomies ──────────────────────────────────────────
+          // El backend consulta si alguna vez hubo una solicitud aceptada entre
+          // los dos. Esto es true aunque ya no sean roomies actualmente.
+          setWasRoomieHistory(data.was_roomie ?? false);
+
           setLoading(false);
         })
         .catch(() => { toast.error('Perfil no encontrado'); navigate('/'); });
-
-      const pendingIdFromState = location.state?.pendingRequestId;
-      if (pendingIdFromState) setPendingRequest({ id: pendingIdFromState });
     } else {
       setProfile(myProfile);
       setRoommate(myProfile?.current_roomie ?? null);
@@ -93,9 +106,15 @@ export default function ProfilePage() {
     }
   }, [targetId, isMe]);
 
-  const wasRoomie = !isMe && Boolean(
-    myProfile?.current_roomie_id === targetId ||
-    profile?.current_roomie_id === me?.id,
+  // wasRoomie: true si alguna vez fueron roomies (para habilitar reseñas)
+  // Combina el historial del backend con el estado actual — así funciona
+  // tanto cuando son roomies activos como después de que dejan de serlo.
+  const wasRoomie = !isMe && (
+    wasRoomieHistory ||
+    Boolean(
+      myProfile?.current_roomie?.id === targetId ||
+      profile?.current_roomie?.id   === me?.id
+    )
   );
 
   // ── isRoomie: indica si el usuario visitado es mi roomie ACTUAL ────────────

@@ -28,6 +28,20 @@ const useNotifStore = create((set, get) => ({
     }))
   },
 
+  // Elimina una notificación del servidor y del estado local
+  remove: async (id) => {
+    try {
+      await api.delete(`/notifications/${id}`)
+      set((s) => {
+        const notif = s.notifications.find((n) => n.id === id)
+        return {
+          notifications: s.notifications.filter((n) => n.id !== id),
+          unread: notif && !notif.read ? Math.max(0, s.unread - 1) : s.unread,
+        }
+      })
+    } catch { /* noop */ }
+  },
+
   addRealtime: (notif) => {
     set((s) => ({
       notifications: [notif, ...s.notifications],

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from ..extensions import db
-from ..models import RoommateRequest, User
+from ..models import RoommateRequest, User, Chat, ChatMember, Profile
 from ..services.notification_service import send_notification
 from ..utils.jwt_helpers import get_current_user_id
 
@@ -12,7 +12,6 @@ request_bp = Blueprint("requests", __name__)
 @request_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_request():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -58,11 +57,21 @@ def create_request():
     db.session.flush()
 
     if target:
+        # ── CAMBIO: incluir el nombre del remitente en la notificación ────────
+        # Antes decía "Alguien quiere ser tu roomie" sin identificar quién.
+        # Ahora buscamos el perfil del sender para mostrar su nombre real.
+        sender_user = User.query.get(user_id)
+        sender_name = (
+            sender_user.profile.name
+            if sender_user and sender_user.profile and sender_user.profile.name
+            else "Un usuario"
+        )
+
         send_notification(
             user_id=target,
             notif_type="match_request",
-            title="Nueva solicitud de roomie",
-            content="Alguien quiere ser tu roomie",
+            title=f"{sender_name} quiere ser tu roomie",
+            content=f"{sender_name} te envió una solicitud. Entrá a su perfil para aceptar o rechazar.",
             data={"request_id": req.id, "sender_id": user_id},
         )
 
@@ -74,7 +83,6 @@ def create_request():
 @request_bp.route("/<int:req_id>/respond", methods=["PUT"])
 @jwt_required()
 def respond_request(req_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -111,6 +119,28 @@ def respond_request(req_id):
         receiver.profile.current_roomie_id = sender.id
         sender.profile.is_looking = False
         receiver.profile.is_looking = False
+
+        # ── Crear chat privado automáticamente ───────────────────────────────
+        # Al aceptar, los roomies ya pueden chatear. Buscamos si ya existe
+        # un chat privado entre ellos para no duplicarlo.
+        existing_chat_ids = (
+            db.session.query(ChatMember.chat_id)
+            .join(Chat, Chat.id == ChatMember.chat_id)
+            .filter(Chat.type == "private", ChatMember.user_id == sender.id)
+            .subquery()
+        )
+        chat_already_exists = (
+            Chat.query.filter(Chat.id.in_(existing_chat_ids))
+            .join(ChatMember, ChatMember.chat_id == Chat.id)
+            .filter(ChatMember.user_id == receiver.id)
+            .first()
+        )
+        if not chat_already_exists:
+            new_chat = Chat(type="private")
+            db.session.add(new_chat)
+            db.session.flush()
+            db.session.add(ChatMember(chat_id=new_chat.id, user_id=sender.id))
+            db.session.add(ChatMember(chat_id=new_chat.id, user_id=receiver.id))
 
         db.session.commit()
 
@@ -156,55 +186,46 @@ def respond_request(req_id):
 
 
 # ── LISTAR SOLICITUDES RECIBIDAS PENDIENTES ───────────────────────────────────
-@request_bp.route("/pending", methods=["GET"])
+@request_bp.route("/received", methods=["GET"])
 @jwt_required()
-def get_pending_requests():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+def get_received_requests():
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    reqs = (
-        RoommateRequest.query.filter_by(target_user_id=user_id, status="pending")
-        .order_by(RoommateRequest.created_at.desc())
-        .all()
-    )
+    reqs = RoommateRequest.query.filter_by(
+        target_user_id=user_id, status="pending"
+    ).all()
     return jsonify({"requests": [r.to_dict() for r in reqs]}), 200
 
 
-# ── LISTAR SOLICITUDES ENVIADAS ───────────────────────────────────────────────
-@request_bp.route("/sent", methods=["GET"])
+# ── DEJAR DE SER ROOMIE ───────────────────────────────────────────────────────
+# Consulta Profile directamente (no por relación lazy) para evitar
+# problemas de caché de SQLAlchemy session.
+@request_bp.route("/leave-roomie", methods=["POST"])
 @jwt_required()
-def get_sent_requests():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+def leave_roomie():
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    reqs = (
-        RoommateRequest.query.filter_by(sender_user_id=user_id)
-        .order_by(RoommateRequest.created_at.desc())
-        .all()
-    )
-    return jsonify({"requests": [r.to_dict() for r in reqs]}), 200
+    my_profile = Profile.query.filter_by(user_id=user_id).first()
+    if not my_profile:
+        return jsonify({"error": "Perfil no encontrado"}), 404
 
+    roomie_id = my_profile.current_roomie_id
+    if not roomie_id:
+        return jsonify({"error": "No tenés roomie actualmente"}), 400
 
-# ── CANCELAR SOLICITUD ENVIADA ────────────────────────────────────────────────
-@request_bp.route("/<int:req_id>/cancel", methods=["DELETE"])
-@jwt_required()
-def cancel_request(req_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
-    user_id = get_current_user_id()
-    if user_id is None:
-        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+    # Limpiar mi lado
+    my_profile.current_roomie_id = None
+    my_profile.is_looking = True
 
-    req = RoommateRequest.query.get_or_404(req_id)
+    # Limpiar el lado del roomie
+    roomie_profile = Profile.query.filter_by(user_id=roomie_id).first()
+    if roomie_profile:
+        roomie_profile.current_roomie_id = None
+        roomie_profile.is_looking = True
 
-    if req.sender_user_id != user_id:
-        return jsonify({"error": "No autorizado"}), 403
-    if req.status != "pending":
-        return jsonify({"error": "Solo se pueden cancelar solicitudes pendientes"}), 400
-
-    req.status = "cancelled"
     db.session.commit()
-    return jsonify({"message": "Solicitud cancelada"}), 200
+    return jsonify({"message": "Ya no son roomies"}), 200

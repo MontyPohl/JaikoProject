@@ -11,6 +11,11 @@ import Logo from '../ui/Logo';
 import BackButton from '../ui/BackButton';
 import clsx from 'clsx';
 
+// ── NUEVO: Banner de perfil incompleto ────────────────────────────────────────
+// Se muestra justo debajo del navbar si el usuario no completó
+// los campos obligatorios (nombre, edad, sexo).
+import ProfileCompletionBanner from '../ui/ProfileCompletionBanner';
+
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 const Navbar = () => {
   const { isAuthenticated, user, profile, logout } = useAuthStore();
@@ -55,31 +60,6 @@ const Navbar = () => {
 
   return (
     <>
-      {/*
-       * ── Navbar ──────────────────────────────────────────────────────────
-       *
-       * LÓGICA DE FONDO (3 estados):
-       *
-       * 1. isScrolled (cualquier dispositivo):
-       *    → bg-white/90 con blur — igual en mobile y desktop.
-       *
-       * 2. !isScrolled + mobile (< md):
-       *    → bg-white sólido SIEMPRE.
-       *    Por qué: en mobile el navbar siempre está sobre contenido
-       *    desplazable (no sobre un hero de pantalla completa). Sin fondo
-       *    sólido, el ícono ☰ y el logo quedan sobre imágenes/texto del
-       *    contenido y pueden ser ilegibles.
-       *
-       * 3. !isScrolled + desktop (≥ md):
-       *    → transparente. El hero de la homepage necesita este efecto.
-       *    Las páginas interiores hacen scroll y rápidamente pasan al
-       *    estado isScrolled, así que la transparencia dura poco.
-       *
-       * Implementación: mobile-first con override en md.
-       *   bg-white        → aplica en todos los tamaños base
-       *   md:bg-transparent → en desktop y sin scroll, se vuelve transparente
-       * Cuando isScrolled=true, la clase de Tailwind sobrescribe todo.
-       */}
       <nav
         className={clsx(
           'fixed top-0 left-0 w-full z-50 transition-all duration-300 px-6',
@@ -156,22 +136,7 @@ const Navbar = () => {
         </div>
       </nav>
 
-      {/*
-       * ── Menú mobile ─────────────────────────────────────────────────────
-       *
-       * Por qué está FUERA del <nav> y usa position:fixed propio:
-       * Si lo ponemos dentro del <nav>, el contenido del menú hereda el
-       * z-index del navbar y puede quedar debajo de otros elementos. Al
-       * sacarlo al mismo nivel del DOM pero con z-index propio (z-40, menor
-       * que el navbar z-50), el navbar siempre queda encima del panel.
-       *
-       * overflow-y-auto: si el usuario tiene muchos links y la pantalla es
-       * pequeña, el menú hace scroll interno en vez de cortarse.
-       *
-       * top-[65px]: altura exacta del navbar (py-4 = 16px × 2 + logo 33px ≈ 65px).
-       * Si el navbar cambia de tamaño con isScrolled, el panel se queda donde
-       * está (el usuario solo lo abre cuando no hay scroll, con py-4 activo).
-       */}
+      {/* Menú mobile */}
       <div
         aria-hidden={!isOpen}
         className={clsx(
@@ -181,7 +146,6 @@ const Navbar = () => {
           isOpen ? 'translate-x-0' : 'translate-x-full',
         )}
       >
-        {/* Padding inferior extra para que el último ítem no quede bajo el BottomNav */}
         <div className="flex flex-col gap-5 p-8 pb-32">
           {navLinks.map(link => (
             <Link
@@ -303,20 +267,18 @@ const Layout = () => {
   const showBackButton = location.pathname !== '/';
 
   return (
-    /*
-     * overflow-x-hidden: evita scroll horizontal por animaciones de slide-in.
-     * NO usamos overflow-hidden a secas porque eso bloquearía el scroll vertical
-     * de toda la página.
-     */
     <div className="min-h-screen flex flex-col bg-brand-cream overflow-x-hidden">
       <Navbar />
 
       <main className="flex-1 pt-[65px] pb-20 md:pb-0">
         {/*
-         * pt-[65px]: deja espacio exacto para la altura del navbar en mobile.
-         * pb-20: deja espacio para el BottomNav (altura ≈ 72px + safe area).
-         * md:pb-0: en desktop no hay BottomNav.
+         * ── NUEVO: Banner de perfil incompleto ───────────────────────────
+         * Aparece justo debajo del espacio del navbar, antes del contenido.
+         * El componente se oculta solo cuando el perfil está completo,
+         * en páginas de auth/edición, o si el usuario lo cierra manualmente.
          */}
+        <ProfileCompletionBanner />
+
         {showBackButton && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
             <BackButton />
@@ -347,17 +309,6 @@ const Layout = () => {
               <li><Link to="/verification" className="hover:text-white transition-colors">Verificación</Link></li>
             </ul>
           </div>
-          <div>
-            <h4 className="font-bold mb-6 text-lg">Legal</h4>
-            <ul className="space-y-4 text-blue-200/60 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">Términos y Condiciones</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Privacidad</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Cookies</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto border-t border-white/10 mt-20 pt-8 text-center text-blue-200/30 text-xs font-bold uppercase tracking-widest">
-          © {new Date().getFullYear()} JAIKO! — Todos los derechos reservados.
         </div>
       </footer>
     </div>

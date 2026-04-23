@@ -7,7 +7,6 @@ ESTRUCTURA DEL PROYECTO:
         │   ├── __init__.py
         │   ├── config.py
         │   ├── extensions.py
-        │   ├── jaiko_dev.db
         │   ├── models
         │   │   ├── __init__.py
         │   │   ├── chat.py
@@ -28,6 +27,7 @@ ESTRUCTURA DEL PROYECTO:
         │   │   ├── report_routes.py
         │   │   ├── request_routes.py
         │   │   ├── review_routes.py
+        │   │   ├── services
         │   │   ├── upload_routes.py
         │   │   └── verification_routes.py
         │   ├── services
@@ -63,11 +63,11 @@ ESTRUCTURA DEL PROYECTO:
         │   │       ├── ListingCard.jsx
         │   │       ├── Logo.jsx
         │   │       ├── ProfileCard.jsx
+        │   │       ├── ProfileCompletionBanner.jsx
         │   │       └── index.jsx
         │   ├── context
         │   │   ├── authStore.js
         │   │   └── notifStore.js
-        │   ├── hooks
         │   ├── index.css
         │   ├── main.jsx
         │   ├── pages
@@ -90,11 +90,10 @@ ESTRUCTURA DEL PROYECTO:
         │   │   ├── RegisterPage.jsx
         │   │   ├── SearchPage.jsx
         │   │   └── VerificationPage.jsx
-        │   ├── services
-        │   │   ├── api.js
-        │   │   ├── socket.js
-        │   │   └── storage.js
-        │   └── utils
+        │   └── services
+        │       ├── api.js
+        │       ├── socket.js
+        │       └── storage.js
         └── vite.config.js
     mobile/
         ├── README.md
@@ -110,11 +109,9 @@ ESTRUCTURA DEL PROYECTO:
         │   └── register.jsx
         ├── app.json
         ├── components
-        │   ├── ProfileCard.jsx
-        │   └── ui
+        │   └── ProfileCard.jsx
         ├── constants
         │   └── theme.js
-        ├── hooks
         └── package.json
     shared/
         ├── context
@@ -678,64 +675,82 @@ from ..extensions import db
 class Listing(db.Model):
     __tablename__ = "listings"
 
-    id = db.Column(db.Integer, primary_key=True)
-    owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    title = db.Column(db.String(200), nullable=False)
+    id          = db.Column(db.Integer, primary_key=True)
+    owner_id    = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    title       = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    city = db.Column(db.String(100), nullable=False, default="Asunción")
+    city        = db.Column(db.String(100), nullable=False, default="Asunción")
     neighborhood = db.Column(db.String(100), nullable=True)
-    address = db.Column(db.String(300), nullable=True)
-    latitude = db.Column(db.Float, nullable=True)
-    longitude = db.Column(db.Float, nullable=True)
-    total_price = db.Column(db.Integer, nullable=False)   # in PYG (Guaraníes)
-    rooms = db.Column(db.Integer, nullable=False, default=1)
-    bathrooms = db.Column(db.Integer, nullable=True, default=1)
-    max_people = db.Column(db.Integer, nullable=False, default=2)
-    pets_allowed = db.Column(db.Boolean, default=False)
-    smoking_allowed = db.Column(db.Boolean, default=False)
-    furnished = db.Column(db.Boolean, default=False)
-    type = db.Column(db.String(30), default="apartment")  # apartment | room | house
-    status = db.Column(db.String(20), default="active")   # active | rented | paused | deleted
+    address     = db.Column(db.String(300), nullable=True)
+    latitude    = db.Column(db.Float, nullable=True)
+    longitude   = db.Column(db.Float, nullable=True)
+    total_price = db.Column(db.Integer, nullable=False)   # en Guaraníes (PYG)
+    rooms       = db.Column(db.Integer, nullable=False, default=1)
+    bathrooms   = db.Column(db.Integer, nullable=True, default=1)
+    max_people  = db.Column(db.Integer, nullable=False, default=2)
+    pets_allowed     = db.Column(db.Boolean, default=False)
+    smoking_allowed  = db.Column(db.Boolean, default=False)
+    furnished        = db.Column(db.Boolean, default=False)
+    type    = db.Column(db.String(30), default="apartment")  # apartment | room | house
+    status  = db.Column(db.String(20), default="active")     # active | rented | paused | deleted
+
+    # ── NUEVAS COLUMNAS: preferencias del roomie ─────────────────────────────
+    #
+    # preferred_gender: el género que el dueño prefiere para su roomie.
+    #   Valores válidos: 'any' | 'male' | 'female' | 'non_binary'
+    #   Default 'any' → sin preferencia de género.
+    #
+    # min_age_required: edad mínima que el dueño pide para el roomie.
+    #   Default 18 → la mayoría de edad legal mínima para un contrato.
+    #
+    # nullable=True en ambas para compatibilidad con registros anteriores
+    # que ya existen en la BD sin estos campos.
+    preferred_gender  = db.Column(db.String(30), nullable=True, default="any")
+    min_age_required  = db.Column(db.Integer,    nullable=True, default=18)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    owner = db.relationship("User", back_populates="listings")
-    photos = db.relationship("ListingPhoto", back_populates="listing", cascade="all, delete-orphan")
+    owner   = db.relationship("User", back_populates="listings")
+    photos  = db.relationship("ListingPhoto", back_populates="listing", cascade="all, delete-orphan")
     reviews = db.relationship("Review", back_populates="listing")
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id,
-            "owner_id": self.owner_id,
-            "title": self.title,
-            "description": self.description,
-            "city": self.city,
-            "neighborhood": self.neighborhood,
-            "address": self.address,
-            "latitude": self.latitude,
-            "longitude": self.longitude,
-            "total_price": self.total_price,
-            "rooms": self.rooms,
-            "bathrooms": self.bathrooms,
-            "max_people": self.max_people,
-            "pets_allowed": self.pets_allowed,
+            "id":              self.id,
+            "owner_id":        self.owner_id,
+            "title":           self.title,
+            "description":     self.description,
+            "city":            self.city,
+            "neighborhood":    self.neighborhood,
+            "address":         self.address,
+            "latitude":        self.latitude,
+            "longitude":       self.longitude,
+            "total_price":     self.total_price,
+            "rooms":           self.rooms,
+            "bathrooms":       self.bathrooms,
+            "max_people":      self.max_people,
+            "pets_allowed":    self.pets_allowed,
             "smoking_allowed": self.smoking_allowed,
-            "furnished": self.furnished,
-            "type": self.type,
-            "status": self.status,
-            "photos": [p.to_dict() for p in self.photos],
-            "created_at": self.created_at.isoformat(),
+            "furnished":       self.furnished,
+            "type":            self.type,
+            "status":          self.status,
+            # Nuevos campos incluidos en la respuesta al frontend
+            "preferred_gender":  self.preferred_gender or "any",
+            "min_age_required":  self.min_age_required if self.min_age_required is not None else 18,
+            "photos":          [p.to_dict() for p in self.photos],
+            "created_at":      self.created_at.isoformat(),
         }
 
 
 class ListingPhoto(db.Model):
     __tablename__ = "listing_photos"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id         = db.Column(db.Integer, primary_key=True)
     listing_id = db.Column(db.Integer, db.ForeignKey("listings.id"), nullable=False)
-    photo_url = db.Column(db.String(500), nullable=False)
-    order = db.Column(db.Integer, default=0)
+    photo_url  = db.Column(db.String(500), nullable=False)
+    order      = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     listing = db.relationship("Listing", back_populates="photos")
@@ -1577,7 +1592,7 @@ from flask_jwt_extended import jwt_required
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from ..extensions import db
-from ..models import Chat, ChatMember, Message, User
+from ..models import Chat, ChatMember, Message, User, GroupMember
 from ..utils.jwt_helpers import get_current_user_id
 
 chat_bp = Blueprint("chats", __name__)
@@ -1586,15 +1601,10 @@ chat_bp = Blueprint("chats", __name__)
 @chat_bp.route("/", methods=["GET"])
 @jwt_required()
 def get_my_chats():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
-    # En este endpoint solo necesitamos el id numérico para filtrar ChatMember,
-    # no el objeto User completo, así que usamos get_current_user_id().
-    # Si devuelve None, retornamos 401 para que el frontend limpie el token.
     user_id = get_current_user_id()
     if user_id is None:
         return ({"error": "Token inválido. Iniciá sesión nuevamente."}, 401)
 
-    # 1 query: obtener los IDs de chats donde el usuario es miembro
     chat_ids = [
         row.chat_id
         for row in db.session.query(ChatMember.chat_id).filter_by(user_id=user_id).all()
@@ -1602,15 +1612,12 @@ def get_my_chats():
     if not chat_ids:
         return ({"chats": []}), 200
 
-    # 1 query: cargar chats + miembros + perfiles de usuario de forma eager
-    # (evita el problema N+1: sin joinedload haría 1 query por cada miembro)
     chats = (
         Chat.query.filter(Chat.id.in_(chat_ids))
         .options(joinedload(Chat.members).joinedload(ChatMember.user))
         .all()
     )
 
-    # 1 query: obtener el último mensaje por chat usando subquery MAX(id)
     last_msg_subq = (
         db.session.query(func.max(Message.id))
         .filter(Message.chat_id.in_(chat_ids))
@@ -1639,8 +1646,14 @@ def get_my_chats():
             }
         )
 
+    # Ordenar: chats con mensajes primero por fecha del último mensaje.
+    # Chats vacíos (roomie recién vinculado) ordenan por fecha de creación.
     result.sort(
-        key=lambda c: c["last_message"]["created_at"] if c.get("last_message") else "",
+        key=lambda c: (
+            c["last_message"]["created_at"]
+            if c.get("last_message")
+            else c["created_at"]
+        ),
         reverse=True,
     )
     return ({"chats": result}), 200
@@ -1649,8 +1662,7 @@ def get_my_chats():
 @chat_bp.route("/private/<int:other_user_id>", methods=["POST"])
 @jwt_required()
 def get_or_create_private_chat(other_user_id):
-    """Obtiene o crea un chat privado 1 a 1."""
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+    """Obtiene o crea un chat privado entre roomies."""
     user_id = get_current_user_id()
     if user_id is None:
         return ({"error": "Token inválido. Iniciá sesión nuevamente."}, 401)
@@ -1658,18 +1670,49 @@ def get_or_create_private_chat(other_user_id):
     if user_id == other_user_id:
         return ({"error": "No podés chatear con vos mismo"}), 400
 
-    # Verificar que el otro usuario existe antes de crear el chat
-    User.query.get_or_404(other_user_id)
+    current_user = User.query.get(user_id)
+    other_user   = User.query.get_or_404(other_user_id)
 
-    # Buscar si ya existe un chat privado entre estos dos usuarios:
-    # Subconsulta: IDs de chats privados donde el usuario actual es miembro
+    my_profile    = current_user.profile if current_user else None
+    other_profile = other_user.profile
+
+    # ── Verificar si son roomies (ambas direcciones) ──────────────────────────
+    # current_roomie_id es el ID del roomie actual guardado en el perfil.
+    # Chequeamos ambas direcciones por si la relación quedó registrada
+    # en un solo lado.
+    are_roomies = bool(
+        my_profile and other_profile and (
+            my_profile.current_roomie_id == other_user_id
+            or other_profile.current_roomie_id == user_id
+        )
+    )
+
+    if not are_roomies:
+        # ── Verificar si están en el mismo grupo ──────────────────────────────
+        my_group    = GroupMember.query.filter_by(user_id=user_id,       status="active").first()
+        other_group = GroupMember.query.filter_by(user_id=other_user_id, status="active").first()
+
+        if my_group and other_group and my_group.group_id == other_group.group_id:
+            group_chat = Chat.query.filter_by(
+                type="group", group_id=my_group.group_id
+            ).first()
+            return (
+                {
+                    "error": "Están en el mismo grupo. Usá el chat grupal.",
+                    "code": "SAME_GROUP",
+                    "group_chat_id": group_chat.id if group_chat else None,
+                }
+            ), 403
+
+        return ({"error": "Solo podés chatear con tu roomie actual"}), 403
+
+    # ── Buscar si ya existe un chat privado entre los dos ────────────────────
     my_chats = (
         db.session.query(Chat.id)
         .join(ChatMember, ChatMember.chat_id == Chat.id)
         .filter(Chat.type == "private", ChatMember.user_id == user_id)
         .subquery()
     )
-    # De esos chats, ver si el otro usuario también es miembro
     existing = (
         Chat.query.filter(Chat.id.in_(my_chats))
         .join(ChatMember, ChatMember.chat_id == Chat.id)
@@ -1679,10 +1722,10 @@ def get_or_create_private_chat(other_user_id):
     if existing:
         return ({"chat": existing.to_dict()}), 200
 
-    # Crear nuevo chat privado con ambos usuarios como miembros
+    # ── Crear chat si no existe (fallback por si request_routes no lo hizo) ──
     chat = Chat(type="private")
     db.session.add(chat)
-    db.session.flush()  # flush asigna chat.id sin hacer commit todavía
+    db.session.flush()
     db.session.add(ChatMember(chat_id=chat.id, user_id=user_id))
     db.session.add(ChatMember(chat_id=chat.id, user_id=other_user_id))
     db.session.commit()
@@ -1692,18 +1735,15 @@ def get_or_create_private_chat(other_user_id):
 @chat_bp.route("/<int:chat_id>/messages", methods=["GET"])
 @jwt_required()
 def get_messages(chat_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return ({"error": "Token inválido. Iniciá sesión nuevamente."}, 401)
 
-    # Verificar que el usuario es miembro del chat antes de mostrar mensajes
     member = ChatMember.query.filter_by(chat_id=chat_id, user_id=user_id).first()
     if not member:
         return ({"error": "No sos miembro de este chat"}), 403
 
-    # BUG CORREGIDO: int(request.args.get(...)) → type=int para seguridad
-    page = request.args.get("page", 1, type=int) or 1
+    page     = request.args.get("page",     1,  type=int) or 1
     per_page = request.args.get("per_page", 50, type=int) or 50
 
     messages = (
@@ -1713,7 +1753,7 @@ def get_messages(chat_id):
         .limit(per_page)
         .all()
     )
-    messages.reverse()  # Devolver en orden cronológico ascendente
+    messages.reverse()
     return ({"messages": [m.to_dict() for m in messages], "page": page}), 200
 
 
@@ -2139,30 +2179,31 @@ from ..utils.jwt_helpers import get_current_user_id
 
 listing_bp = Blueprint("listings", __name__)
 
+# Valores válidos para preferred_gender — sirve para validar el input del frontend
+VALID_GENDERS = {"any", "male", "female", "non_binary"}
 
-# ── GET /listings ────────────────────────────────────────────────────────────
+
+# ── GET /listings ─────────────────────────────────────────────────────────────
 @listing_bp.route("/", methods=["GET"])
 def get_listings():
-    city = request.args.get("city", "Asunción")
-    min_price = request.args.get("min_price", type=int)
-    max_price = request.args.get("max_price", type=int)
-    pets = request.args.get("pets_allowed")
-    smoking = request.args.get("smoking_allowed")
+    city         = request.args.get("city", "Asunción")
+    min_price    = request.args.get("min_price",    type=int)
+    max_price    = request.args.get("max_price",    type=int)
+    pets         = request.args.get("pets_allowed")
+    smoking      = request.args.get("smoking_allowed")
     listing_type = request.args.get("type")
+    page         = request.args.get("page",     1,  type=int) or 1
+    per_page     = request.args.get("per_page", 20, type=int) or 20
 
-    # BUG CORREGIDO: int(request.args.get(...)) → type=int
-    # Si page o per_page no son números, Flask devuelve el default en lugar de crashear.
-    page = request.args.get("page", 1, type=int) or 1
-    per_page = request.args.get("per_page", 20, type=int) or 20
+    # ── Nuevos parámetros de filtro ───────────────────────────────────────────
+    preferred_gender = request.args.get("preferred_gender")  # 'male'|'female'|'non_binary'|None
+    min_age          = request.args.get("min_age", type=int) # edad del usuario que busca
 
     q = Listing.query.filter(
-        Listing.city == city,
+        Listing.city   == city,
         Listing.status == "active",
     )
 
-    # Solo filtrar por type si el frontend lo pide explícitamente.
-    # Antes estaba hardcodeado a "apartment", ocultando listings de tipo
-    # "room" o "house" sin importar lo que el usuario hubiera creado.
     if listing_type:
         q = q.filter(Listing.type == listing_type)
 
@@ -2181,7 +2222,46 @@ def get_listings():
     elif smoking == "false":
         q = q.filter(Listing.smoking_allowed == False)
 
-    total = q.count()
+    # ── Filtro por género preferido ───────────────────────────────────────────
+    #
+    # Lógica: el usuario que busca tiene un género X.
+    # Solo queremos mostrarle listings donde el dueño busca ese género O
+    # donde no tiene preferencia ('any').
+    #
+    # Ejemplo: si el usuario filtra preferred_gender='female', mostramos:
+    #   - listings con preferred_gender = 'female'  (el dueño quiere mujer)
+    #   - listings con preferred_gender = 'any'     (el dueño no tiene preferencia)
+    #   - listings con preferred_gender IS NULL      (registros viejos sin dato)
+    #
+    # No mostramos listings que pidan explícitamente otro género.
+    if preferred_gender and preferred_gender in VALID_GENDERS and preferred_gender != "any":
+        q = q.filter(
+            db.or_(
+                Listing.preferred_gender == preferred_gender,
+                Listing.preferred_gender == "any",
+                Listing.preferred_gender.is_(None),  # compatibilidad con registros viejos
+            )
+        )
+
+    # ── Filtro por edad mínima requerida ──────────────────────────────────────
+    #
+    # Lógica: el usuario tiene X años de edad y quiere ver listings que lo acepten.
+    # Un listing lo acepta si su min_age_required <= edad del usuario.
+    #
+    # Ejemplo: si el usuario tiene 22 años y filtra min_age=22:
+    #   - Listing con min_age_required = 18 → ✓ (el usuario cumple el requisito)
+    #   - Listing con min_age_required = 22 → ✓ (el usuario cumple exacto)
+    #   - Listing con min_age_required = 25 → ✗ (el usuario no cumple)
+    #   - Listing con min_age_required IS NULL → ✓ (sin restricción de edad)
+    if min_age and min_age >= 18:
+        q = q.filter(
+            db.or_(
+                Listing.min_age_required <= min_age,
+                Listing.min_age_required.is_(None),  # compatibilidad con registros viejos
+            )
+        )
+
+    total    = q.count()
     listings = (
         q.order_by(Listing.created_at.desc())
         .offset((page - 1) * per_page)
@@ -2190,22 +2270,19 @@ def get_listings():
     )
 
     return (
-        jsonify(
-            {
-                "listings": [l.to_dict() for l in listings],
-                "total": total,
-                "page": page,
-                "pages": (total + per_page - 1) // per_page,
-            }
-        ),
+        jsonify({
+            "listings": [l.to_dict() for l in listings],
+            "total":    total,
+            "page":     page,
+            "pages":    (total + per_page - 1) // per_page,
+        }),
         200,
     )
 
 
-# ── GET /listings/<id> ───────────────────────────────────────────────────────
+# ── GET /listings/<id> ────────────────────────────────────────────────────────
 @listing_bp.route("/<int:listing_id>", methods=["GET"])
 def get_listing(listing_id):
-    # Este endpoint es público — no usa JWT, así que get_or_404 es correcto acá.
     listing = Listing.query.get_or_404(listing_id)
     data = listing.to_dict()
     owner_profile = listing.owner.profile
@@ -2213,53 +2290,67 @@ def get_listing(listing_id):
     return jsonify({"listing": data}), 200
 
 
-# ── POST /listings ───────────────────────────────────────────────────────────
+# ── POST /listings ────────────────────────────────────────────────────────────
 @listing_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_listing():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    data = request.get_json()
+    data     = request.get_json()
     required = ["title", "city", "total_price", "rooms", "max_people"]
     for f in required:
         if f not in data:
             return jsonify({"error": f"{f} is required"}), 400
 
+    # ── Validar preferred_gender si viene en el payload ───────────────────────
+    preferred_gender = data.get("preferred_gender", "any")
+    if preferred_gender not in VALID_GENDERS:
+        preferred_gender = "any"   # si viene un valor inválido, lo ignoramos
+
+    # ── Validar min_age_required ──────────────────────────────────────────────
+    # Mínimo 18 (mayoría de edad), máximo 80 para evitar valores absurdos.
+    # Si viene null o un número fuera de rango, usamos 18 como fallback.
+    raw_min_age = data.get("min_age_required", 18)
+    try:
+        min_age_required = int(raw_min_age)
+        if not (18 <= min_age_required <= 80):
+            min_age_required = 18
+    except (TypeError, ValueError):
+        min_age_required = 18
+
     listing = Listing(
-        owner_id=user_id,
-        title=data["title"],
-        description=data.get("description"),
-        city=data["city"],
-        neighborhood=data.get("neighborhood"),
-        address=data.get("address"),
-        latitude=data.get("latitude"),
-        longitude=data.get("longitude"),
-        total_price=data["total_price"],
-        rooms=data["rooms"],
-        bathrooms=data.get("bathrooms", 1),
-        max_people=data["max_people"],
-        pets_allowed=data.get("pets_allowed", False),
-        smoking_allowed=data.get("smoking_allowed", False),
-        furnished=data.get("furnished", False),
-        type=data.get("type", "apartment"),
-        # Seteamos status="active" explícitamente al crear.
-        # Sin esto, si el modelo no tiene default, el listing queda con
-        # status=NULL y el filtro .status=="active" lo excluye de los resultados.
-        status="active",
+        owner_id         = user_id,
+        title            = data["title"],
+        description      = data.get("description"),
+        city             = data["city"],
+        neighborhood     = data.get("neighborhood"),
+        address          = data.get("address"),
+        latitude         = data.get("latitude"),
+        longitude        = data.get("longitude"),
+        total_price      = data["total_price"],
+        rooms            = data["rooms"],
+        bathrooms        = data.get("bathrooms", 1),
+        max_people       = data["max_people"],
+        pets_allowed     = data.get("pets_allowed", False),
+        smoking_allowed  = data.get("smoking_allowed", False),
+        furnished        = data.get("furnished", False),
+        type             = data.get("type", "apartment"),
+        status           = "active",
+        # Nuevos campos
+        preferred_gender = preferred_gender,
+        min_age_required = min_age_required,
     )
     db.session.add(listing)
     db.session.commit()
     return jsonify({"listing": listing.to_dict()}), 201
 
 
-# ── PUT /listings/<id> ───────────────────────────────────────────────────────
+# ── PUT /listings/<id> ────────────────────────────────────────────────────────
 @listing_bp.route("/<int:listing_id>", methods=["PUT"])
 @jwt_required()
 def update_listing(listing_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -2269,37 +2360,40 @@ def update_listing(listing_id):
         return jsonify({"error": "Forbidden"}), 403
 
     data = request.get_json()
+
+    # Lista de campos que el dueño puede actualizar (incluimos los nuevos)
     updatable = [
-        "title",
-        "description",
-        "city",
-        "neighborhood",
-        "address",
-        "latitude",
-        "longitude",
-        "total_price",
-        "rooms",
-        "bathrooms",
-        "max_people",
-        "pets_allowed",
-        "smoking_allowed",
-        "furnished",
-        "type",
-        "status",
+        "title", "description", "city", "neighborhood", "address",
+        "latitude", "longitude", "total_price", "rooms", "bathrooms",
+        "max_people", "pets_allowed", "smoking_allowed", "furnished",
+        "type", "status",
+        # Nuevos campos editables
+        "preferred_gender", "min_age_required",
     ]
     for f in updatable:
         if f in data:
             setattr(listing, f, data[f])
 
+    # Re-validar preferred_gender por si vino un valor inválido
+    if listing.preferred_gender not in VALID_GENDERS:
+        listing.preferred_gender = "any"
+
+    # Re-validar min_age_required
+    if listing.min_age_required is not None:
+        try:
+            age = int(listing.min_age_required)
+            listing.min_age_required = age if 18 <= age <= 80 else 18
+        except (TypeError, ValueError):
+            listing.min_age_required = 18
+
     db.session.commit()
     return jsonify({"listing": listing.to_dict()}), 200
 
 
-# ── DELETE /listings/<id> ────────────────────────────────────────────────────
+# ── DELETE /listings/<id> ─────────────────────────────────────────────────────
 @listing_bp.route("/<int:listing_id>", methods=["DELETE"])
 @jwt_required()
 def delete_listing(listing_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -2308,19 +2402,16 @@ def delete_listing(listing_id):
     if listing.owner_id != user_id:
         return jsonify({"error": "Forbidden"}), 403
 
-    # Borrado lógico: marcamos como "deleted" en lugar de eliminar de la BD.
-    # Beneficio: podemos recuperar el registro si fue un error, y los chats
-    # o referencias a este listing no quedan con FK inválidas.
+    # Borrado lógico — no eliminamos el registro físicamente
     listing.status = "deleted"
     db.session.commit()
     return jsonify({"message": "Listing deleted"}), 200
 
 
-# ── GET /listings/my ─────────────────────────────────────────────────────────
+# ── GET /listings/my ──────────────────────────────────────────────────────────
 @listing_bp.route("/my", methods=["GET"])
 @jwt_required()
 def my_listings():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -2723,7 +2814,7 @@ FILE_PATH: .\backend\app\routes\request_routes.py
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from ..extensions import db
-from ..models import RoommateRequest, User
+from ..models import RoommateRequest, User, Chat, ChatMember, Profile
 from ..services.notification_service import send_notification
 from ..utils.jwt_helpers import get_current_user_id
 
@@ -2734,7 +2825,6 @@ request_bp = Blueprint("requests", __name__)
 @request_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_request():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -2780,11 +2870,21 @@ def create_request():
     db.session.flush()
 
     if target:
+        # ── CAMBIO: incluir el nombre del remitente en la notificación ────────
+        # Antes decía "Alguien quiere ser tu roomie" sin identificar quién.
+        # Ahora buscamos el perfil del sender para mostrar su nombre real.
+        sender_user = User.query.get(user_id)
+        sender_name = (
+            sender_user.profile.name
+            if sender_user and sender_user.profile and sender_user.profile.name
+            else "Un usuario"
+        )
+
         send_notification(
             user_id=target,
             notif_type="match_request",
-            title="Nueva solicitud de roomie",
-            content="Alguien quiere ser tu roomie",
+            title=f"{sender_name} quiere ser tu roomie",
+            content=f"{sender_name} te envió una solicitud. Entrá a su perfil para aceptar o rechazar.",
             data={"request_id": req.id, "sender_id": user_id},
         )
 
@@ -2796,7 +2896,6 @@ def create_request():
 @request_bp.route("/<int:req_id>/respond", methods=["PUT"])
 @jwt_required()
 def respond_request(req_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
@@ -2833,6 +2932,28 @@ def respond_request(req_id):
         receiver.profile.current_roomie_id = sender.id
         sender.profile.is_looking = False
         receiver.profile.is_looking = False
+
+        # ── Crear chat privado automáticamente ───────────────────────────────
+        # Al aceptar, los roomies ya pueden chatear. Buscamos si ya existe
+        # un chat privado entre ellos para no duplicarlo.
+        existing_chat_ids = (
+            db.session.query(ChatMember.chat_id)
+            .join(Chat, Chat.id == ChatMember.chat_id)
+            .filter(Chat.type == "private", ChatMember.user_id == sender.id)
+            .subquery()
+        )
+        chat_already_exists = (
+            Chat.query.filter(Chat.id.in_(existing_chat_ids))
+            .join(ChatMember, ChatMember.chat_id == Chat.id)
+            .filter(ChatMember.user_id == receiver.id)
+            .first()
+        )
+        if not chat_already_exists:
+            new_chat = Chat(type="private")
+            db.session.add(new_chat)
+            db.session.flush()
+            db.session.add(ChatMember(chat_id=new_chat.id, user_id=sender.id))
+            db.session.add(ChatMember(chat_id=new_chat.id, user_id=receiver.id))
 
         db.session.commit()
 
@@ -2878,58 +2999,49 @@ def respond_request(req_id):
 
 
 # ── LISTAR SOLICITUDES RECIBIDAS PENDIENTES ───────────────────────────────────
-@request_bp.route("/pending", methods=["GET"])
+@request_bp.route("/received", methods=["GET"])
 @jwt_required()
-def get_pending_requests():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+def get_received_requests():
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    reqs = (
-        RoommateRequest.query.filter_by(target_user_id=user_id, status="pending")
-        .order_by(RoommateRequest.created_at.desc())
-        .all()
-    )
+    reqs = RoommateRequest.query.filter_by(
+        target_user_id=user_id, status="pending"
+    ).all()
     return jsonify({"requests": [r.to_dict() for r in reqs]}), 200
 
 
-# ── LISTAR SOLICITUDES ENVIADAS ───────────────────────────────────────────────
-@request_bp.route("/sent", methods=["GET"])
+# ── DEJAR DE SER ROOMIE ───────────────────────────────────────────────────────
+# Consulta Profile directamente (no por relación lazy) para evitar
+# problemas de caché de SQLAlchemy session.
+@request_bp.route("/leave-roomie", methods=["POST"])
 @jwt_required()
-def get_sent_requests():
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
+def leave_roomie():
     user_id = get_current_user_id()
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    reqs = (
-        RoommateRequest.query.filter_by(sender_user_id=user_id)
-        .order_by(RoommateRequest.created_at.desc())
-        .all()
-    )
-    return jsonify({"requests": [r.to_dict() for r in reqs]}), 200
+    my_profile = Profile.query.filter_by(user_id=user_id).first()
+    if not my_profile:
+        return jsonify({"error": "Perfil no encontrado"}), 404
 
+    roomie_id = my_profile.current_roomie_id
+    if not roomie_id:
+        return jsonify({"error": "No tenés roomie actualmente"}), 400
 
-# ── CANCELAR SOLICITUD ENVIADA ────────────────────────────────────────────────
-@request_bp.route("/<int:req_id>/cancel", methods=["DELETE"])
-@jwt_required()
-def cancel_request(req_id):
-    # BUG CORREGIDO: int(get_jwt_identity()) → get_current_user_id()
-    user_id = get_current_user_id()
-    if user_id is None:
-        return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
+    # Limpiar mi lado
+    my_profile.current_roomie_id = None
+    my_profile.is_looking = True
 
-    req = RoommateRequest.query.get_or_404(req_id)
+    # Limpiar el lado del roomie
+    roomie_profile = Profile.query.filter_by(user_id=roomie_id).first()
+    if roomie_profile:
+        roomie_profile.current_roomie_id = None
+        roomie_profile.is_looking = True
 
-    if req.sender_user_id != user_id:
-        return jsonify({"error": "No autorizado"}), 403
-    if req.status != "pending":
-        return jsonify({"error": "Solo se pueden cancelar solicitudes pendientes"}), 400
-
-    req.status = "cancelled"
     db.session.commit()
-    return jsonify({"message": "Solicitud cancelada"}), 200
+    return jsonify({"message": "Ya no son roomies"}), 200
 
 
 FILE_PATH: .\backend\app\routes\review_routes.py
@@ -4262,6 +4374,11 @@ import Logo from '../ui/Logo';
 import BackButton from '../ui/BackButton';
 import clsx from 'clsx';
 
+// ── NUEVO: Banner de perfil incompleto ────────────────────────────────────────
+// Se muestra justo debajo del navbar si el usuario no completó
+// los campos obligatorios (nombre, edad, sexo).
+import ProfileCompletionBanner from '../ui/ProfileCompletionBanner';
+
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 const Navbar = () => {
   const { isAuthenticated, user, profile, logout } = useAuthStore();
@@ -4306,31 +4423,6 @@ const Navbar = () => {
 
   return (
     <>
-      {/*
-       * ── Navbar ──────────────────────────────────────────────────────────
-       *
-       * LÓGICA DE FONDO (3 estados):
-       *
-       * 1. isScrolled (cualquier dispositivo):
-       *    → bg-white/90 con blur — igual en mobile y desktop.
-       *
-       * 2. !isScrolled + mobile (< md):
-       *    → bg-white sólido SIEMPRE.
-       *    Por qué: en mobile el navbar siempre está sobre contenido
-       *    desplazable (no sobre un hero de pantalla completa). Sin fondo
-       *    sólido, el ícono ☰ y el logo quedan sobre imágenes/texto del
-       *    contenido y pueden ser ilegibles.
-       *
-       * 3. !isScrolled + desktop (≥ md):
-       *    → transparente. El hero de la homepage necesita este efecto.
-       *    Las páginas interiores hacen scroll y rápidamente pasan al
-       *    estado isScrolled, así que la transparencia dura poco.
-       *
-       * Implementación: mobile-first con override en md.
-       *   bg-white        → aplica en todos los tamaños base
-       *   md:bg-transparent → en desktop y sin scroll, se vuelve transparente
-       * Cuando isScrolled=true, la clase de Tailwind sobrescribe todo.
-       */}
       <nav
         className={clsx(
           'fixed top-0 left-0 w-full z-50 transition-all duration-300 px-6',
@@ -4407,22 +4499,7 @@ const Navbar = () => {
         </div>
       </nav>
 
-      {/*
-       * ── Menú mobile ─────────────────────────────────────────────────────
-       *
-       * Por qué está FUERA del <nav> y usa position:fixed propio:
-       * Si lo ponemos dentro del <nav>, el contenido del menú hereda el
-       * z-index del navbar y puede quedar debajo de otros elementos. Al
-       * sacarlo al mismo nivel del DOM pero con z-index propio (z-40, menor
-       * que el navbar z-50), el navbar siempre queda encima del panel.
-       *
-       * overflow-y-auto: si el usuario tiene muchos links y la pantalla es
-       * pequeña, el menú hace scroll interno en vez de cortarse.
-       *
-       * top-[65px]: altura exacta del navbar (py-4 = 16px × 2 + logo 33px ≈ 65px).
-       * Si el navbar cambia de tamaño con isScrolled, el panel se queda donde
-       * está (el usuario solo lo abre cuando no hay scroll, con py-4 activo).
-       */}
+      {/* Menú mobile */}
       <div
         aria-hidden={!isOpen}
         className={clsx(
@@ -4432,7 +4509,6 @@ const Navbar = () => {
           isOpen ? 'translate-x-0' : 'translate-x-full',
         )}
       >
-        {/* Padding inferior extra para que el último ítem no quede bajo el BottomNav */}
         <div className="flex flex-col gap-5 p-8 pb-32">
           {navLinks.map(link => (
             <Link
@@ -4554,20 +4630,18 @@ const Layout = () => {
   const showBackButton = location.pathname !== '/';
 
   return (
-    /*
-     * overflow-x-hidden: evita scroll horizontal por animaciones de slide-in.
-     * NO usamos overflow-hidden a secas porque eso bloquearía el scroll vertical
-     * de toda la página.
-     */
     <div className="min-h-screen flex flex-col bg-brand-cream overflow-x-hidden">
       <Navbar />
 
       <main className="flex-1 pt-[65px] pb-20 md:pb-0">
         {/*
-         * pt-[65px]: deja espacio exacto para la altura del navbar en mobile.
-         * pb-20: deja espacio para el BottomNav (altura ≈ 72px + safe area).
-         * md:pb-0: en desktop no hay BottomNav.
+         * ── NUEVO: Banner de perfil incompleto ───────────────────────────
+         * Aparece justo debajo del espacio del navbar, antes del contenido.
+         * El componente se oculta solo cuando el perfil está completo,
+         * en páginas de auth/edición, o si el usuario lo cierra manualmente.
          */}
+        <ProfileCompletionBanner />
+
         {showBackButton && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
             <BackButton />
@@ -4598,17 +4672,6 @@ const Layout = () => {
               <li><Link to="/verification" className="hover:text-white transition-colors">Verificación</Link></li>
             </ul>
           </div>
-          <div>
-            <h4 className="font-bold mb-6 text-lg">Legal</h4>
-            <ul className="space-y-4 text-blue-200/60 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">Términos y Condiciones</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Privacidad</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Cookies</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto border-t border-white/10 mt-20 pt-8 text-center text-blue-200/30 text-xs font-bold uppercase tracking-widest">
-          © {new Date().getFullYear()} JAIKO! — Todos los derechos reservados.
         </div>
       </footer>
     </div>
@@ -4940,6 +5003,123 @@ const ProfileCard = ({ profile, compatibility }) => {
 };
 
 export default ProfileCard;
+
+
+FILE_PATH: .\frontend\src\components\ui\ProfileCompletionBanner.jsx
+----------------------------------------
+// ProfileCompletionBanner.jsx
+// Banner pegajoso que aparece en todas las páginas si el usuario
+// no completó los campos obligatorios del perfil.
+//
+// ¿Por qué estos 3 campos?
+//   - name:   sin nombre no podés aparecer en búsquedas
+//   - age:    sin edad no podés ser filtrado correctamente
+//   - gender: sin género los filtros de compatibilidad no funcionan
+//   city tiene default 'Asunción' así que siempre tiene valor.
+
+import { Link, useLocation } from 'react-router-dom'
+import { AlertTriangle, ChevronRight, X } from 'lucide-react'
+import { useState } from 'react'
+import useAuthStore from '../../context/authStore'
+
+// ── Qué campos son obligatorios y cómo se llaman en pantalla ──────────────────
+const REQUIRED_FIELDS = [
+  { key: 'name',   label: 'nombre'  },
+  { key: 'age',    label: 'edad'    },
+  { key: 'gender', label: 'sexo'    },
+]
+
+// ── Páginas donde el banner NO debe mostrarse ─────────────────────────────────
+// (auth, la propia pantalla de edición, y la home pública)
+const HIDDEN_PATHS = ['/', '/login', '/register', '/profile/edit']
+
+/**
+ * Devuelve true si el perfil está completo (todos los campos obligatorios OK).
+ * Acepta 0, false y otros valores falsy como válidos.
+ * Solo bloquea: null, undefined y string vacío.
+ */
+function isProfileComplete(profile) {
+  if (!profile) return false
+  return REQUIRED_FIELDS.every(({ key }) => {
+    const val = profile[key]
+    return val !== null && val !== undefined && val !== ''
+  })
+}
+
+export default function ProfileCompletionBanner() {
+  const { user, profile, isAuthenticated } = useAuthStore()
+  const location = useLocation()
+  const [dismissed, setDismissed] = useState(false)
+
+  // No mostrar si: no está logueado, ruta excluida, perfil completo o ya cerró
+  if (!isAuthenticated() || !user) return null
+  if (HIDDEN_PATHS.includes(location.pathname)) return null
+  if (isProfileComplete(profile)) return null
+  if (dismissed) return null
+
+  // Qué campos faltan puntualmente
+  const missing = REQUIRED_FIELDS
+    .filter(({ key }) => {
+      const val = profile?.[key]
+      return val === null || val === undefined || val === ''
+    })
+    .map(({ label }) => label)
+
+  return (
+    <div
+      role="alert"
+      className="w-full bg-orange-500 text-white px-4 py-3
+        flex items-center justify-between gap-3
+        border-b border-orange-600/30"
+    >
+      {/* Ícono + mensaje */}
+      <div className="flex items-center gap-3 min-w-0">
+        <AlertTriangle
+          size={18}
+          className="flex-shrink-0 text-orange-100"
+          aria-hidden
+        />
+        <p className="text-sm font-bold leading-tight">
+          <span className="hidden sm:inline">
+            Tu perfil está incompleto — falta: {missing.join(', ')}.{' '}
+          </span>
+          <span className="sm:hidden">
+            Perfil incompleto ({missing.join(', ')}).{' '}
+          </span>
+          <span className="font-normal opacity-90">
+            Completalo para usar todas las funciones de Jaiko.
+          </span>
+        </p>
+      </div>
+
+      {/* Botón + cerrar */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <Link
+          to="/profile/edit"
+          className="inline-flex items-center gap-1
+            bg-white text-orange-500 font-extrabold text-xs
+            px-3 py-1.5 rounded-xl
+            hover:bg-orange-50 active:scale-95
+            transition-all duration-150"
+        >
+          Completar
+          <ChevronRight size={13} />
+        </Link>
+
+        {/* Botón para cerrar el banner SOLO en esta sesión */}
+        <button
+          onClick={() => setDismissed(true)}
+          aria-label="Cerrar aviso"
+          className="p-1 rounded-lg text-orange-100
+            hover:text-white hover:bg-orange-600/50
+            transition-colors duration-150"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
 
 
 FILE_PATH: .\frontend\src\components\ui\index.jsx
@@ -6020,7 +6200,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function ChatPage() {
   const { chatId } = useParams();
-  const { user }   = useAuthStore();
+  const { user, profile } = useAuthStore();
   const navigate   = useNavigate();
 
   const [chats,   setChats]   = useState([]);
@@ -6205,7 +6385,9 @@ export default function ChatPage() {
   };
 
   const getChatName = (chat) => {
-    if (chat.type === 'group') return `Grupo #${chat.group_id}`;
+    // Mejora: nombres más descriptivos que "Grupo #5"
+    if (chat.type === 'group')   return 'Chat del grupo';
+    if (chat.type === 'listing') return 'Consulta de depto';
     const other = chat.members?.find((m) => m.user_id !== user?.id);
     return other?.name ?? `Usuario #${other?.user_id}`;
   };
@@ -6214,6 +6396,21 @@ export default function ChatPage() {
     const other = chat.members?.find((m) => m.user_id !== user?.id);
     return other?.photo ?? null;
   };
+
+  // Devuelve el user_id del otro miembro en chats privados (para el link al perfil)
+  const getOtherUserId = (chat) => {
+    const other = chat.members?.find((m) => m.user_id !== user?.id);
+    return other?.user_id ?? null;
+  };
+
+  // ── FIX LÍNEAS FANTASMA (segunda capa de defensa) ─────────────────────────
+  // El backend ya filtra los chats privados sin mensajes, pero lo repetimos
+  // Mostramos todos los chats privados — los chats vacíos ya no son "fantasmas"
+  // porque solo se crean al aceptar una solicitud de roomie (controlado).
+  // Los chats de grupo siempre se muestran.
+  const visibleChats = chats.filter(chat =>
+    chat.type !== 'private' || chat.members?.length > 0
+  );
 
   const handleBack = () => {
     const s = socketRef.current;
@@ -6240,19 +6437,19 @@ export default function ChatPage() {
               Mensajes
             </h1>
             <p className="text-blue-900/40 text-sm font-bold">
-              {chats.length} conversaciones activas
+              {visibleChats.length} conversaciones activas
             </p>
           </div>
 
           {/* Lista de chats */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {chats.length === 0 ? (
+            {visibleChats.length === 0 ? (
               <div className="py-20 text-center">
                 <div className="text-4xl mb-4 opacity-20">💬</div>
                 <p className="text-slate-400 font-medium">Sin chats aún</p>
               </div>
             ) : (
-              chats.map((chat) => (
+              visibleChats.map((chat) => (
                 <button
                   key={chat.id}
                   onClick={() => selectChat(chat)}
@@ -6327,23 +6524,52 @@ export default function ChatPage() {
                   >
                     <ArrowLeft size={20} />
                   </button>
-                  <Avatar
-                    src={getChatPhoto(active)}
-                    name={getChatName(active)}
-                    size="md"
-                    className="border-2 border-slate-100"
-                  />
-                  <div>
-                    <p className="font-display font-extrabold text-blue-950">
-                      {getChatName(active)}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <p className="text-[10px] font-bold text-blue-900/40 uppercase tracking-widest">
-                        En línea
-                      </p>
+
+                  {/* Avatar + nombre — clickeable al perfil si es chat privado */}
+                  {active.type === 'private' && getOtherUserId(active) ? (
+                    <button
+                      onClick={() => navigate(`/profile/${getOtherUserId(active)}`)}
+                      className="flex items-center gap-4 hover:opacity-80 transition-opacity"
+                    >
+                      <Avatar
+                        src={getChatPhoto(active)}
+                        name={getChatName(active)}
+                        size="md"
+                        className="border-2 border-slate-100"
+                      />
+                      <div className="text-left">
+                        <p className="font-display font-extrabold text-blue-950">
+                          {getChatName(active)}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <p className="text-[10px] font-bold text-blue-900/40 uppercase tracking-widest">
+                            Ver perfil
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-4">
+                      <Avatar
+                        src={getChatPhoto(active)}
+                        name={getChatName(active)}
+                        size="md"
+                        className="border-2 border-slate-100"
+                      />
+                      <div>
+                        <p className="font-display font-extrabold text-blue-950">
+                          {getChatName(active)}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <p className="text-[10px] font-bold text-blue-900/40 uppercase tracking-widest">
+                            En línea
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="p-2.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
@@ -6477,79 +6703,195 @@ export default function ChatPage() {
 
 FILE_PATH: .\frontend\src\pages\CreateListingPage.jsx
 ----------------------------------------
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ImagePlus, X, Loader2 } from 'lucide-react'
+import { ImagePlus, X, Loader2, AlertCircle, MapPin } from 'lucide-react'
 import api from '../services/api'
 import { uploadListingPhoto } from '../services/storage'
 import { toast } from 'react-hot-toast'
+// Mismos imports de mapa que EditProfilePage
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+
+// Fix de íconos rotos por Vite (igual que EditProfilePage)
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
 
 const CITIES = ['Asunción', 'San Lorenzo', 'Luque', 'Fernando de la Mora', 'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este']
+
+// Coordenadas centrales de cada ciudad
+const CITY_COORDS = {
+  'Asunción':            [-25.28646, -57.64700],
+  'San Lorenzo':         [-25.33550, -57.51775],
+  'Luque':               [-25.26348, -57.48570],
+  'Fernando de la Mora': [-25.30848, -57.52245],
+  'Lambaré':             [-25.34037, -57.60753],
+  'Capiatá':             [-25.35602, -57.44545],
+  'Encarnación':         [-27.33333, -55.86667],
+  'Ciudad del Este':     [-25.50966, -54.61105],
+}
+
+const MIN_PHOTOS = 4
+const MAX_PHOTOS = 8
+
 const Label = ({ children }) => (
-  <label className="block text-xs font-semibold text-orange-400 uppercase tracking-wide mb-1">{children}</label>
+  <label className="block text-xs font-semibold text-orange-400 uppercase tracking-wide mb-1">
+    {children}
+  </label>
 )
 
 export function CreateListingPage() {
   const navigate = useNavigate()
 
+  const defaultLat = CITY_COORDS['Asunción'][0]
+  const defaultLng = CITY_COORDS['Asunción'][1]
+
   const [form, setForm] = useState({
     title: '', description: '', city: 'Asunción', neighborhood: '',
-    address: '', latitude: '', longitude: '', total_price: '',
-    rooms: 1, bathrooms: 1, max_people: 2,
+    address: '', latitude: defaultLat, longitude: defaultLng,
+    total_price: '', rooms: 1, bathrooms: 1, max_people: 2,
     pets_allowed: false, smoking_allowed: false, furnished: false,
     type: 'apartment',
+    // Preferencias del roomie
+    preferred_gender:  'any',  // 'any' | 'male' | 'female' | 'non_binary'
+    min_age_required:  18,     // edad mínima del roomie (número)
   })
 
-  const [photoFiles, setPhotoFiles] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [photoFiles, setPhotoFiles]           = useState([])
+  const [loading, setLoading]                 = useState(false)
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
 
+  // locationSelected: false hasta que el usuario haga clic o arrastre el pin.
+  // Así distinguimos "el pin está en el centro de la ciudad por defecto"
+  // de "el usuario confirmó exactamente dónde está el departamento".
+  const [locationSelected, setLocationSelected] = useState(false)
+
+  // Errores visuales por sección
+  const [errors, setErrors] = useState({
+    title: null, price: null, photos: null, location: null,
+  })
+
   const setField = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
-  const tog = k => () => setForm(f => ({ ...f, [k]: !f[k] }))
+  const tog      = k => () => setForm(f => ({ ...f, [k]: !f[k] }))
+
+  // Cuando cambia la ciudad, el mapa vuela a esa ciudad.
+  // Si el usuario NO marcó ubicación todavía, también movemos el pin.
+  const handleCityChange = (e) => {
+    const newCity = e.target.value
+    const [newLat, newLng] = CITY_COORDS[newCity] || [defaultLat, defaultLng]
+    setForm(f => ({
+      ...f,
+      city:      newCity,
+      latitude:  locationSelected ? f.latitude  : newLat,
+      longitude: locationSelected ? f.longitude : newLng,
+    }))
+  }
 
   const handlePhotoSelect = (e) => {
     const files = Array.from(e.target.files)
-    const remaining = 8 - photoFiles.length
+    const remaining = MAX_PHOTOS - photoFiles.length
     const toAdd = files.slice(0, remaining).map(file => ({
       file,
       preview: URL.createObjectURL(file),
     }))
     setPhotoFiles(prev => [...prev, ...toAdd])
     e.target.value = ''
+    if (errors.photos) setErrors(p => ({ ...p, photos: null }))
   }
 
   const removePhoto = (index) => {
     setPhotoFiles(prev => prev.filter((_, i) => i !== index))
   }
 
+  // Sub-componente del marcador interactivo (igual patrón que EditProfilePage)
+  // Definido dentro del componente para acceder al estado sin props
+  function LocationMarker() {
+    useMapEvents({
+      click(e) {
+        setForm(f => ({ ...f, latitude: e.latlng.lat, longitude: e.latlng.lng }))
+        setLocationSelected(true)
+        setErrors(p => ({ ...p, location: null }))
+      },
+    })
+    return (
+      <Marker
+        position={[form.latitude, form.longitude]}
+        draggable
+        eventHandlers={{
+          dragend: (e) => {
+            const pos = e.target.getLatLng()
+            setForm(f => ({ ...f, latitude: pos.lat, longitude: pos.lng }))
+            setLocationSelected(true)
+            setErrors(p => ({ ...p, location: null }))
+          }
+        }}
+      />
+    )
+  }
+
+  // Sub-componente que mueve la cámara del mapa cuando cambia lat/lng
+  function FlyToCity({ lat, lng }) {
+    const map = useMap()
+    useEffect(() => {
+      if (lat && lng) map.flyTo([lat, lng], 14, { duration: 0.8 })
+    }, [lat, lng])
+    return null
+  }
+
   const handleSubmit = async e => {
     e.preventDefault()
-    if (!form.title || !form.total_price) {
-      toast.error('Título y precio son obligatorios')
+
+    const newErrors = { title: null, price: null, photos: null, location: null }
+    let hasErrors = false
+
+    if (!form.title.trim()) {
+      newErrors.title = 'El título es obligatorio'
+      hasErrors = true
+    }
+    if (!form.total_price || parseInt(form.total_price) <= 0) {
+      newErrors.price = 'El precio mensual es obligatorio'
+      hasErrors = true
+    }
+    if (photoFiles.length < MIN_PHOTOS) {
+      newErrors.photos = `Necesitás al menos ${MIN_PHOTOS} fotos (tenés ${photoFiles.length})`
+      hasErrors = true
+    }
+    if (!locationSelected) {
+      newErrors.location = 'Hacé clic en el mapa para marcar la ubicación del departamento'
+      hasErrors = true
+    }
+
+    if (hasErrors) {
+      setErrors(newErrors)
+      toast.error('Revisá los campos marcados antes de publicar', { duration: 4000 })
       return
     }
+
     setLoading(true)
     try {
       const payload = {
         ...form,
         total_price: parseInt(form.total_price),
-        rooms: parseInt(form.rooms),
-        bathrooms: parseInt(form.bathrooms),
-        max_people: parseInt(form.max_people),
-        latitude: form.latitude ? parseFloat(form.latitude) : null,
-        longitude: form.longitude ? parseFloat(form.longitude) : null,
+        rooms:       parseInt(form.rooms),
+        bathrooms:   parseInt(form.bathrooms),
+        max_people:  parseInt(form.max_people),
+        latitude:    form.latitude,
+        longitude:   form.longitude,
       }
       const { data } = await api.post('/listings/', payload)
       const listingId = data.listing.id
 
-      if (photoFiles.length > 0) {
-        setUploadingPhotos(true)
-        for (const { file } of photoFiles) {
-          try { await uploadListingPhoto(listingId, file) }
-          catch { toast.error(`No se pudo subir ${file.name}`) }
-        }
-        setUploadingPhotos(false)
+      setUploadingPhotos(true)
+      for (const { file } of photoFiles) {
+        try { await uploadListingPhoto(listingId, file) }
+        catch { toast.error(`No se pudo subir ${file.name}`) }
       }
+      setUploadingPhotos(false)
 
       toast.success('¡Publicación creada!')
       navigate(`/listings/${listingId}`)
@@ -6563,17 +6905,30 @@ export function CreateListingPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
-      <h1 className="font-display font-extrabold text-2xl sm:text-3xl mb-6 sm:mb-8">Publicar vivienda</h1>
+      <h1 className="font-display font-extrabold text-2xl sm:text-3xl mb-6 sm:mb-8">
+        Publicar vivienda
+      </h1>
 
       <form onSubmit={handleSubmit} className="card space-y-5 sm:space-y-6">
 
-        {/* Basic info */}
+        {/* ── Info básica ────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+
           <div className="sm:col-span-2">
             <Label>Título *</Label>
-            <input className="input" value={form.title} onChange={setField('title')}
-              placeholder="Ej: Dpto 2 hab. en Asunción" required />
+            <input
+              className={`input ${errors.title ? 'border-red-300 focus:border-red-400' : ''}`}
+              value={form.title}
+              onChange={e => { setField('title')(e); if (errors.title) setErrors(p => ({ ...p, title: null })) }}
+              placeholder="Ej: Dpto 2 hab. en Asunción"
+            />
+            {errors.title && (
+              <div className="flex items-center gap-1.5 mt-1.5 text-red-500">
+                <AlertCircle size={13} /><p className="text-xs font-medium">{errors.title}</p>
+              </div>
+            )}
           </div>
+
           <div>
             <Label>Tipo</Label>
             <select className="input" value={form.type} onChange={setField('type')}>
@@ -6582,23 +6937,35 @@ export function CreateListingPage() {
               <option value="house">Casa</option>
             </select>
           </div>
+
           <div>
             <Label>Ciudad *</Label>
-            <select className="input" value={form.city} onChange={setField('city')}>
+            <select className="input" value={form.city} onChange={handleCityChange}>
               {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+
           <div>
             <Label>Barrio</Label>
-            <input className="input" value={form.neighborhood} onChange={setField('neighborhood')} placeholder="Ej: Villa Morra" />
-          </div>
-          <div>
-            <Label>Precio mensual (₲) *</Label>
-            <input className="input" type="number" value={form.total_price} onChange={setField('total_price')}
-              placeholder="Ej: 2500000" required />
+            <input className="input" value={form.neighborhood}
+              onChange={setField('neighborhood')} placeholder="Ej: Villa Morra" />
           </div>
 
-          {/* Numeric inputs — 3 per row on sm+, individual on xs */}
+          <div>
+            <Label>Precio mensual (₲) *</Label>
+            <input
+              className={`input ${errors.price ? 'border-red-300 focus:border-red-400' : ''}`}
+              type="number" value={form.total_price}
+              onChange={e => { setField('total_price')(e); if (errors.price) setErrors(p => ({ ...p, price: null })) }}
+              placeholder="Ej: 2500000"
+            />
+            {errors.price && (
+              <div className="flex items-center gap-1.5 mt-1.5 text-red-500">
+                <AlertCircle size={13} /><p className="text-xs font-medium">{errors.price}</p>
+              </div>
+            )}
+          </div>
+
           <div>
             <Label>Habitaciones</Label>
             <input className="input" type="number" min={1} value={form.rooms} onChange={setField('rooms')} />
@@ -6611,11 +6978,46 @@ export function CreateListingPage() {
             <Label>Máx. personas</Label>
             <input className="input" type="number" min={1} value={form.max_people} onChange={setField('max_people')} />
           </div>
-          <div>
-            <Label>Latitud (opcional)</Label>
-            <input className="input" type="number" step="any" value={form.latitude}
-              onChange={setField('latitude')} placeholder="-25.2867" />
+
+          {/* ── Preferencias del roomie ───────────────────────────────────── */}
+          {/* Separador visual para distinguir esta sección */}
+          <div className="sm:col-span-2 pt-1">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
+              👥 Preferencias del roomie
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              {/* Género del roomie */}
+              <div>
+                <Label>Género preferido</Label>
+                <select
+                  className="input"
+                  value={form.preferred_gender}
+                  onChange={setField('preferred_gender')}
+                >
+                  <option value="any">Sin preferencia</option>
+                  <option value="male">Hombre</option>
+                  <option value="female">Mujer</option>
+                  <option value="non_binary">No binario</option>
+                </select>
+              </div>
+
+              {/* Edad mínima del roomie */}
+              <div>
+                <Label>Edad mínima del roomie</Label>
+                <input
+                  className="input"
+                  type="number"
+                  min={18}
+                  max={80}
+                  value={form.min_age_required}
+                  onChange={setField('min_age_required')}
+                  placeholder="18"
+                />
+              </div>
+            </div>
           </div>
+
           <div className="sm:col-span-2">
             <Label>Descripción</Label>
             <textarea className="input h-24 sm:h-28 resize-none" value={form.description}
@@ -6623,42 +7025,121 @@ export function CreateListingPage() {
           </div>
         </div>
 
-        {/* Photos */}
+        {/* ── Mapa de ubicación ──────────────────────────────────────────── */}
         <div>
-          <Label>Fotos del lugar (máx. 8)</Label>
-          {/* Responsive grid: 3 cols on xs, 4 on sm+ */}
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3 mt-2">
-            {photoFiles.map(({ preview }, i) => (
-              <div key={i} className="relative aspect-square rounded-xl overflow-hidden border-2 border-orange-100">
-                <img src={preview} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
-                <button type="button" onClick={() => removePhoto(i)}
-                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 shadow hover:bg-red-600">
-                  <X size={11} />
-                </button>
-              </div>
-            ))}
-            {photoFiles.length < 8 && (
-              <label className="aspect-square rounded-xl border-2 border-dashed border-orange-200
-                flex flex-col items-center justify-center cursor-pointer
-                hover:border-orange-400 hover:bg-orange-50 transition">
-                <ImagePlus size={20} className="text-orange-300" />
-                <span className="text-xs text-orange-300 mt-1">Agregar</span>
-                <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden"
-                  onChange={handlePhotoSelect} />
-              </label>
-            )}
+          <div className="flex items-center gap-2 mb-1">
+            <MapPin size={14} className="text-orange-400" />
+            <Label>Ubicación en el mapa *</Label>
           </div>
-          <p className="text-xs text-gray-400 mt-2">Las fotos se suben al publicar.</p>
+
+          <p className={`text-xs mb-2 font-medium transition-colors ${
+            errors.location ? 'text-red-500' : locationSelected ? 'text-emerald-600' : 'text-slate-400'
+          }`}>
+            {locationSelected
+              ? '✓ Ubicación marcada. Podés ajustarla moviendo el pin.'
+              : 'Hacé clic en el mapa o arrastrá el pin para marcar la ubicación exacta.'
+            }
+          </p>
+
+          <div className={`rounded-xl overflow-hidden border-2 transition-colors ${
+            errors.location   ? 'border-red-300'
+            : locationSelected ? 'border-emerald-300'
+            :                    'border-orange-100'
+          }`} style={{ height: '280px' }}>
+            <MapContainer
+              center={[form.latitude, form.longitude]}
+              zoom={14}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <FlyToCity lat={form.latitude} lng={form.longitude} />
+              <LocationMarker />
+            </MapContainer>
+          </div>
+
+          {errors.location && (
+            <div className="flex items-center gap-1.5 mt-2 text-red-500">
+              <AlertCircle size={13} className="flex-shrink-0" />
+              <p className="text-xs font-medium">{errors.location}</p>
+            </div>
+          )}
+
+          {locationSelected && (
+            <p className="text-xs text-slate-400 mt-1.5 font-mono">
+              Lat: {form.latitude.toFixed(5)} · Lng: {form.longitude.toFixed(5)}
+            </p>
+          )}
         </div>
 
-        {/* Features toggles */}
+        {/* ── Fotos ──────────────────────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <Label>Fotos del lugar *</Label>
+            <span className={`text-xs font-bold ${
+              errors.photos           ? 'text-red-500'
+              : photoFiles.length >= MIN_PHOTOS ? 'text-emerald-600'
+              :                                   'text-slate-400'
+            }`}>
+              {photoFiles.length} / {MAX_PHOTOS}
+              {photoFiles.length < MIN_PHOTOS ? ` (mínimo ${MIN_PHOTOS})` : ' ✓'}
+            </span>
+          </div>
+
+          <div className={`rounded-xl p-2 border-2 transition-colors ${
+            errors.photos             ? 'border-red-300 bg-red-50/30'
+            : photoFiles.length >= MIN_PHOTOS ? 'border-emerald-200 bg-emerald-50/20'
+            :                                   'border-transparent'
+          }`}>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
+              {photoFiles.map(({ preview }, i) => (
+                <div key={i} className="relative aspect-square rounded-xl overflow-hidden border-2 border-orange-100">
+                  <img src={preview} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                  <button type="button" onClick={() => removePhoto(i)}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 shadow hover:bg-red-600">
+                    <X size={11} />
+                  </button>
+                  <span className="absolute bottom-1 left-1 bg-black/40 text-white text-[9px] font-bold px-1 rounded">
+                    {i + 1}
+                  </span>
+                </div>
+              ))}
+
+              {photoFiles.length < MAX_PHOTOS && (
+                <label className={`aspect-square rounded-xl border-2 border-dashed
+                  flex flex-col items-center justify-center cursor-pointer transition
+                  ${errors.photos
+                    ? 'border-red-300 hover:border-red-400 hover:bg-red-50'
+                    : 'border-orange-200 hover:border-orange-400 hover:bg-orange-50'
+                  }`}>
+                  <ImagePlus size={20} className={errors.photos ? 'text-red-300' : 'text-orange-300'} />
+                  <span className={`text-xs mt-1 ${errors.photos ? 'text-red-400' : 'text-orange-300'}`}>
+                    Agregar
+                  </span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple
+                    className="hidden" onChange={handlePhotoSelect} />
+                </label>
+              )}
+            </div>
+          </div>
+
+          {errors.photos ? (
+            <div className="flex items-center gap-1.5 mt-2 text-red-500">
+              <AlertCircle size={13} className="flex-shrink-0" />
+              <p className="text-xs font-medium">{errors.photos}</p>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 mt-1.5">Las fotos se suben al publicar · máx. 5MB cada una</p>
+          )}
+        </div>
+
+        {/* ── Características ────────────────────────────────────────────── */}
         <div>
           <Label>Características</Label>
           <div className="flex flex-wrap gap-2 sm:gap-3 mt-2">
             {[
-              ['pets_allowed', '🐾 Mascotas permitidas'],
+              ['pets_allowed',    '🐾 Mascotas permitidas'],
               ['smoking_allowed', '🚬 Fumadores ok'],
-              ['furnished', '🛋️ Amoblado'],
+              ['furnished',       '🛋️ Amoblado'],
             ].map(([k, l]) => (
               <button key={k} type="button" onClick={tog(k)}
                 className={`px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all
@@ -6671,9 +7152,26 @@ export function CreateListingPage() {
           </div>
         </div>
 
-        {/* Submit */}
+        {/* ── Resumen de errores (solo visible cuando hay errores) ────────── */}
+        {(errors.title || errors.price || errors.photos || errors.location) && (
+          <div className="p-4 bg-red-50 rounded-2xl border border-red-100">
+            <p className="text-xs font-bold text-red-600 mb-2 uppercase tracking-wide">
+              Completá lo siguiente antes de publicar:
+            </p>
+            <ul className="space-y-1">
+              {errors.title    && <li className="text-xs text-red-500 flex items-center gap-1.5"><AlertCircle size={11} /> {errors.title}</li>}
+              {errors.price    && <li className="text-xs text-red-500 flex items-center gap-1.5"><AlertCircle size={11} /> {errors.price}</li>}
+              {errors.photos   && <li className="text-xs text-red-500 flex items-center gap-1.5"><AlertCircle size={11} /> {errors.photos}</li>}
+              {errors.location && <li className="text-xs text-red-500 flex items-center gap-1.5"><AlertCircle size={11} /> {errors.location}</li>}
+            </ul>
+          </div>
+        )}
+
+        {/* ── Botones finales ────────────────────────────────────────────── */}
         <div className="flex gap-3 justify-end pt-2 border-t border-orange-100">
-          <button type="button" onClick={() => navigate('/listings')} className="btn-ghost">Cancelar</button>
+          <button type="button" onClick={() => navigate('/listings')} className="btn-ghost">
+            Cancelar
+          </button>
           <button type="submit" disabled={loading} className="btn-primary flex items-center gap-2">
             {loading
               ? <><Loader2 size={15} className="animate-spin" />{uploadingPhotos ? 'Subiendo fotos...' : 'Publicando...'}</>
@@ -6681,6 +7179,7 @@ export function CreateListingPage() {
             }
           </button>
         </div>
+
       </form>
     </div>
   )
@@ -6694,7 +7193,8 @@ FILE_PATH: .\frontend\src\pages\EditProfilePage.jsx
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
-import { Camera, Loader2 } from 'lucide-react'
+// ── CAMBIO 1: Agregamos el ícono Lock para indicar campo bloqueado ─────────────
+import { Camera, Loader2, Lock } from 'lucide-react'
 import api from '../services/api'
 import { uploadProfilePhoto } from '../services/storage'
 import useAuthStore from '../context/authStore'
@@ -6727,9 +7227,26 @@ const CITY_COORDS = {
 }
 
 export default function EditProfilePage() {
-  const { profile, updateProfile } = useAuthStore()
+  // ── CAMBIO 2: Agregamos 'user' al destructuring ────────────────────────────
+  // Antes solo teníamos { profile, updateProfile }
+  // Ahora también traemos 'user' para poder leer user.google_id
+  const { profile, updateProfile, user } = useAuthStore()
   const navigate   = useNavigate()
   const fileInputRef = useRef(null)
+
+  // ── Edad y sexo: se pueden llenar solo una vez ────────────────────────────
+  //
+  // Si el perfil ya tiene un valor guardado → el campo queda bloqueado para
+  // siempre (muestra un div de solo lectura con candado).
+  // Si el campo está vacío → el usuario puede llenarlo (primera y única vez).
+  //
+  // Boolean(profile?.age)    → true si age es número (ej: 25), false si null/undefined
+  // Boolean(profile?.gender) → true si gender tiene valor (ej: 'male'), false si vacío
+  const ageIsLocked    = Boolean(profile?.age)
+  const genderIsLocked = Boolean(profile?.gender)
+
+  // Mantenemos isGoogleUser por compatibilidad con otros usos
+  const isGoogleUser = Boolean(user?.google_id)
 
   const defaultLat = -25.28646
   const defaultLng = -57.64700
@@ -6814,8 +7331,12 @@ export default function EditProfilePage() {
     }
   }
 
+  // ── CAMBIO 4: Label ahora acepta children como elemento React ─────────────
+  // Esto permite que el label de Género tenga el badge "(desde Google)"
   const Label = ({ children }) => (
-    <label className="block text-xs font-semibold text-orange-500 uppercase tracking-wide mb-1">{children}</label>
+    <label className="flex items-center gap-1 text-xs font-semibold text-orange-500 uppercase tracking-wide mb-1">
+      {children}
+    </label>
   )
 
   function LocationMarker() {
@@ -6876,14 +7397,66 @@ export default function EditProfilePage() {
         {/* Cuadrícula de campos */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
           <div><Label>Nombre completo *</Label><input className="input" value={form.name} onChange={setField('name')} required /></div>
-          <div><Label>Edad</Label><input className="input" type="number" min={18} max={80} value={form.age} onChange={setField('age')} /></div>
+          {/* ── Edad: editable solo si todavía no tiene valor ────────────── */}
           <div>
-            <Label>Género</Label>
-            <select className="input" value={form.gender} onChange={setField('gender')}>
-              <option value="">Prefiero no decir</option>
-              {GENDERS.map(g => <option key={g} value={g}>{GENDER_LABELS[g]}</option>)}
-            </select>
+            <Label>
+              Edad
+              {ageIsLocked && (
+                <span className="ml-1 text-[10px] font-normal text-slate-400 normal-case tracking-normal">
+                  (no se puede modificar)
+                </span>
+              )}
+            </Label>
+            {ageIsLocked ? (
+              <div
+                className="input bg-slate-50 text-slate-500 cursor-not-allowed flex items-center justify-between"
+                title="La edad no puede modificarse una vez guardada"
+              >
+                <span>{form.age} años</span>
+                <Lock size={14} className="text-slate-400 flex-shrink-0" />
+              </div>
+            ) : (
+              <input
+                className="input"
+                type="number"
+                min={18}
+                max={80}
+                value={form.age}
+                onChange={setField('age')}
+                placeholder="Tu edad"
+              />
+            )}
           </div>
+
+          {/* ── Género: editable solo si todavía no tiene valor ──────────── */}
+          <div>
+            <Label>
+              Género
+              {genderIsLocked && (
+                <span className="ml-1 text-[10px] font-normal text-slate-400 normal-case tracking-normal">
+                  (no se puede modificar)
+                </span>
+              )}
+            </Label>
+
+            {genderIsLocked ? (
+              // 🔒 BLOQUEADO: ya tiene valor, no se puede cambiar
+              <div
+                className="input bg-slate-50 text-slate-500 cursor-not-allowed flex items-center justify-between"
+                title="El sexo no puede modificarse una vez guardado"
+              >
+                <span>{GENDER_LABELS[form.gender] || 'No especificado'}</span>
+                <Lock size={14} className="text-slate-400 flex-shrink-0" />
+              </div>
+            ) : (
+              // ✏️ EDITABLE: todavía vacío, el usuario puede llenarlo una vez
+              <select className="input" value={form.gender} onChange={setField('gender')}>
+                <option value="">Seleccioná tu sexo</option>
+                {GENDERS.map(g => <option key={g} value={g}>{GENDER_LABELS[g]}</option>)}
+              </select>
+            )}
+          </div>
+
           <div><Label>Profesión / ocupación</Label><input className="input" value={form.profession} onChange={setField('profession')} /></div>
           <div>
             <Label>Ciudad</Label>
@@ -6960,6 +7533,7 @@ export default function EditProfilePage() {
     </div>
   )
 }
+
 
 FILE_PATH: .\frontend\src\pages\GroupDetailPage.jsx
 ----------------------------------------
@@ -7701,7 +8275,11 @@ import {
   ChevronRight
 } from "lucide-react";
 
-import Logo from "../components/ui/Logo"; // <-- Esta ruta está bien si la carpeta components está en la raíz.
+// ── CAMBIO 1: Importamos el store de autenticación ────────────────────────────
+// useAuthStore nos da acceso al estado global del usuario (si está logueado o no)
+import useAuthStore from '../context/authStore'
+
+import Logo from "../components/ui/Logo";
 
 const FEATURES = [
   { 
@@ -7758,6 +8336,17 @@ const STEPS = [
 const HomePage = () => {
   const [current, setCurrent] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
+
+  // ── CAMBIO 2: Leemos el estado de autenticación ───────────────────────────
+  // Importante: destruturamos 'token' además de 'isAuthenticated'.
+  // Esto hace que React "escuche" los cambios de token en el store.
+  // Cuando el usuario se loguea o desloguea, token cambia → React re-renderiza
+  // la página → loggedIn se recalcula con el valor correcto.
+  const { isAuthenticated, token } = useAuthStore()
+
+  // Calculamos si está logueado una sola vez y lo guardamos en esta variable.
+  // La usaremos en el JSX para decidir qué botones mostrar.
+  const loggedIn = isAuthenticated()
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -7828,19 +8417,43 @@ const HomePage = () => {
             {SLIDES[current].subtitle}
           </motion.p>
 
+          {/* ── CAMBIO 3: Botones del Hero con renderizado condicional ──────── */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link to="/login" className="group relative px-8 py-4 bg-orange-500 text-white rounded-2xl font-bold text-lg overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-orange-500/40">
-              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-              <span className="relative flex items-center gap-2">
-                EMPEZAR AHORA <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </span>
-            </Link>
-            <a href="#how-it-works" className="px-8 py-4 rounded-2xl font-bold text-lg border border-orange-200 bg-white/50 text-blue-950 hover:bg-orange-50 transition-all backdrop-blur-sm">
+            {loggedIn ? (
+              // ✅ Usuario YA logueado → lo mandamos a buscar roomies
+              // No tiene sentido mostrarle "Empezar ahora" si ya tiene sesión
+              <Link
+                to="/search"
+                className="group relative px-8 py-4 bg-orange-500 text-white rounded-2xl font-bold text-lg overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-orange-500/40"
+              >
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                <span className="relative flex items-center gap-2">
+                  BUSCAR ROOMIE <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </Link>
+            ) : (
+              // 🚪 Usuario NO logueado → lo mandamos a login/registro
+              <Link
+                to="/login"
+                className="group relative px-8 py-4 bg-orange-500 text-white rounded-2xl font-bold text-lg overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-orange-500/40"
+              >
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                <span className="relative flex items-center gap-2">
+                  EMPEZAR AHORA <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </span>
+              </Link>
+            )}
+
+            {/* Este botón se muestra siempre, logueado o no */}
+            <a
+              href="#how-it-works"
+              className="px-8 py-4 rounded-2xl font-bold text-lg border border-orange-200 bg-white/50 text-blue-950 hover:bg-orange-50 transition-all backdrop-blur-sm"
+            >
               Ver cómo funciona
             </a>
           </motion.div>
@@ -7952,9 +8565,25 @@ const HomePage = () => {
             <h2 className="relative z-10 text-4xl md:text-6xl font-display font-extrabold mb-8 tracking-tight text-white">
               ¿Listo para encontrar <br /> a tu roomie ideal?
             </h2>
-            <Link to="/login" className="relative z-10 inline-flex items-center gap-3 px-10 py-5 bg-white text-orange-500 rounded-2xl font-bold text-xl hover:scale-105 active:scale-95 transition-all shadow-xl">
-              EMPEZAR AHORA <ChevronRight />
-            </Link>
+
+            {/* ── CAMBIO 4: Botón del CTA final con renderizado condicional ── */}
+            {loggedIn ? (
+              // ✅ Logueado → lo llevamos directo a buscar roomies
+              <Link
+                to="/search"
+                className="relative z-10 inline-flex items-center gap-3 px-10 py-5 bg-white text-orange-500 rounded-2xl font-bold text-xl hover:scale-105 active:scale-95 transition-all shadow-xl"
+              >
+                BUSCAR ROOMIE <ChevronRight />
+              </Link>
+            ) : (
+              // 🚪 No logueado → lo mandamos a login
+              <Link
+                to="/login"
+                className="relative z-10 inline-flex items-center gap-3 px-10 py-5 bg-white text-orange-500 rounded-2xl font-bold text-xl hover:scale-105 active:scale-95 transition-all shadow-xl"
+              >
+                EMPEZAR AHORA <ChevronRight />
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -7969,24 +8598,28 @@ FILE_PATH: .\frontend\src\pages\ListingDetailPage.jsx
 ----------------------------------------
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import {
-  MapPin, BedDouble, Bath, Users, PawPrint, Sofa,
-  MessageCircle, ChevronLeft, ChevronRight,
-} from 'lucide-react'
+import { MapPin, BedDouble, Bath, Users, PawPrint, Sofa, MessageCircle, ChevronLeft, ChevronRight, Share2, Loader2 } from 'lucide-react'
 import api from '../services/api'
 import { Badge, Avatar, StarRating, Spinner } from '../components/ui'
 import useAuthStore from '../context/authStore'
 import { toast } from 'react-hot-toast'
+// ── CAMBIO 1: Importamos getSocket para enviar mensajes al chat del grupo ──────
+// getSocket() devuelve la instancia del socket ya conectado (o null si no hay)
+import { getSocket } from '../services/socket'
 
 export default function ListingDetailPage() {
-  const { id }       = useParams()
-  const navigate     = useNavigate()
+  const { id } = useParams()
+  const navigate = useNavigate()
   const { isAuthenticated, user } = useAuthStore()
-  const [listing,  setListing]  = useState(null)
-  const [reviews,  setReviews]  = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [photo,    setPhoto]    = useState(0)
-  const [MapComp,  setMapComp]  = useState(null)
+  const [listing, setListing] = useState(null)
+  const [reviews, setReviews] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [photo, setPhoto] = useState(0)
+  const [MapComp, setMapComp] = useState(null)
+
+  // ── CAMBIO 2: Estado para el proceso de compartir ─────────────────────────
+  // sharing: true mientras estamos buscando el grupo y enviando el mensaje
+  const [sharing, setSharing] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -8009,80 +8642,158 @@ export default function ListingDetailPage() {
     } catch { toast.error('Error al abrir chat') }
   }
 
+  // ── CAMBIO 3: Función para compartir el departamento en el chat del grupo ──
+  //
+  // Flujo completo:
+  //   1. Verificar que el usuario está logueado
+  //   2. Buscar los grupos del usuario → GET /groups/my
+  //   3. Buscar todos los chats → GET /chats/
+  //   4. Encontrar el chat de tipo "group" que coincide con el grupo del usuario
+  //   5. Construir un mensaje de texto con los datos del departamento
+  //   6. Enviarlo por socket → emit('send_message', { chat_id, content })
+  //   7. Navegar al chat para que el usuario vea el mensaje enviado
+  //
+  // ¿Por qué usamos el socket y no un endpoint REST?
+  // Porque el sistema de mensajería de JAIKO funciona en tiempo real a través
+  // de Socket.IO (ver ChatPage.jsx). Si enviáramos por REST, el mensaje
+  // aparecería en la BD pero los otros miembros no lo verían en tiempo real.
+  const handleShare = async () => {
+    if (!isAuthenticated()) {
+      navigate('/login')
+      return
+    }
+
+    setSharing(true)
+    try {
+      // ── Paso 1: Obtener los grupos del usuario ─────────────────────────
+      const { data: myGroupsData } = await api.get('/groups/my')
+      const myGroups = myGroupsData.groups || []
+
+      if (myGroups.length === 0) {
+        toast.error('Necesitás pertenecer a un grupo para compartir')
+        return
+      }
+
+      // ── Paso 2: Obtener todos los chats del usuario ────────────────────
+      const { data: chatsData } = await api.get('/chats/')
+      const allChats = chatsData.chats || []
+
+      // ── Paso 3: Encontrar el chat grupal ──────────────────────────────
+      // Un chat de tipo "group" tiene group_id asociado.
+      // Buscamos el chat donde group_id coincide con alguno de los grupos del usuario.
+      //
+      // .some() devuelve true si al menos uno de los grupos coincide.
+      const groupChat = allChats.find(chat =>
+        chat.type === 'group' &&
+        myGroups.some(group => group.id === chat.group_id)
+      )
+
+      if (!groupChat) {
+        toast.error('Tu grupo no tiene un chat activo todavía')
+        return
+      }
+
+      // ── Paso 4: Construir el mensaje con los datos del departamento ────
+      // Formateamos el precio de Guaraníes a millones (ej: 2.5M)
+      const priceFormatted = (listing.total_price / 1_000_000).toFixed(1)
+
+      // Armamos la ubicación: "Barrio, Ciudad" o solo "Ciudad" si no hay barrio
+      const locationText = [listing.neighborhood, listing.city]
+        .filter(Boolean)   // Elimina undefined/null/''
+        .join(', ')
+
+      // El mensaje que aparecerá en el chat
+      // \n es un salto de línea en texto plano
+      const messageContent = [
+        `🏠 Departamento compartido por ${user?.email || 'un compañero'}:`,
+        ``,
+        `📍 ${listing.title}`,
+        `💰 ₲ ${priceFormatted}M / mes`,
+        `🏘️ ${locationText}`,
+        `🛏️ ${listing.rooms} hab.  ·  🚿 ${listing.bathrooms} baños  ·  👥 Máx. ${listing.max_people}`,
+        ``,
+        `🔗 Ver en JAIKO: /listings/${listing.id}`,
+      ].join('\n')
+
+      // ── Paso 5: Enviar por Socket.IO ──────────────────────────────────
+      const socket = getSocket()
+
+      if (!socket?.connected) {
+        toast.error('Sin conexión en tiempo real. Intentá de nuevo en un momento.')
+        return
+      }
+
+      // Este es el mismo evento que usa ChatPage cuando el usuario escribe
+      socket.emit('send_message', {
+        chat_id: groupChat.id,
+        content: messageContent,
+      })
+
+      toast.success('¡Departamento compartido en el chat de tu grupo!')
+
+      // ── Paso 6: Navegar al chat para ver el mensaje ────────────────────
+      navigate(`/chat/${groupChat.id}`)
+
+    } catch (err) {
+      console.error('Error al compartir:', err)
+      toast.error('No se pudo compartir el departamento. Intentá de nuevo.')
+    } finally {
+      setSharing(false)
+    }
+  }
+
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>
   if (!listing) return null
 
-  const photos  = listing.photos || []
+  const photos = listing.photos || []
   const isOwner = user?.id === listing.owner_id
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
-      <Link
-        to="/listings"
-        className="flex items-center gap-1 text-orange-400 hover:text-primary-600 mb-4 text-sm font-semibold transition-colors"
-      >
+      <Link to="/listings" className="flex items-center gap-1 text-orange-400 hover:text-primary-600 mb-4 text-sm font-semibold transition-colors">
         <ChevronLeft size={15} /> Volver a publicaciones
       </Link>
 
-      {/* Galería de fotos */}
+      {/* Photo gallery */}
       {photos.length > 0 ? (
         <div className="relative h-56 sm:h-72 md:h-96 rounded-2xl overflow-hidden mb-4 sm:mb-6 bg-orange-100">
-          <img
-            src={photos[photo]?.photo_url}
-            alt={listing.title}
-            className="w-full h-full object-cover"
-          />
+          <img src={photos[photo]?.photo_url} alt={listing.title} className="w-full h-full object-cover" />
           {photos.length > 1 && (
             <>
-              <button
-                onClick={() => setPhoto(p => (p - 1 + photos.length) % photos.length)}
-                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1.5 sm:p-2 hover:bg-white transition-colors"
-              >
+              <button onClick={() => setPhoto(p => (p - 1 + photos.length) % photos.length)}
+                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1.5 sm:p-2 hover:bg-white transition-colors">
                 <ChevronLeft size={16} />
               </button>
-              <button
-                onClick={() => setPhoto(p => (p + 1) % photos.length)}
-                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1.5 sm:p-2 hover:bg-white transition-colors"
-              >
+              <button onClick={() => setPhoto(p => (p + 1) % photos.length)}
+                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-1.5 sm:p-2 hover:bg-white transition-colors">
                 <ChevronRight size={16} />
               </button>
               <div className="absolute bottom-2 sm:bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                 {photos.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPhoto(i)}
-                    className={`w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full transition-colors ${
-                      i === photo ? 'bg-white' : 'bg-white/50'
-                    }`}
-                  />
+                  <button key={i} onClick={() => setPhoto(i)}
+                    className={`w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full transition-colors ${i === photo ? 'bg-white' : 'bg-white/50'}`} />
                 ))}
               </div>
             </>
           )}
         </div>
       ) : (
-        <div className="h-44 sm:h-56 rounded-2xl bg-orange-100 flex items-center justify-center text-5xl sm:text-6xl mb-4 sm:mb-6">
-          🏠
-        </div>
+        <div className="h-44 sm:h-56 rounded-2xl bg-orange-100 flex items-center justify-center text-5xl sm:text-6xl mb-4 sm:mb-6">🏠</div>
       )}
 
-      {/* Grid principal: 1 col mobile, 3 col desktop */}
+      {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
 
-        {/* ── Info principal ──────────────────────────────────────────────── */}
+        {/* Main info */}
         <div className="lg:col-span-2 space-y-4 sm:space-y-5">
           <div className="card">
             <div className="flex items-start justify-between flex-wrap gap-3 mb-3 sm:mb-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <Badge variant="dark">{listing.type}</Badge>
-                  <Badge variant={listing.status === 'active' ? 'green' : 'gray'}>
-                    {listing.status}
-                  </Badge>
+                  <Badge variant={listing.status === 'active' ? 'green' : 'gray'}>{listing.status}</Badge>
                 </div>
-                <h1 className="font-display font-extrabold text-xl sm:text-2xl">
-                  {listing.title}
-                </h1>
+                <h1 className="font-display font-extrabold text-xl sm:text-2xl">{listing.title}</h1>
                 <div className="flex items-center gap-1 text-orange-400 text-sm mt-1">
                   <MapPin size={13} />
                   {listing.neighborhood ? `${listing.neighborhood}, ` : ''}{listing.city}
@@ -8096,17 +8807,13 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
-            {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
               {[
-                { icon: BedDouble, label: `${listing.rooms} hab.`      },
-                { icon: Bath,      label: `${listing.bathrooms} baños` },
-                { icon: Users,     label: `Máx. ${listing.max_people}` },
+                { icon: BedDouble, label: `${listing.rooms} hab.` },
+                { icon: Bath, label: `${listing.bathrooms} baños` },
+                { icon: Users, label: `Máx. ${listing.max_people}` },
               ].map(({ icon: Icon, label }) => (
-                <div
-                  key={label}
-                  className="bg-orange-50 rounded-xl p-2.5 sm:p-3 flex flex-col items-center gap-1"
-                >
+                <div key={label} className="bg-orange-50 rounded-xl p-2.5 sm:p-3 flex flex-col items-center gap-1">
                   <Icon size={15} className="text-primary-500" />
                   <span className="text-xs font-semibold text-center">{label}</span>
                 </div>
@@ -8120,7 +8827,7 @@ export default function ListingDetailPage() {
             </div>
 
             <div className="flex flex-wrap gap-2 mb-3 sm:mb-4">
-              {listing.pets_allowed    && <Badge variant="orange"><PawPrint size={11} className="inline" /> Mascotas ok</Badge>}
+              {listing.pets_allowed && <Badge variant="orange"><PawPrint size={11} className="inline" /> Mascotas ok</Badge>}
               {listing.smoking_allowed && <Badge variant="gray">🚬 Fumadores ok</Badge>}
             </div>
 
@@ -8129,43 +8836,19 @@ export default function ListingDetailPage() {
             )}
           </div>
 
-          {/*
-           * ── Mapa ─────────────────────────────────────────────────────────
-           *
-           * ✅ FIX: Antes se usaba `markers` (prop de roomies) pasándole un
-           * objeto de listing, pero JaikoMap filtra los markers-de-roomie
-           * exigiendo que cada marcador tenga la propiedad `profile`.
-           * Como un listing no tiene `profile`, se filtraba todo y el mapa
-           * aparecía vacío (o no aparecía el pin).
-           *
-           * Solución: usar `listingMarkers` — la prop correcta para pins de
-           * departamentos. JaikoMap la filtra con isValidCoord() solamente,
-           * sin exigir `profile`.
-           *
-           * Estructura esperada por listingMarkers:
-           *   { lat, lng, id, title, price, neighborhood }
-           */}
+          {/* Map */}
           {listing.latitude && listing.longitude && MapComp && (
             <div>
-              <h2 className="font-display font-bold text-base sm:text-lg mb-2 sm:mb-3">
-                Ubicación
-              </h2>
+              <h2 className="font-display font-bold text-base sm:text-lg mb-2 sm:mb-3">Ubicación</h2>
               <MapComp
                 center={[listing.latitude, listing.longitude]}
-                listingMarkers={[{
-                  lat:          listing.latitude,
-                  lng:          listing.longitude,
-                  id:           listing.id,
-                  title:        listing.title,
-                  price:        listing.total_price,
-                  neighborhood: listing.neighborhood,
-                }]}
+                markers={[{ lat: listing.latitude, lng: listing.longitude, title: listing.title }]}
                 height="240px"
               />
             </div>
           )}
 
-          {/* Reseñas */}
+          {/* Reviews */}
           {reviews.length > 0 && (
             <div className="card">
               <h2 className="font-display font-bold text-base sm:text-lg mb-3 sm:mb-4">
@@ -8178,54 +8861,87 @@ export default function ListingDetailPage() {
                     <span className="font-semibold text-sm">{r.reviewer_name}</span>
                     <StarRating value={r.rating} />
                   </div>
-                  {r.comment && (
-                    <p className="text-xs text-gray-500 ml-10">{r.comment}</p>
-                  )}
+                  {r.comment && <p className="text-xs text-gray-500 ml-10">{r.comment}</p>}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+        {/* ── CAMBIO 4: Sidebar con botón "Compartir" nuevo ─────────────────── */}
         <div className="space-y-4">
           <div className="card lg:sticky lg:top-20">
-            <h3 className="font-display font-bold text-sm sm:text-base mb-3 sm:mb-4">
-              Publicado por
-            </h3>
+            <h3 className="font-display font-bold text-sm sm:text-base mb-3 sm:mb-4">Publicado por</h3>
             {listing.owner && (
-              <Link
-                to={`/profile/${listing.owner_id}`}
-                className="flex items-center gap-3 mb-3 sm:mb-4 hover:opacity-80 transition-opacity"
-              >
-                <Avatar
-                  src={listing.owner.profile_photo_url}
-                  name={listing.owner.name}
-                  size="md"
-                  verified={listing.owner.verified}
-                />
+              <Link to={`/profile/${listing.owner_id}`}
+                className="flex items-center gap-3 mb-3 sm:mb-4 hover:opacity-80 transition-opacity">
+                <Avatar src={listing.owner.profile_photo_url} name={listing.owner.name} size="md" verified={listing.owner.verified} />
                 <div className="min-w-0">
                   <p className="font-semibold truncate">{listing.owner.name}</p>
-                  {listing.owner.profession && (
-                    <p className="text-xs text-orange-400 truncate">
-                      {listing.owner.profession}
-                    </p>
-                  )}
+                  {listing.owner.profession && <p className="text-xs text-orange-400 truncate">{listing.owner.profession}</p>}
                 </div>
               </Link>
             )}
+
+            {/* Botón "Contactar" — existente, sin cambios */}
             {!isOwner && (
-              <button
-                onClick={handleContact}
-                className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
-              >
+              <button onClick={handleContact} className="btn-primary w-full flex items-center justify-center gap-2 text-sm mb-3">
                 <MessageCircle size={15} /> Contactar
               </button>
             )}
+
             {isOwner && (
-              <Badge variant="orange" className="w-full text-center py-2">
-                Tu publicación
-              </Badge>
+              <Badge variant="orange" className="w-full text-center py-2 mb-3">Tu publicación</Badge>
+            )}
+
+            {/* ── CAMBIO 5: Botón "Compartir en mi grupo" ──────────────── */}
+            {/*
+             * Solo visible para usuarios logueados que NO son el dueño.
+             * El dueño no necesita compartirlo con su propio grupo.
+             *
+             * Cuando sharing === true mostramos un spinner y deshabilitamos
+             * el botón para evitar que el usuario haga clic múltiples veces.
+             *
+             * ¿Qué hace al hacer clic? → handleShare() que está definido arriba.
+             * Lee el grupo del usuario, encuentra el chat del grupo, y envía
+             * el departamento como mensaje de texto formateado.
+             */}
+            {isAuthenticated() && !isOwner && (
+              <button
+                onClick={handleShare}
+                disabled={sharing}
+                className="w-full flex items-center justify-center gap-2 text-sm font-bold
+                  px-4 py-2.5 rounded-2xl border-2 border-orange-200 text-orange-500
+                  hover:bg-orange-50 hover:border-orange-300 transition-all
+                  disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {sharing ? (
+                  // Estado cargando
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Compartiendo...
+                  </>
+                ) : (
+                  // Estado normal
+                  <>
+                    <Share2 size={15} />
+                    Compartir en mi grupo
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Si no está logueado, mostramos el botón deshabilitado con tooltip */}
+            {!isAuthenticated() && (
+              <button
+                onClick={() => navigate('/login')}
+                className="w-full flex items-center justify-center gap-2 text-sm font-bold
+                  px-4 py-2.5 rounded-2xl border-2 border-slate-100 text-slate-400
+                  hover:bg-slate-50 transition-all"
+              >
+                <Share2 size={15} />
+                Compartir en grupo
+              </button>
             )}
           </div>
         </div>
@@ -8239,8 +8955,11 @@ FILE_PATH: .\frontend\src\pages\ListingsPage.jsx
 ----------------------------------------
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+// ── CAMBIO 1: Importamos useLocation para leer el estado del router ───────────
+// useLocation().state es donde ProfilePage guarda { flyTo, switchToMap }
+import { useLocation } from 'react-router-dom';
 import { Map, LayoutGrid, Plus, SlidersHorizontal, X } from 'lucide-react';
-import api, { getRoomies } from '../services/api';
+import api from '../services/api';
 import ListingCard from '../components/ui/ListingCard';
 import { Spinner, EmptyState } from '../components/ui';
 import useAuthStore from '../context/authStore';
@@ -8250,51 +8969,89 @@ const CITIES = [
   'Lambaré', 'Capiatá', 'Encarnación', 'Ciudad del Este',
 ];
 
+// Coordenadas centrales de cada ciudad — para centrar el mapa
 const CITY_CENTERS = {
-  'Asunción':           [-25.2867, -57.647 ],
-  'San Lorenzo':        [-25.3355, -57.5178],
-  'Luque':              [-25.2635, -57.4857],
-  'Fernando de la Mora':[-25.3085, -57.5225],
-  'Lambaré':            [-25.3404, -57.6075],
-  'Capiatá':            [-25.356,  -57.4455],
-  'Encarnación':        [-27.3333, -55.8667],
-  'Ciudad del Este':    [-25.5097, -54.611 ],
+  'Asunción': [-25.2867, -57.647],
+  'San Lorenzo': [-25.3355, -57.5178],
+  'Luque': [-25.2635, -57.4857],
+  'Fernando de la Mora': [-25.3085, -57.5225],
+  'Lambaré': [-25.3404, -57.6075],
+  'Capiatá': [-25.356, -57.4455],
+  'Encarnación': [-27.3333, -55.8667],
+  'Ciudad del Este': [-25.5097, -54.611],
 };
 
 export default function ListingsPage() {
   const { isAuthenticated } = useAuthStore();
-  const [listings,   setListings]   = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [view,       setView]       = useState('grid');
-  const [showFilters,setShowFilters]= useState(false);
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('grid');
+  const [showFilters, setShowFilters] = useState(false);
 
-  /**
-   * ✅ NUEVO: estado para el componente del mapa.
-   *
-   * JaikoMap usa react-leaflet (que no soporta SSR y es pesado).
-   * Lo cargamos de forma dinámica con import() solamente cuando el
-   * usuario activa la vista de mapa — no antes.
-   * Esto evita que leaflet se incluya en el bundle inicial de la página.
-   */
-  const [MapComp, setMapComp] = useState(null);
+  // ── CAMBIO 2: Leer el estado que nos pasó ProfilePage ────────────────────
+  // useLocation() devuelve el objeto de la ruta actual.
+  // .state es el objeto que pasamos en navigate('/listings', { state: {...} })
+  //
+  // Ejemplo de lo que puede llegar:
+  //   { flyTo: [-25.28, -57.64], switchToMap: true }
+  const routerState = useLocation().state;
+
+  // ── CAMBIO 3: Estado para las coordenadas de foco en el mapa ─────────────
+  // Si llegamos desde ProfilePage con flyTo, lo usamos como valor inicial.
+  // null = el mapa muestra el centro de la ciudad sin foco especial.
+  const [mapFlyTo, setMapFlyTo] = useState(
+    routerState?.flyTo || null
+  )
+
+  // ── CAMBIO 4: Estado para el componente JaikoMap (carga lazy) ─────────────
+  // Igual que en ListingDetailPage: cargamos JaikoMap solo cuando se necesita
+  // para no agregar su peso al bundle inicial de la página.
+  const [MapComp, setMapComp] = useState(null)
 
   const [filters, setFilters] = useState({
-    city:            'Asunción',
-    min_price:       '',
-    max_price:       '',
-    pets_allowed:    '',
-    smoking_allowed: '',
-    type:            '',
+    city:             'Asunción',
+    min_price:        '',
+    max_price:        '',
+    pets_allowed:     '',
+    smoking_allowed:  '',
+    type:             '',
+    // Nuevos filtros: género preferido del roomie y edad mínima
+    preferred_gender: '',   // 'male' | 'female' | 'non_binary' | '' (cualquiera)
+    min_age:          '',   // número >= 18, '' = sin límite
   });
 
-  // ── Cargar listados ────────────────────────────────────────────────────────
+  // ── CAMBIO 5: Efecto que responde a la navegación desde ProfilePage ────────
+  // Si llegamos con { switchToMap: true } en el estado del router,
+  // automáticamente activamos la vista de mapa.
+  // Solo corre una vez al montar el componente (dependencias vacías []).
+  useEffect(() => {
+    if (routerState?.switchToMap) {
+      setView('map')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── CAMBIO 6: Cargar JaikoMap de forma lazy cuando se activa la vista mapa ─
+  // No queremos cargar Leaflet si el usuario está en vista grid.
+  // useEffect con [view] se ejecuta cada vez que view cambia.
+  useEffect(() => {
+    if (view === 'map' && !MapComp) {
+      // import() dinámico: carga el módulo solo cuando se necesita
+      import('../components/map/JaikoMap').then(m => {
+        setMapComp(() => m.default)
+      })
+    }
+  }, [view])
+
+  // Carga los listings cuando cambian los filtros
   useEffect(() => {
     const params = new URLSearchParams({ page: 1, per_page: 24, city: filters.city });
-    if (filters.min_price)       params.set('min_price',       filters.min_price);
-    if (filters.max_price)       params.set('max_price',       filters.max_price);
-    if (filters.pets_allowed)    params.set('pets_allowed',    filters.pets_allowed);
-    if (filters.smoking_allowed) params.set('smoking_allowed', filters.smoking_allowed);
-    if (filters.type)            params.set('type',            filters.type);
+    if (filters.min_price)       params.set('min_price',        filters.min_price);
+    if (filters.max_price)       params.set('max_price',        filters.max_price);
+    if (filters.pets_allowed)    params.set('pets_allowed',     filters.pets_allowed);
+    if (filters.smoking_allowed) params.set('smoking_allowed',  filters.smoking_allowed);
+    if (filters.type)            params.set('type',             filters.type);
+    if (filters.preferred_gender) params.set('preferred_gender', filters.preferred_gender);
+    if (filters.min_age)         params.set('min_age',          filters.min_age);
 
     setLoading(true);
     api.get(`/listings/?${params}`)
@@ -8303,31 +9060,17 @@ export default function ListingsPage() {
       .finally(() => setLoading(false));
   }, [filters]);
 
-  /**
-   * ✅ NUEVO: cargar JaikoMap de forma dinámica al activar la vista mapa.
-   *
-   * Por qué no lo cargamos al montar el componente:
-   *   react-leaflet incluye todo Leaflet (~40kb gzipped) más el CSS del mapa.
-   *   Si el usuario nunca toca "Mapa", pagaría ese costo sin necesidad.
-   *   Con import() diferido, el chunk solo se descarga si se activa la vista.
-   *
-   * Por qué setMapComp(() => m.default) y no setMapComp(m.default):
-   *   Si pasás una función directamente a setState, React la llama como
-   *   "updater function". Al envolverla en () => m.default le indicamos
-   *   que el nuevo estado ES esa función, no el resultado de llamarla.
-   */
-  const handleViewChange = (newView) => {
-    setView(newView);
-    if (newView === 'map' && !MapComp) {
-      import('../components/map/JaikoMap')
-        .then(m => setMapComp(() => m.default))
-        .catch(() => {}); // silencioso: si falla, la vista queda vacía
-    }
-  };
+  const activeFilterCount = [
+    filters.min_price, filters.max_price, filters.pets_allowed,
+    filters.smoking_allowed, filters.type, filters.preferred_gender, filters.min_age,
+  ].filter(Boolean).length;
 
-  // Convertir listings a formato listingMarkers que acepta JaikoMap
+  // ── CAMBIO 7: Preparar los marcadores para JaikoMap ──────────────────────
+  // JaikoMap espera: [{ lat, lng, id, title, price, neighborhood }]
+  // Los listings tienen latitude/longitude (nombres distintos), hay que mapear.
+  // .filter() descarta listings sin coordenadas (no pueden mostrarse en el mapa).
   const listingMarkers = listings
-    .filter(l => l.latitude != null && l.longitude != null)
+    .filter(l => l.latitude && l.longitude)
     .map(l => ({
       lat:          l.latitude,
       lng:          l.longitude,
@@ -8335,44 +9078,35 @@ export default function ListingsPage() {
       title:        l.title,
       price:        l.total_price,
       neighborhood: l.neighborhood,
-    }));
-
-  const activeFilterCount = [
-    filters.min_price, filters.max_price, filters.pets_allowed,
-    filters.smoking_allowed, filters.type,
-  ].filter(Boolean).length;
+    }))
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
-          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900">
-            Departamentos
-          </h1>
-          <p className="text-orange-500 font-medium mt-1">
-            {listings.length} publicaciones disponibles
-          </p>
+          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900">Departamentos</h1>
+          <p className="text-orange-500 font-medium mt-1">{listings.length} publicaciones disponibles</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Toggle Grid / Mapa */}
+          {/* Botones Grid / Mapa */}
           <div className="flex bg-slate-100 p-1 rounded-2xl">
             <button
-              onClick={() => handleViewChange('grid')}
+              onClick={() => setView('grid')}
               className={`px-4 py-2 flex items-center gap-2 text-sm font-bold rounded-xl transition-all
-                ${view === 'grid'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-600'}`}
+                ${view === 'grid' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
               <LayoutGrid size={16} /> Grid
             </button>
             <button
-              onClick={() => handleViewChange('map')}
+              onClick={() => {
+                setView('map')
+                // Al cambiar a mapa manualmente (no desde perfil), limpiamos el flyTo
+                // para que no quede un foco residual de una navegación anterior
+                if (!routerState?.flyTo) setMapFlyTo(null)
+              }}
               className={`px-4 py-2 flex items-center gap-2 text-sm font-bold rounded-xl transition-all
-                ${view === 'map'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-600'}`}
+                ${view === 'map' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
               <Map size={16} /> Mapa
             </button>
@@ -8400,16 +9134,10 @@ export default function ListingsPage() {
       </div>
 
       {/* ── Filters ───────────────────────────────────────────────────────── */}
-      <div className={`card mb-10 overflow-hidden transition-all duration-500 ${
-        showFilters
-          ? 'max-h-[1000px] opacity-100 p-8'
-          : 'max-h-0 opacity-0 p-0 border-none shadow-none'
-      }`}>
+      <div className={`card mb-10 overflow-hidden transition-all duration-500 ${showFilters ? 'max-h-[1000px] opacity-100 p-8' : 'max-h-0 opacity-0 p-0 border-none shadow-none'}`}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-              Ciudad
-            </label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Ciudad</label>
             <select
               className="input"
               value={filters.city}
@@ -8420,9 +9148,7 @@ export default function ListingsPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-              Tipo
-            </label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Tipo</label>
             <select
               className="input"
               value={filters.type}
@@ -8436,35 +9162,57 @@ export default function ListingsPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-              Precio mín
-            </label>
-            <input
-              type="number" className="input" value={filters.min_price} placeholder="0"
-              onChange={e => setFilters(f => ({ ...f, min_price: e.target.value }))}
-            />
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Precio mín</label>
+            <input type="number" className="input" value={filters.min_price} placeholder="0"
+              onChange={e => setFilters(f => ({ ...f, min_price: e.target.value }))} />
           </div>
 
           <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Precio máx</label>
+            <input type="number" className="input" value={filters.max_price} placeholder="Sin límite"
+              onChange={e => setFilters(f => ({ ...f, max_price: e.target.value }))} />
+          </div>
+
+          {/* Género preferido del roomie */}
+          <div className="space-y-2">
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-              Precio máx
+              Género del roomie
+            </label>
+            <select
+              className="input"
+              value={filters.preferred_gender}
+              onChange={e => setFilters(f => ({ ...f, preferred_gender: e.target.value }))}
+            >
+              <option value="">Cualquiera</option>
+              <option value="male">Hombre</option>
+              <option value="female">Mujer</option>
+              <option value="non_binary">No binario</option>
+            </select>
+          </div>
+
+          {/* Edad mínima del roomie */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              Edad mínima del roomie
             </label>
             <input
-              type="number" className="input" value={filters.max_price} placeholder="Sin límite"
-              onChange={e => setFilters(f => ({ ...f, max_price: e.target.value }))}
+              type="number"
+              className="input"
+              min={18} max={80}
+              value={filters.min_age}
+              placeholder="Sin límite"
+              onChange={e => setFilters(f => ({ ...f, min_age: e.target.value }))}
             />
           </div>
 
           <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap gap-3 pt-4 border-t border-slate-50">
             {[
-              ['pets_allowed',    '🐾 Mascotas' ],
-              ['smoking_allowed', '🚬 Fumadores'],
+              ['pets_allowed', '🐾 Mascotas'],
+              ['smoking_allowed', '🚬 Fumadores']
             ].map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => setFilters(f => ({
-                  ...f, [key]: f[key] === 'true' ? '' : 'true',
-                }))}
+                onClick={() => setFilters(f => ({ ...f, [key]: f[key] === 'true' ? '' : 'true' }))}
                 className={`px-4 py-2 rounded-xl border-2 text-sm font-bold transition-all
                   ${filters[key] === 'true'
                     ? 'border-blue-500 bg-blue-50 text-blue-600'
@@ -8477,6 +9225,7 @@ export default function ListingsPage() {
               onClick={() => setFilters({
                 city: 'Asunción', min_price: '', max_price: '',
                 pets_allowed: '', smoking_allowed: '', type: '',
+                preferred_gender: '', min_age: '',
               })}
               className="ml-auto text-sm font-bold text-red-400 hover:text-red-500 flex items-center gap-1"
             >
@@ -8486,72 +9235,58 @@ export default function ListingsPage() {
         </div>
       </div>
 
-      {/* ── Contenido: Grid o Mapa ────────────────────────────────────────── */}
+      {/* ── CAMBIO 8: Contenido con vista Mapa implementada ──────────────── */}
       {loading ? (
         <div className="flex justify-center py-32"><Spinner size="lg" /></div>
 
-      ) : listings.length === 0 ? (
-        <EmptyState
-          icon="🏠"
-          title="No hay publicaciones"
-          description="Sé el primero en publicar en esta ciudad."
-        />
+      ) : listings.length === 0 && view === 'grid' ? (
+        <EmptyState icon="🏠" title="No hay publicaciones" description="Sé el primero en publicar en esta ciudad." />
 
-      ) : view === 'grid' ? (
-        /* ── Vista grilla ─────────────────────────────────────────────────── */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {listings.map(l => <ListingCard key={l.id} listing={l} />)}
+      ) : view === 'map' ? (
+        // ── VISTA MAPA ──────────────────────────────────────────────────────
+        <div>
+          {/* Contador de marcadores sobre el mapa */}
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-bold text-slate-500">
+              {listingMarkers.length === 0
+                ? 'No hay departamentos con ubicación en esta ciudad'
+                : `${listingMarkers.length} departamento${listingMarkers.length !== 1 ? 's' : ''} en el mapa`
+              }
+            </p>
+            {/* Si llegamos desde el perfil con flyTo, mostramos de dónde vino el foco */}
+            {mapFlyTo && (
+              <button
+                onClick={() => setMapFlyTo(null)}
+                className="text-xs font-bold text-orange-500 hover:text-orange-600 flex items-center gap-1"
+              >
+                <X size={12} /> Quitar foco de tu ubicación
+              </button>
+            )}
+          </div>
+
+          {MapComp ? (
+            // JaikoMap ya está cargado → renderizamos el mapa
+            <MapComp
+              center={CITY_CENTERS[filters.city] || [-25.2867, -57.647]}
+              listingMarkers={listingMarkers}
+              height="600px"
+              flyTo={mapFlyTo}
+            />
+          ) : (
+            // JaikoMap todavía se está cargando (import() dinámico)
+            <div className="flex justify-center items-center py-32 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="flex flex-col items-center gap-3 text-slate-400">
+                <Spinner size="lg" />
+                <p className="text-sm font-medium">Cargando mapa...</p>
+              </div>
+            </div>
+          )}
         </div>
 
       ) : (
-        /* ── Vista mapa ───────────────────────────────────────────────────────
-         *
-         * ✅ FIX: Esta sección no existía antes.
-         *
-         * El botón "Mapa" cambiaba view a 'map' pero el JSX no tenía
-         * ninguna rama para ese estado — el contenido desaparecía por completo.
-         *
-         * Ahora:
-         *  1. Si MapComp aún no cargó (import() en curso) → muestra spinner.
-         *  2. Si no hay departamentos con coords → muestra mensaje informativo.
-         *  3. Si todo está listo → renderiza JaikoMap con listingMarkers.
-         *
-         * Por qué un contenedor con altura fija (h-[500px]):
-         *   JaikoMap necesita que el padre tenga altura definida.
-         *   Con height: '100%' sin un padre con altura, el mapa queda en 0px.
-         *   500px en mobile, 600px en sm+ da una experiencia cómoda.
-         */
-        <div>
-          {/* Contador de pins disponibles */}
-          {listingMarkers.length < listings.length && (
-            <p className="text-sm text-slate-400 mb-3">
-              Mostrando {listingMarkers.length} de {listings.length} departamentos en el mapa
-              (los demás no tienen coordenadas registradas).
-            </p>
-          )}
-
-          <div className="h-[500px] sm:h-[600px] w-full rounded-2xl overflow-hidden shadow-lg">
-            {!MapComp ? (
-              // Mapa aún cargando (import() en progreso)
-              <div className="flex items-center justify-center h-full bg-slate-50 rounded-2xl border border-slate-100">
-                <Spinner size="lg" />
-              </div>
-            ) : listingMarkers.length === 0 ? (
-              // Ningún listing tiene coordenadas
-              <div className="flex flex-col items-center justify-center h-full bg-slate-50 rounded-2xl border border-dashed border-slate-200 gap-4">
-                <span className="text-5xl opacity-30">🗺️</span>
-                <p className="text-slate-400 font-medium text-center max-w-xs">
-                  Ningún departamento de esta ciudad tiene coordenadas registradas todavía.
-                </p>
-              </div>
-            ) : (
-              <MapComp
-                center={CITY_CENTERS[filters.city] || [-25.2867, -57.647]}
-                listingMarkers={listingMarkers}
-                height="100%"
-              />
-            )}
-          </div>
+        // ── VISTA GRID (original, sin cambios) ────────────────────────────
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {listings.map(l => <ListingCard key={l.id} listing={l} />)}
         </div>
       )}
     </div>
@@ -8803,40 +9538,57 @@ FILE_PATH: .\frontend\src\pages\NotificationsPage.jsx
 ----------------------------------------
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, MessageSquare, UserPlus, CheckCircle2, XCircle, ShieldCheck, AlertCircle } from 'lucide-react';
+import {
+  MessageSquare, UserPlus, CheckCircle2,
+  XCircle, ShieldCheck, AlertCircle, Users,
+} from 'lucide-react';
 import useNotifStore from '../context/notifStore';
-import { formatDistanceToNow } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { EmptyState } from '../components/ui';
 import { motion } from 'motion/react';
 
 const ICONS = {
-  message: { icon: <MessageSquare size={20} />, color: 'bg-blue-500' },
-  match_request: { icon: <UserPlus size={20} />, color: 'bg-orange-500' },
-  request_accepted: { icon: <CheckCircle2 size={20} />, color: 'bg-emerald-500' },
-  request_rejected: { icon: <XCircle size={20} />, color: 'bg-red-500' },
-  system: { icon: <ShieldCheck size={20} />, color: 'bg-slate-900' },
-  alert: { icon: <AlertCircle size={20} />, color: 'bg-amber-500' },
+  message:          { icon: <MessageSquare size={20} />, color: 'bg-blue-500'    },
+  match_request:    { icon: <UserPlus size={20} />,      color: 'bg-orange-500'  },
+  join_request:     { icon: <Users size={20} />,         color: 'bg-purple-500'  },
+  request_accepted: { icon: <CheckCircle2 size={20} />,  color: 'bg-emerald-500' },
+  request_rejected: { icon: <XCircle size={20} />,       color: 'bg-red-500'     },
+  system:           { icon: <ShieldCheck size={20} />,   color: 'bg-slate-900'   },
+  alert:            { icon: <AlertCircle size={20} />,   color: 'bg-amber-500'   },
 };
 
 export default function NotificationsPage() {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
   const { notifications, unread, markRead, markAllRead } = useNotifStore();
 
   const handleClick = (n) => {
     markRead(n.id);
     const d = n.data || {};
-    if (n.type === 'message' && d.chat_id) return navigate(`/chat/${d.chat_id}`);
-    if (n.type === 'match_request' && d.sender_id) return navigate(`/profile/${d.sender_id}`);
+
+    if (n.type === 'match_request' && d.sender_id) {
+      return navigate(`/profile/${d.sender_id}`, {
+        state: { pendingRequestId: d.request_id },
+      });
+    }
+    if (n.type === 'join_request' && d.group_id) {
+      return navigate(`/groups/${d.group_id}`);
+    }
+    if (n.type === 'message' && d.chat_id) {
+      return navigate(`/chat/${d.chat_id}`);
+    }
+    if (n.type === 'request_accepted' && d.sender_id) {
+      return navigate(`/profile/${d.sender_id}`);
+    }
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12 pb-24 md:pb-12">
       <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900">Notificaciones</h1>
+          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900">
+            Notificaciones
+          </h1>
           <p className="text-orange-500 font-medium mt-1">
-            {unread > 0 ? `Tenés ${unread} mensajes sin leer` : 'Estás al día'}
+            {unread > 0 ? `Tenés ${unread} sin leer` : 'Estás al día'}
           </p>
         </div>
         {unread > 0 && (
@@ -8863,23 +9615,36 @@ export default function NotificationsPage() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.05 }}
                 onClick={() => handleClick(n)}
-                className={`w-full text-left p-6 rounded-[2rem] border transition-all duration-300 flex items-start gap-6 group
-                  ${!n.read ? 'bg-white border-blue-100 shadow-xl shadow-blue-500/5' : 'bg-slate-50 border-slate-100 opacity-60'}`}
+                className={`w-full text-left p-6 rounded-[2rem] border
+                  transition-all duration-300 flex items-start gap-6 group
+                  ${!n.read
+                    ? 'bg-white border-blue-100 shadow-xl shadow-blue-500/5'
+                    : 'bg-slate-50 border-slate-100 opacity-60'
+                  }`}
               >
-                <div className={`w-12 h-12 rounded-2xl ${cfg.color} text-white flex items-center justify-center shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                <div className={`w-12 h-12 rounded-2xl ${cfg.color} text-white
+                  flex items-center justify-center shadow-lg flex-shrink-0
+                  group-hover:scale-110 transition-transform`}
+                >
                   {cfg.icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start mb-1">
-                    <p className="font-bold text-slate-900">{n.title}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      {formatDistanceToNow(new Date(n.created_at), { locale: es, addSuffix: true })}
-                    </p>
-                  </div>
+                  <p className="font-bold text-slate-900 mb-1">{n.title}</p>
                   <p className="text-slate-500 text-sm leading-relaxed">{n.content}</p>
+                  {n.type === 'match_request' && (
+                    <p className="text-xs text-orange-500 font-bold mt-2">
+                      Tocá para ver el perfil y responder →
+                    </p>
+                  )}
+                  {n.type === 'join_request' && (
+                    <p className="text-xs text-purple-500 font-bold mt-2">
+                      Tocá para ir al grupo y decidir →
+                    </p>
+                  )}
                 </div>
                 {!n.read && (
-                  <div className="w-2.5 h-2.5 bg-blue-600 rounded-full mt-2 shadow-lg shadow-blue-600/40" />
+                  <div className="w-2.5 h-2.5 bg-blue-600 rounded-full mt-2
+                    shadow-lg shadow-blue-600/40 flex-shrink-0" />
                 )}
               </motion.button>
             );
@@ -8897,7 +9662,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Edit2, MessageCircle, UserPlus, Flag, Star,
-  MapPin, Briefcase, Calendar, ShieldCheck, UserMinus, Lock,
+  // ── CAMBIO 1: Agregamos Map2 para el botón "Ver en mapa" ──────────────────
+  // Map2 es la versión sólida del ícono de mapa en lucide-react
+  MapPin, Briefcase, Calendar, ShieldCheck, UserMinus, Lock, Map,
 } from 'lucide-react';
 import api from '../services/api';
 import useAuthStore from '../context/authStore';
@@ -8906,10 +9673,6 @@ import { toast } from 'react-hot-toast';
 import { motion } from 'motion/react';
 
 // ─── Sub-componente: Input de estrellas ───────────────────────────────────────
-/**
- * Selector de estrellas para el formulario de reseña.
- * Componente separado por responsabilidad única (Single Responsibility).
- */
 const StarInput = ({ value, onChange }) => (
   <div className="flex gap-1" role="group" aria-label="Calificación">
     {[1, 2, 3, 4, 5].map((star) => (
@@ -8990,26 +9753,47 @@ export default function ProfilePage() {
     }
   }, [targetId, isMe]);
 
-  /**
-   * ✅ NUEVO: Lógica wasRoomie basada en current_roomie_id.
-   *
-   * Condición: el usuario autenticado (me) y el perfil visitado (targetId)
-   * se consideran "roomies" si alguno de los dos tiene al otro como
-   * current_roomie_id.
-   *
-   * Por qué importa: la regla de negocio dice que solo se puede reseñar
-   * a alguien con quien se fue roomie, para evitar reseñas falsas.
-   *
-   * LIMITACIÓN ACTUAL: Solo detecta roomies ACTUALES (current_roomie_id).
-   * Para detectar roomies PASADOS se necesitaría una tabla
-   * `roommate_history` (pendiente en el backend).
-   */
   const wasRoomie = !isMe && Boolean(
     myProfile?.current_roomie_id === targetId ||
     profile?.current_roomie_id === me?.id,
   );
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
+  // ── isRoomie: indica si el usuario visitado es mi roomie ACTUAL ────────────
+  // Usamos current_roomie?.id porque el perfil devuelve el objeto completo,
+  // no solo el ID. Verificamos ambas direcciones por si la relación quedó
+  // registrada en uno solo de los dos perfiles.
+  const isRoomie = !isMe && Boolean(
+    myProfile?.current_roomie?.id === targetId ||
+    profile?.current_roomie?.id   === me?.id
+  );
+
+  // ── CAMBIO 2: Handler para navegar al mapa ─────────────────────────────────
+  //
+  // ¿Cómo funciona la comunicación entre páginas?
+  // React Router permite pasar datos entre rutas a través de `navigate()`.
+  // El segundo argumento `{ state: {...} }` guarda datos en la "memoria del router"
+  // que solo dura mientras la sesión de navegación está activa.
+  //
+  // En ListingsPage, usaremos `useLocation().state` para leer estos datos
+  // y hacer foco en las coordenadas del usuario.
+  //
+  // Los datos que pasamos:
+  //   flyTo:         [lat, lng] → Las coordenadas donde el mapa debe hacer foco
+  //   switchToMap:   true       → Le dice a ListingsPage que abra la vista mapa
+  const handleViewOnMap = () => {
+    if (!profile?.lat || !profile?.lng) {
+      toast.error('No tenés una ubicación guardada. Editá tu perfil para agregarla.')
+      return
+    }
+    navigate('/listings', {
+      state: {
+        flyTo: [profile.lat, profile.lng],
+        switchToMap: true,          // ListingsPage leerá esto para cambiar la vista
+      }
+    })
+  }
+
+  // ── Handlers existentes (sin cambios) ─────────────────────────────────────
   const respondRequest = async (reqId, action) => {
     try {
       const { data } = await api.put(`/requests/${reqId}/respond`, { action });
@@ -9041,7 +9825,22 @@ export default function ProfilePage() {
     try {
       const { data } = await api.post(`/chats/private/${targetId}`);
       navigate(`/chat/${data.chat.id}`);
-    } catch { toast.error('Error al abrir el chat'); }
+    } catch (e) {
+      if (e.response?.status === 403) {
+        const { code, group_chat_id, error } = e.response.data
+
+        if (code === 'SAME_GROUP' && group_chat_id) {
+          // Están en el mismo grupo → redirigir al chat grupal
+          toast('Están en el mismo grupo. Abriendo chat del grupo...', { icon: '👥' })
+          navigate(`/chat/${group_chat_id}`)
+        } else {
+          // No son roomies u otro error de permisos
+          toast.error(error || 'No podés iniciar este chat')
+        }
+      } else {
+        toast.error('Error al abrir el chat')
+      }
+    }
   };
 
   const handleReport = async () => {
@@ -9057,29 +9856,17 @@ export default function ProfilePage() {
     } catch { toast.error('Error al enviar el reporte'); }
   };
 
-  /**
-   * ✅ NUEVO: Handler "Dejar de ser roomie".
-   *
-   * Solo frontend por ahora. Preparado para conectar al backend.
-   *
-   * TODO (backend): PUT /api/profiles/me con { current_roomie_id: null }
-   * IMPORTANTE: el endpoint debe también limpiar el current_roomie_id
-   * del otro usuario (transacción doble). Ver profile_routes.py.
-   */
-  const handleLeaveRoomie = () => {
-    // TODO: descomentar cuando el backend esté listo:
-    // await api.put('/profiles/me', { current_roomie_id: null });
-    // updateProfile({ ...myProfile, current_roomie: null, current_roomie_id: null });
-    // setRoommate(null);
-    toast('Esta acción estará disponible próximamente.', { icon: '🚧' });
+  const handleLeaveRoomie = async () => {
+    try {
+      await api.post('/requests/leave-roomie');
+      toast.success('Ya no son roomies');
+      setRoommate(null);
+      updateProfile({ ...myProfile, current_roomie: null, current_roomie_id: null, is_looking: true });
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Error al dejar de ser roomie');
+    }
   };
 
-  /**
-   * ✅ NUEVO: Handler para enviar una reseña.
-   *
-   * Solo se puede llegar aquí si wasRoomie === true (la UI lo bloquea de otra forma).
-   * El endpoint /reviews/ ya existe en review_routes.py.
-   */
   const handleSubmitReview = async () => {
     if (reviewRating === 0) { toast.error('Seleccioná al menos 1 estrella'); return; }
     setSubmittingReview(true);
@@ -9093,7 +9880,6 @@ export default function ProfilePage() {
       setShowReviewForm(false);
       setReviewComment('');
       setReviewRating(5);
-      // Recargar las reseñas del perfil
       const { data } = await api.get(`/reviews/user/${targetId}`);
       setReviews(data.reviews);
     } catch (e) {
@@ -9153,16 +9939,50 @@ export default function ProfilePage() {
                     </Badge>
                   )}
                 </div>
+
+                {/* Datos del perfil: edad, profesión, ciudad */}
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-blue-900/60 font-bold">
                   {profile.age       && <span className="flex items-center gap-1.5"><Calendar size={16} className="text-orange-500" /> {profile.age} años</span>}
                   {profile.profession && <span className="flex items-center gap-1.5"><Briefcase size={16} className="text-orange-500" /> {profile.profession}</span>}
-                  {profile.city      && <span className="flex items-center gap-1.5"><MapPin size={16} className="text-orange-500" /> {profile.city}</span>}
+                  {profile.city      && (
+                    <span className="flex items-center gap-1.5">
+                      <MapPin size={16} className="text-orange-500" />
+                      {profile.city}
+
+                      {/* ── CAMBIO 3: Botón "Ver en mapa" ───────────────────── */}
+                      {/*
+                       * Condiciones para mostrar el botón:
+                       * 1. isMe → Solo el propio usuario ve este botón
+                       * 2. profile.lat && profile.lng → Solo si tiene ubicación guardada
+                       *
+                       * Al hacer clic llama a handleViewOnMap() que navega a
+                       * /listings pasando las coordenadas y la orden de abrir el mapa.
+                       *
+                       * Si no tiene ubicación, muestra un toast explicativo
+                       * (ver handleViewOnMap arriba).
+                       */}
+                      {isMe && (
+                        <button
+                          onClick={handleViewOnMap}
+                          title={profile.lat && profile.lng
+                            ? 'Ver tu ubicación en el mapa de departamentos'
+                            : 'Agregá tu ubicación en Editar Perfil para usar esta función'
+                          }
+                          className="ml-1 inline-flex items-center gap-1 text-xs font-bold text-orange-500
+                            hover:text-orange-600 hover:bg-orange-50 px-2 py-0.5 rounded-lg transition-all"
+                        >
+                          <Map size={12} />
+                          Ver en mapa
+                        </button>
+                      )}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {!isMe && (
                 <div className="flex items-center gap-3">
-                  {!roommate && !pendingRequest && (
+                  {!roommate && !pendingRequest && !myProfile?.current_roomie && (
                     <button
                       onClick={handleSendRequest}
                       disabled={requestSent}
@@ -9172,12 +9992,37 @@ export default function ProfilePage() {
                       {requestSent ? 'Enviada' : 'Solicitar Roomie'}
                     </button>
                   )}
-                  <button
-                    onClick={handleOpenChat}
-                    className="btn-secondary flex items-center gap-2 py-2.5"
-                  >
-                    <MessageCircle size={18} /> Chat
-                  </button>
+
+                  {/* ── Botón Chat con lógica de permisos ────────────────── */}
+                  {/*
+                   * El chat privado solo está permitido entre roomies confirmados.
+                   * Si NO son roomies → mostramos el botón bloqueado con tooltip.
+                   * Si SÍ son roomies → botón funcional que abre el chat privado
+                   *   (o redirige al grupo si están en el mismo grupo).
+                   *
+                   * El candado es intencional: le muestra al usuario que la función
+                   * existe pero que primero necesita confirmar una relación de roomie.
+                   */}
+                  {isRoomie ? (
+                    <button
+                      onClick={handleOpenChat}
+                      className="btn-secondary flex items-center gap-2 py-2.5"
+                    >
+                      <MessageCircle size={18} /> Chat
+                    </button>
+                  ) : (
+                    <div
+                      title="Aceptá una solicitud de roomie para poder chatear en privado"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-2xl
+                        bg-slate-50 border-2 border-slate-100
+                        text-slate-300 text-sm font-bold
+                        cursor-not-allowed select-none"
+                    >
+                      <Lock size={16} />
+                      Chat
+                    </div>
+                  )}
+
                   <button
                     onClick={() => setReportModal(true)}
                     className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
@@ -9197,18 +10042,18 @@ export default function ProfilePage() {
             {/* Banner de roomie actual */}
             {roommate && (
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl border border-emerald-100">
+                {/* Al hacer click navega al perfil del roomie */}
+                <Link
+                  to={`/profile/${roommate.id}`}
+                  className="inline-flex items-center gap-2 px-4 py-2
+                    bg-emerald-50 text-emerald-700 font-bold rounded-xl
+                    border border-emerald-100 hover:bg-emerald-100
+                    transition-colors"
+                >
                   <span className="text-lg">🏠</span>
                   {isMe ? `Soy roomie de ${roommate.name}` : `Es roomie de ${roommate.name}`}
-                </div>
+                </Link>
 
-                {/*
-                 * ✅ NUEVO: Botón "Dejar de ser roomie"
-                 *
-                 * Solo visible para el propio usuario (isMe) cuando tiene un roomie activo.
-                 * Handler conectado al mock → listo para backend.
-                 * Estilo: texto pequeño, rojo, discreto → acción destructiva poco frecuente.
-                 */}
                 {isMe && (
                   <button
                     onClick={handleLeaveRoomie}
@@ -9340,18 +10185,7 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/*
-           * ✅ NUEVO: Sección "Escribir reseña"
-           *
-           * Solo visible para usuarios que visitan el perfil de otra persona.
-           * Se muestra en DOS estados:
-           *   1. wasRoomie === true → formulario habilitado
-           *   2. wasRoomie === false → estado bloqueado con explicación
-           *
-           * Por qué importa esta distinción:
-           *   Previene reseñas de personas que nunca convivieron juntas,
-           *   lo que protege la reputación de los usuarios en la plataforma.
-           */}
+          {/* Formulario de reseña */}
           {!isMe && (
             <div className="card">
               <h2 className="font-display font-extrabold text-2xl text-slate-900 mb-4">
@@ -9359,7 +10193,6 @@ export default function ProfilePage() {
               </h2>
 
               {wasRoomie ? (
-                /* ── Formulario habilitado (fueron roomies) ── */
                 showReviewForm ? (
                   <div className="space-y-5">
                     <div>
@@ -9380,18 +10213,10 @@ export default function ProfilePage() {
                       />
                     </div>
                     <div className="flex gap-3 pt-2 border-t border-slate-50">
-                      <button
-                        type="button"
-                        onClick={() => setShowReviewForm(false)}
-                        className="flex-1 btn-ghost"
-                      >
+                      <button type="button" onClick={() => setShowReviewForm(false)} className="flex-1 btn-ghost">
                         Cancelar
                       </button>
-                      <button
-                        onClick={handleSubmitReview}
-                        disabled={submittingReview}
-                        className="flex-1 btn-primary"
-                      >
+                      <button onClick={handleSubmitReview} disabled={submittingReview} className="flex-1 btn-primary">
                         {submittingReview ? 'Enviando...' : 'Enviar reseña'}
                       </button>
                     </div>
@@ -9408,16 +10233,12 @@ export default function ProfilePage() {
                   </button>
                 )
               ) : (
-                /* ── Estado bloqueado (no fueron roomies) ── */
                 <div className="flex flex-col items-center gap-3 py-6 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center">
                   <Lock size={28} className="text-slate-300" />
                   <div>
-                    <p className="font-bold text-slate-500 mb-1">
-                      Reseña no disponible
-                    </p>
+                    <p className="font-bold text-slate-500 mb-1">Reseña no disponible</p>
                     <p className="text-sm text-slate-400 max-w-xs">
                       Solo podés reseñar a alguien con quien hayas sido roomie.
-                      Si conviviste con esta persona, la opción se habilitará automáticamente.
                     </p>
                   </div>
                 </div>
@@ -9464,14 +10285,8 @@ export default function ProfilePage() {
         <Modal open={reportModal} onClose={() => setReportModal(false)} title="Reportar usuario">
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-                Motivo
-              </label>
-              <select
-                className="input"
-                value={reportReason}
-                onChange={(e) => setReportReason(e.target.value)}
-              >
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Motivo</label>
+              <select className="input" value={reportReason} onChange={(e) => setReportReason(e.target.value)}>
                 <option value="fake_profile">Perfil falso</option>
                 <option value="inappropriate">Contenido inapropiado</option>
                 <option value="spam">Spam</option>
@@ -9480,9 +10295,7 @@ export default function ProfilePage() {
               </select>
             </div>
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-                Descripción (opcional)
-              </label>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Descripción (opcional)</label>
               <textarea
                 className="input resize-none h-32"
                 value={reportDesc}
@@ -9491,12 +10304,8 @@ export default function ProfilePage() {
               />
             </div>
             <div className="flex gap-3 pt-4">
-              <button onClick={() => setReportModal(false)} className="flex-1 btn-ghost">
-                Cancelar
-              </button>
-              <button onClick={handleReport} className="flex-1 btn-primary">
-                Enviar reporte
-              </button>
+              <button onClick={() => setReportModal(false)} className="flex-1 btn-ghost">Cancelar</button>
+              <button onClick={handleReport} className="flex-1 btn-primary">Enviar reporte</button>
             </div>
           </div>
         </Modal>
@@ -10026,7 +10835,8 @@ export default function SearchPage() {
 FILE_PATH: .\frontend\src\pages\VerificationPage.jsx
 ----------------------------------------
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Upload, Clock, CheckCircle2, XCircle, Camera, Loader2, Info } from 'lucide-react';
+// ── CAMBIO 1: Agregamos FileText al import (ícono para los documentos) ────────
+import { ShieldCheck, Upload, Clock, CheckCircle2, XCircle, Camera, Loader2, Info, FileText } from 'lucide-react';
 import api from '../services/api';
 import { uploadVerificationSelfie } from '../services/storage';
 import { toast } from 'react-hot-toast';
@@ -10040,6 +10850,173 @@ const STATUS_CONFIG = {
   rejected:             { icon: XCircle,       color: 'text-red-500',     bg: 'bg-red-50', border: 'border-red-100', label: 'Rechazado' },
 };
 
+// ── CAMBIO 2: Nuevo componente reutilizable para subir documentos ─────────────
+//
+// ¿Por qué lo creamos como un componente separado y no dentro de VerificationPage?
+// Porque tanto la Cédula como los Antecedentes tienen exactamente la misma
+// estructura (input de archivo, botón de subir, badge de estado). Si copiáramos
+// el código dos veces, cualquier cambio futuro habría que hacerlo en dos lugares.
+// Un componente reutilizable resuelve eso — principio DRY (Don't Repeat Yourself).
+//
+// Props que recibe:
+//   title        → Nombre que se muestra (ej: "Cédula de Identidad")
+//   description  → Texto de ayuda debajo del título
+//   documentType → Identificador para el backend (ej: "cedula" o "antecedentes")
+//
+function DocumentUploadCard({ title, description, documentType }) {
+  // Estado del proceso de este documento particular:
+  //   'idle'      → No se subió nada todavía
+  //   'uploading' → Se está enviando al servidor en este momento
+  //   'pending'   → Subido con éxito, esperando revisión del equipo
+  //   'verified'  → El equipo confirmó que el documento es válido
+  const [status, setStatus]     = useState('idle')
+  const [file, setFile]         = useState(null)      // El archivo seleccionado
+  const [fileName, setFileName] = useState('')        // Nombre del archivo (para mostrarlo)
+  const fileRef                 = useRef(null)        // Referencia al input file oculto
+
+  const handleFileSelect = (e) => {
+    const selected = e.target.files[0]
+    if (!selected) return
+
+    // Validamos tamaño máximo de 10MB
+    // 10 * 1024 * 1024 = 10 MB en bytes
+    if (selected.size > 10 * 1024 * 1024) {
+      toast.error('El archivo no puede superar 10MB')
+      return
+    }
+    setFile(selected)
+    setFileName(selected.name)
+  }
+
+  const handleUpload = async () => {
+    if (!file) { toast.error('Seleccioná un archivo primero'); return }
+
+    setStatus('uploading')
+    try {
+      // FormData es la forma estándar de enviar archivos por HTTP.
+      // Funciona igual que un formulario HTML con enctype="multipart/form-data"
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('document_type', documentType) // 'cedula' o 'antecedentes'
+
+      // Llamamos al endpoint del backend.
+      // ⚠️ NOTA: este endpoint /verification/document todavía hay que crearlo
+      // en verification_routes.py con el mismo patrón que uploadVerificationSelfie
+      await api.post('/verification/document', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+
+      // Si llegamos aquí es porque el servidor respondió OK (status 2xx)
+      setStatus('pending')
+      setFile(null)
+      toast.success(`${title} enviada. El equipo la revisará pronto.`)
+    } catch (err) {
+      // Volvemos a 'idle' para que el usuario pueda reintentar
+      setStatus('idle')
+      toast.error(err.response?.data?.error || 'Error al subir el documento')
+    }
+  }
+
+  // Configuración visual para cada estado posible
+  // Cada estado tiene su propio color, fondo, texto e ícono
+  const statusConfig = {
+    idle:      { color: 'text-slate-400',   bg: 'bg-slate-50',   label: 'Sin subir',             icon: FileText     },
+    uploading: { color: 'text-blue-500',    bg: 'bg-blue-50',    label: 'Subiendo...',            icon: Loader2      },
+    pending:   { color: 'text-amber-500',   bg: 'bg-amber-50',   label: 'Pendiente de revisión', icon: Clock        },
+    verified:  { color: 'text-emerald-500', bg: 'bg-emerald-50', label: 'Verificado',             icon: CheckCircle2 },
+  }
+
+  const cfg      = statusConfig[status]
+  const StatusIcon = cfg.icon
+
+  return (
+    <div className="card p-6 border border-slate-100">
+
+      {/* Cabecera: título a la izquierda, badge de estado a la derecha */}
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="font-bold text-slate-900 text-lg">{title}</h3>
+          <p className="text-sm text-slate-500 mt-1">{description}</p>
+        </div>
+
+        {/* Badge que cambia según el estado actual */}
+        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${cfg.bg} ${cfg.color} flex-shrink-0 ml-3`}>
+          <StatusIcon
+            size={12}
+            // Cuando está subiendo, el ícono gira (efecto spinner)
+            className={status === 'uploading' ? 'animate-spin' : ''}
+          />
+          {cfg.label}
+        </div>
+      </div>
+
+      {/* Zona de upload: solo se muestra cuando el estado es 'idle' */}
+      {/* Cuando ya se subió (pending/verified), no tiene sentido mostrarlo */}
+      {status === 'idle' && (
+        <div className="space-y-3">
+
+          {/* Zona clickeable estilo "drag & drop" */}
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="w-full border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-orange-300 hover:bg-orange-50 transition-all group"
+          >
+            <Upload className="w-8 h-8 text-slate-300 group-hover:text-orange-400 mx-auto mb-2 transition-colors" />
+            <p className="text-sm font-medium text-slate-500 group-hover:text-orange-500">
+              {/* Si ya eligieron un archivo, mostramos su nombre */}
+              {fileName || 'Hacé clic para seleccionar el archivo'}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">PDF, JPG o PNG · máximo 10MB</p>
+          </button>
+
+          {/* Input de archivo real — está oculto porque el botón de arriba lo activa */}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,image/jpeg,image/png"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+
+          {/* Botón "Enviar" — aparece solo después de seleccionar un archivo */}
+          {file && (
+            <button
+              onClick={handleUpload}
+              className="w-full btn-primary flex items-center justify-center gap-2"
+            >
+              <Upload size={16} />
+              Enviar {title}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Mensaje cuando el documento está en revisión */}
+      {status === 'pending' && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100 mt-2">
+          <Clock size={16} className="text-amber-500 flex-shrink-0" />
+          <p className="text-sm text-amber-700 font-medium">
+            Documento recibido. Nuestro equipo lo revisará en las próximas 24-48 horas.
+          </p>
+        </div>
+      )}
+
+      {/* Mensaje cuando el documento fue verificado exitosamente */}
+      {status === 'verified' && (
+        <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 mt-2">
+          <CheckCircle2 size={16} className="text-emerald-500 flex-shrink-0" />
+          <p className="text-sm text-emerald-700 font-medium">
+            Documento verificado correctamente.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Componente principal — sin cambios en su lógica interna
+// ─────────────────────────────────────────────────────────────────────────────
 export default function VerificationPage() {
   const [verification, setVerification] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -10107,6 +11084,7 @@ export default function VerificationPage() {
         </p>
       </div>
 
+      {/* Badge global del estado de la cuenta — sin cambios */}
       <div className={`card mb-12 flex flex-col sm:flex-row items-center gap-8 p-10 ${cfg.bg} ${cfg.border}`}>
         <div className={`w-20 h-20 rounded-3xl bg-white flex items-center justify-center shadow-xl ${cfg.color}`}>
           <Icon size={40} />
@@ -10116,6 +11094,35 @@ export default function VerificationPage() {
           <h2 className={`text-3xl font-display font-extrabold ${cfg.color}`}>{cfg.label}</h2>
         </div>
       </div>
+
+      {/* ── CAMBIO 3: Sección de documentos — siempre visible ─────────────────
+          Se muestra independientemente del estado de la verificación principal.
+          Usamos el componente DocumentUploadCard para cada tipo de documento.
+          La prop documentType es lo que distingue a uno del otro internamente. */}
+      <div className="mb-12">
+        <h2 className="font-display font-extrabold text-2xl text-slate-900 mb-2">
+          Documentos requeridos
+        </h2>
+        <p className="text-slate-500 text-sm mb-6">
+          Subí los documentos a continuación. El equipo los revisará de forma manual y actualizará el estado de cada uno.
+        </p>
+
+        {/* Grid de 2 columnas en pantallas medianas, 1 columna en móvil */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <DocumentUploadCard
+            title="Cédula de Identidad"
+            description="Foto clara del frente y dorso de tu cédula."
+            documentType="cedula"
+          />
+          <DocumentUploadCard
+            title="Antecedentes Penales"
+            description="Certificado oficial de antecedentes penales."
+            documentType="antecedentes"
+          />
+        </div>
+      </div>
+
+      {/* Las secciones de abajo son las originales — sin ningún cambio */}
 
       {status === 'not_requested' && (
         <div className="grid md:grid-cols-2 gap-8">

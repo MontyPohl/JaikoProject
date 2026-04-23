@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function ChatPage() {
   const { chatId } = useParams();
-  const { user }   = useAuthStore();
+  const { user, profile } = useAuthStore();
   const navigate   = useNavigate();
 
   const [chats,   setChats]   = useState([]);
@@ -209,12 +209,19 @@ export default function ChatPage() {
     return other?.photo ?? null;
   };
 
+  // Devuelve el user_id del otro miembro en chats privados (para el link al perfil)
+  const getOtherUserId = (chat) => {
+    const other = chat.members?.find((m) => m.user_id !== user?.id);
+    return other?.user_id ?? null;
+  };
+
   // ── FIX LÍNEAS FANTASMA (segunda capa de defensa) ─────────────────────────
   // El backend ya filtra los chats privados sin mensajes, pero lo repetimos
-  // acá por si hubiera chats cacheados en el estado antes del fix del backend.
-  // Los chats de grupo siempre se muestran aunque no tengan mensajes todavía.
+  // Mostramos todos los chats privados — los chats vacíos ya no son "fantasmas"
+  // porque solo se crean al aceptar una solicitud de roomie (controlado).
+  // Los chats de grupo siempre se muestran.
   const visibleChats = chats.filter(chat =>
-    chat.type !== 'private' || chat.last_message !== null
+    chat.type !== 'private' || chat.members?.length > 0
   );
 
   const handleBack = () => {
@@ -329,23 +336,52 @@ export default function ChatPage() {
                   >
                     <ArrowLeft size={20} />
                   </button>
-                  <Avatar
-                    src={getChatPhoto(active)}
-                    name={getChatName(active)}
-                    size="md"
-                    className="border-2 border-slate-100"
-                  />
-                  <div>
-                    <p className="font-display font-extrabold text-blue-950">
-                      {getChatName(active)}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <p className="text-[10px] font-bold text-blue-900/40 uppercase tracking-widest">
-                        En línea
-                      </p>
+
+                  {/* Avatar + nombre — clickeable al perfil si es chat privado */}
+                  {active.type === 'private' && getOtherUserId(active) ? (
+                    <button
+                      onClick={() => navigate(`/profile/${getOtherUserId(active)}`)}
+                      className="flex items-center gap-4 hover:opacity-80 transition-opacity"
+                    >
+                      <Avatar
+                        src={getChatPhoto(active)}
+                        name={getChatName(active)}
+                        size="md"
+                        className="border-2 border-slate-100"
+                      />
+                      <div className="text-left">
+                        <p className="font-display font-extrabold text-blue-950">
+                          {getChatName(active)}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <p className="text-[10px] font-bold text-blue-900/40 uppercase tracking-widest">
+                            Ver perfil
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-4">
+                      <Avatar
+                        src={getChatPhoto(active)}
+                        name={getChatName(active)}
+                        size="md"
+                        className="border-2 border-slate-100"
+                      />
+                      <div>
+                        <p className="font-display font-extrabold text-blue-950">
+                          {getChatName(active)}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <p className="text-[10px] font-bold text-blue-900/40 uppercase tracking-widest">
+                            En línea
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="p-2.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">

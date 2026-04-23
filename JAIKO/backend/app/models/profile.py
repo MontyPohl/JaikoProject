@@ -26,12 +26,10 @@ class Profile(db.Model):
     verification_status = db.Column(db.String(30), default="not_requested")
     is_looking = db.Column(db.Boolean, default=True, index=True)
 
-    # FIX: columna current_roomie_id agregada (requiere migración SQL)
     current_roomie_id = db.Column(
         db.Integer, db.ForeignKey("users.id"), nullable=True
     )
 
-    # Preferencias de edad (Aaron Barrios)
     pref_min_age = db.Column(db.Integer, nullable=True, default=18)
     pref_max_age = db.Column(db.Integer, nullable=True, default=99)
 
@@ -40,7 +38,6 @@ class Profile(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    # Relationships — foreign_keys explícitos porque hay 2 FK hacia users
     user = db.relationship(
         "User",
         back_populates="profile",
@@ -52,7 +49,6 @@ class Profile(db.Model):
     )
 
     def to_dict(self, include_private: bool = False) -> dict:
-        # Resolver current_roomie de forma segura
         roomie_data = None
         if self.current_roomie:
             r = self.current_roomie
@@ -87,6 +83,11 @@ class Profile(db.Model):
             "pref_min_age": self.pref_min_age,
             "pref_max_age": self.pref_max_age,
             "current_roomie": roomie_data,
+            # ── FIX: incluir current_roomie_id como campo explícito ───────────
+            # El frontend usa este valor en ProfilePage (isRoomie) y ChatPage.
+            # Sin este campo, el frontend recibe undefined y el botón Chat
+            # aparece bloqueado aunque el usuario SÍ tenga roomie en la BD.
+            "current_roomie_id": self.current_roomie_id,
             "created_at": self.created_at.isoformat(),
         }
         if include_private:

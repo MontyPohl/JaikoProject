@@ -42,11 +42,18 @@ export default function EditProfilePage() {
   const navigate   = useNavigate()
   const fileInputRef = useRef(null)
 
-  // ── CAMBIO 3: Detectamos si el usuario se registró con Google ─────────────
-  // Boolean() convierte cualquier valor a true/false limpio:
-  //   - Si user.google_id tiene valor (ej: "109876543210") → isGoogleUser = true
-  //   - Si user.google_id es null/undefined               → isGoogleUser = false
-  // El ?. (optional chaining) evita errores si 'user' todavía es null
+  // ── Edad y sexo: se pueden llenar solo una vez ────────────────────────────
+  //
+  // Si el perfil ya tiene un valor guardado → el campo queda bloqueado para
+  // siempre (muestra un div de solo lectura con candado).
+  // Si el campo está vacío → el usuario puede llenarlo (primera y única vez).
+  //
+  // Boolean(profile?.age)    → true si age es número (ej: 25), false si null/undefined
+  // Boolean(profile?.gender) → true si gender tiene valor (ej: 'male'), false si vacío
+  const ageIsLocked    = Boolean(profile?.age)
+  const genderIsLocked = Boolean(profile?.gender)
+
+  // Mantenemos isGoogleUser por compatibilidad con otros usos
   const isGoogleUser = Boolean(user?.google_id)
 
   const defaultLat = -25.28646
@@ -198,37 +205,61 @@ export default function EditProfilePage() {
         {/* Cuadrícula de campos */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
           <div><Label>Nombre completo *</Label><input className="input" value={form.name} onChange={setField('name')} required /></div>
-          <div><Label>Edad</Label><input className="input" type="number" min={18} max={80} value={form.age} onChange={setField('age')} /></div>
+          {/* ── Edad: editable solo si todavía no tiene valor ────────────── */}
+          <div>
+            <Label>
+              Edad
+              {ageIsLocked && (
+                <span className="ml-1 text-[10px] font-normal text-slate-400 normal-case tracking-normal">
+                  (no se puede modificar)
+                </span>
+              )}
+            </Label>
+            {ageIsLocked ? (
+              <div
+                className="input bg-slate-50 text-slate-500 cursor-not-allowed flex items-center justify-between"
+                title="La edad no puede modificarse una vez guardada"
+              >
+                <span>{form.age} años</span>
+                <Lock size={14} className="text-slate-400 flex-shrink-0" />
+              </div>
+            ) : (
+              <input
+                className="input"
+                type="number"
+                min={18}
+                max={80}
+                value={form.age}
+                onChange={setField('age')}
+                placeholder="Tu edad"
+              />
+            )}
+          </div>
 
-          {/* ── CAMBIO 5: Campo Género con lógica condicional ─────────────── */}
+          {/* ── Género: editable solo si todavía no tiene valor ──────────── */}
           <div>
             <Label>
               Género
-              {/* Mostramos el badge solo si es usuario de Google */}
-              {isGoogleUser && (
+              {genderIsLocked && (
                 <span className="ml-1 text-[10px] font-normal text-slate-400 normal-case tracking-normal">
-                  (desde Google)
+                  (no se puede modificar)
                 </span>
               )}
             </Label>
 
-            {isGoogleUser ? (
-              // 🔒 MODO SOLO LECTURA para usuarios de Google
-              // Usamos un div con las mismas clases CSS que "input"
-              // para que tenga el mismo tamaño y apariencia visual
+            {genderIsLocked ? (
+              // 🔒 BLOQUEADO: ya tiene valor, no se puede cambiar
               <div
                 className="input bg-slate-50 text-slate-500 cursor-not-allowed flex items-center justify-between"
-                title="Este dato viene de tu cuenta de Google y no puede editarse"
+                title="El sexo no puede modificarse una vez guardado"
               >
-                {/* GENDER_LABELS convierte 'male' → 'Hombre', 'female' → 'Mujer', etc. */}
                 <span>{GENDER_LABELS[form.gender] || 'No especificado'}</span>
-                {/* Ícono de candado para indicar visualmente que está bloqueado */}
                 <Lock size={14} className="text-slate-400 flex-shrink-0" />
               </div>
             ) : (
-              // ✏️ MODO EDITABLE para usuarios con email y contraseña
+              // ✏️ EDITABLE: todavía vacío, el usuario puede llenarlo una vez
               <select className="input" value={form.gender} onChange={setField('gender')}>
-                <option value="">Prefiero no decir</option>
+                <option value="">Seleccioná tu sexo</option>
                 {GENDERS.map(g => <option key={g} value={g}>{GENDER_LABELS[g]}</option>)}
               </select>
             )}
