@@ -29,6 +29,7 @@ export default function ChatPage() {
   const activeChatIdRef    = useRef(null);
   const socketRef          = useRef(null);
   const textareaRef        = useRef(null);
+
   /**
    * ✅ FIX CRÍTICO — Layout Shift (salto hacia abajo al navegar a chats)
    *
@@ -93,16 +94,38 @@ export default function ChatPage() {
     };
   }, [user?.id]);
 
-  // ── Carga inicial de chats ─────────────────────────────────────────────────
+  // ── FIX 2: Carga inicial de chats con chatId como dependencia ─────────────
+  //
+  // Por qué era un bug:
+  //   Con [] como dependencias, este efecto solo corría UNA VEZ al montar
+  //   el componente. Si el usuario ya estaba en /chat y hacía clic en "Chat"
+  //   desde un perfil, la URL cambiaba a /chat/X pero el efecto NO volvía
+  //   a correr → el chat nunca se abría automáticamente.
+  //
+  // Por qué funciona con [chatId]:
+  //   React re-ejecuta este efecto cada vez que chatId cambia en la URL.
+  //   Cuando ProfilePage navega a /chat/X, chatId pasa de undefined a "X",
+  //   el efecto se dispara, busca el chat en la lista y lo selecciona.
+  //
+  // Por qué guardamos el resultado en fetchedChats (variable local):
+  //   Si usáramos el estado `chats` dentro del mismo efecto, React podría
+  //   darnos el valor viejo (closure stale). Con la variable local siempre
+  //   tenemos los datos frescos que acaba de devolver la API.
+  //
+  // Beneficio para el usuario: el chat abre al instante al hacer clic
+  // en "Chat" desde cualquier perfil, sin importar si ya estaba en /chat.
   useEffect(() => {
     api.get('/chats/').then(({ data }) => {
-      setChats(data.chats || []);
+      const fetchedChats = data.chats || [];
+      setChats(fetchedChats);
+
       if (chatId) {
-        const found = data.chats?.find((c) => c.id === parseInt(chatId));
+        const found = fetchedChats.find((c) => c.id === parseInt(chatId));
         if (found) selectChat(found);
       }
     });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]); // ← chatId como dependencia: re-ejecutar cuando la URL cambie
 
   // ── Seleccionar chat ───────────────────────────────────────────────────────
   const selectChat = useCallback(
@@ -151,11 +174,9 @@ export default function ChatPage() {
     if (!container) return;
 
     if (isLoadingHistory.current) {
-      // Instantáneo al cargar historial (sin animación de scroll)
       container.scrollTop = container.scrollHeight;
       isLoadingHistory.current = false;
     } else {
-      // Suave al llegar un nuevo mensaje
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]);
@@ -197,7 +218,6 @@ export default function ChatPage() {
   };
 
   const getChatName = (chat) => {
-    // Mejora: nombres más descriptivos que "Grupo #5"
     if (chat.type === 'group')   return 'Chat del grupo';
     if (chat.type === 'listing') return 'Consulta de depto';
     const other = chat.members?.find((m) => m.user_id !== user?.id);
@@ -209,17 +229,13 @@ export default function ChatPage() {
     return other?.photo ?? null;
   };
 
-  // Devuelve el user_id del otro miembro en chats privados (para el link al perfil)
   const getOtherUserId = (chat) => {
     const other = chat.members?.find((m) => m.user_id !== user?.id);
     return other?.user_id ?? null;
   };
 
-  // ── FIX LÍNEAS FANTASMA (segunda capa de defensa) ─────────────────────────
-  // El backend ya filtra los chats privados sin mensajes, pero lo repetimos
   // Mostramos todos los chats privados — los chats vacíos ya no son "fantasmas"
   // porque solo se crean al aceptar una solicitud de roomie (controlado).
-  // Los chats de grupo siempre se muestran.
   const visibleChats = chats.filter(chat =>
     chat.type !== 'private' || chat.members?.length > 0
   );
@@ -265,17 +281,6 @@ export default function ChatPage() {
                 <button
                   key={chat.id}
                   onClick={() => selectChat(chat)}
-                  /**
-                   * ✅ FIX LÍNEAS FANTASMA: Agregamos la clase `border` base.
-                   *
-                   * Problema anterior: `border-blue-100` y `border-transparent`
-                   * sin `border` solo cambiaban el COLOR pero nunca reservaban
-                   * el espacio del borde → al activar el chat, el layout
-                   * "saltaba" 1px porque el borde de repente aparecía.
-                   *
-                   * Solución: `border` siempre presente; solo cambia el color.
-                   * El espacio del borde está siempre reservado → sin saltos.
-                   */
                   className={clsx(
                     'w-full flex items-center gap-4 p-4 rounded-3xl transition-all text-left group border',
                     active?.id === chat.id
