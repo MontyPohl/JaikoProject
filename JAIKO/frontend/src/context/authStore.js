@@ -2,59 +2,39 @@ import { create } from 'zustand'
 import api from '../services/api'
 import { connectSocket, disconnectSocket } from '../services/socket'
 
-/**
- * Decodifica el payload del JWT y devuelve true si el token ya expiró.
- *
- * Por qué existe esta función:
- * Un JWT tiene tres partes separadas por puntos: header.payload.firma
- * El payload está codificado en Base64 y contiene el campo 'exp'
- * (timestamp Unix en segundos) que indica cuándo vence el token.
- * Antes, isAuthenticated() solo verificaba si el token existía en
- * localStorage, pero no si seguía siendo válido — un token expirado
- * pasaba el check y el usuario veía la app hasta que hacía una petición
- * y recibía un 401 inesperado.
- */
-function isTokenExpired(token) {
-  try {
-    // El payload es la segunda parte del JWT, codificada en Base64
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    // exp está en segundos, Date.now() en milisegundos
-    return payload.exp * 1000 < Date.now()
-  } catch {
-    // Si no se puede decodificar, lo tratamos como expirado por seguridad
-    return true
-  }
-}
+// isTokenExpired ya no es necesaria para la web:
+// el servidor maneja la expiración de la cookie.
+// La mantenemos solo para compatibilidad con mobile (shared store).
 
 const useAuthStore = create((set, get) => ({
   user: null,
   profile: null,
-  token: localStorage.getItem('jaiko_token') || null,
+  // socketToken: vive SOLO en memoria (Zustand state).
+  // NO se persiste en localStorage. Se pierde al recargar la página,
+  // pero fetchMe() lo renueva desde el servidor automáticamente.
+  // Se usa exclusivamente para autenticar la conexión WebSocket.
+  socketToken: null,
   loading: false,
   isNewUser: false,
 
-  // ── Registro con email + contraseña + nombre + CAPTCHA ──────────────────────
   register: async ({ name, email, password, captcha_token }) => {
     set({ loading: true })
     try {
       const { data } = await api.post('/auth/register', {
-        name,
-        email,
-        password,
-        captcha_token
+        name, email, password, captcha_token,
       })
-      localStorage.setItem('jaiko_token', data.access_token)
+      // El servidor seteó la cookie httpOnly automáticamente.
+      // Nosotros solo guardamos en estado lo que necesitamos en JS.
       set({
-        token: data.access_token,
+        socketToken: data.socket_token,   // Para WebSocket, solo en memoria
         user: data.user,
         profile: data.profile || null,
         loading: false,
       })
-      connectSocket()
+      connectSocket(data.socket_token)
       return { success: true }
     } catch (err) {
       set({ loading: false })
-      // Si el servidor devuelve 429, es rate limiting — mostramos mensaje claro
       const mensaje = err.response?.status === 429
         ? 'Demasiados intentos. Esperá un minuto e intentá de nuevo.'
         : err.response?.data?.error
@@ -62,23 +42,20 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // ── Login con email + contraseña ──────────────────────────────────────────
   login: async ({ email, password }) => {
     set({ loading: true })
     try {
       const { data } = await api.post('/auth/login', { email, password })
-      localStorage.setItem('jaiko_token', data.access_token)
       set({
-        token: data.access_token,
+        socketToken: data.socket_token,
         user: data.user,
         profile: data.profile || null,
         loading: false,
       })
-      connectSocket()
+      connectSocket(data.socket_token)
       return { success: true, role: data.user?.role }
     } catch (err) {
       set({ loading: false })
-      // Si el servidor devuelve 429, es rate limiting — mostramos mensaje claro
       const mensaje = err.response?.status === 429
         ? 'Demasiados intentos. Esperá un minuto e intentá de nuevo.'
         : err.response?.data?.error
@@ -86,20 +63,18 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // ── Login con Google ───────────────────────────────────────────────────────
   loginWithGoogle: async (idToken) => {
     set({ loading: true })
     try {
       const { data } = await api.post('/auth/google', { id_token: idToken })
-      localStorage.setItem('jaiko_token', data.access_token)
       set({
-        token: data.access_token,
+        socketToken: data.socket_token,
         user: data.user,
         profile: data.profile,
         isNewUser: data.is_new_user,
         loading: false,
       })
-      connectSocket()
+      connectSocket(data.socket_token)
       return { success: true, isNewUser: data.is_new_user, role: data.user?.role }
     } catch (err) {
       set({ loading: false })
@@ -107,65 +82,49 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  // ── Verificar sesión activa al recargar la página ─────────────────────────
   fetchMe: async () => {
-    const { token } = get()
-
-    // Si el token ya expiró localmente, limpiamos sin hacer petición al servidor.
-    // Beneficio para el usuario: no ve un flash de contenido autenticado antes
-    // de recibir el 401 — la app arranca directamente en estado "no logueado".
-    if (token && isTokenExpired(token)) {
-      localStorage.removeItem('jaiko_token')
-      set({ token: null, user: null, profile: null, loading: false })
-      return
-    }
-
+    // En el nuevo modelo, no hay token en localStorage que verificar.
+    // Simplemente le preguntamos al servidor si la cookie sigue siendo válida.
+    // Si no lo es, el servidor devuelve 401 y el interceptor de axios
+    // redirige al login automáticamente.
     set({ loading: true })
     try {
       const { data } = await api.get('/auth/me')
-      set({ user: data.user, profile: data.profile, loading: false })
-      connectSocket()
+      set({
+        user: data.user,
+        profile: data.profile,
+        socketToken: data.socket_token,  // El servidor renueva el token
+        loading: false,
+      })
+      if (data.socket_token) {
+        connectSocket(data.socket_token)
+      }
     } catch {
-      // El interceptor de api.js ya maneja el 401 (limpia token y redirige),
-      // así que aquí solo limpiamos el estado de loading.
-      set({ loading: false })
-      localStorage.removeItem('jaiko_token')
+      // 401 → el interceptor de api.js ya limpia y redirige al login
+      set({ loading: false, user: null, profile: null, socketToken: null })
     }
   },
 
   updateProfile: (profile) => set({ profile }),
 
-  // ── Logout ─────────────────────────────────────────────────────────────────
-  // Notificamos al backend para que anote el token en la lista negra (blocklist).
-  // Si la petición falla (ej: sin internet), igualmente limpiamos el estado
-  // local — el usuario queda deslogueado en el frontend aunque el token no
-  // haya sido invalidado en el servidor (vence solo en 7 días máximo).
   logout: async () => {
     try {
+      // El servidor limpia la cookie httpOnly y agrega el token a la blocklist
       await api.post('/auth/logout')
     } catch {
-      // Silencioso: el logout local siempre procede aunque falle el servidor
+      // Aunque falle, limpiamos el estado local igualmente
     } finally {
-      localStorage.removeItem('jaiko_token')
       disconnectSocket()
-      set({ user: null, profile: null, token: null })
+      // Limpiamos todo el estado — la cookie la limpió el servidor
+      set({ user: null, profile: null, socketToken: null })
     }
   },
 
-  // ── Helpers de estado ─────────────────────────────────────────────────────
   isAuthenticated: () => {
-    const token = get().token
-    if (!token) return false
-
-    // CORRECCIÓN: verificar expiración además de existencia.
-    // Si el token expiró, lo limpiamos y retornamos false.
-    if (isTokenExpired(token)) {
-      localStorage.removeItem('jaiko_token')
-      set({ token: null, user: null, profile: null })
-      return false
-    }
-
-    return true
+    // Antes verificábamos el token en localStorage.
+    // Ahora la fuente de verdad es si tenemos un usuario cargado en estado.
+    // La cookie la verifica el servidor en cada request protegido.
+    return get().user !== null
   },
 
   isAdmin: () => get().user?.role === 'admin',

@@ -21,6 +21,8 @@ from flask_jwt_extended import (
     # Ahora: usamos get_current_user() que maneja eso de forma segura y además
     # devuelve 401 (no 404) si el usuario fue eliminado.
     jwt_required,
+    set_access_cookies,  # ← NUEVO: escribe la cookie en la respuesta
+    unset_jwt_cookies,  # ← NUEVO: limpia la cookie al hacer logout
 )
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
@@ -41,15 +43,41 @@ auth_bp = Blueprint("auth", __name__)
 # user, por ejemplo) requeriría editarlo en 3 lugares y es fácil olvidar uno.
 # Este helper centraliza esa lógica — es el principio DRY (Don't Repeat Yourself).
 #
-def _build_auth_response(user: User, is_new_user: bool = False) -> dict:
-    """Construye el dict JSON estándar que el frontend espera al autenticarse."""
+def _build_auth_response(user: User, is_new_user: bool = False):
+    """
+    Construye la respuesta de autenticación con cookie httpOnly.
+
+    Qué cambia respecto a antes:
+    - Ya no devolvemos access_token en el body para que el frontend
+      lo guarde en localStorage (eso era el problema).
+    - Seteamos una cookie httpOnly que el browser maneja solo.
+    - Sí devolvemos el token en el body como 'socket_token', pero SOLO
+      para que el cliente lo use en la conexión WebSocket (en memoria,
+      nunca en localStorage).
+
+    Por qué necesitamos socket_token por separado:
+    Los WebSockets no envían cookies automáticamente de la misma forma
+    que HTTP. Guardamos este token en el estado de Zustand (RAM),
+    que desaparece al cerrar el tab — mucho más seguro que localStorage.
+    """
     access_token = create_access_token(identity=str(user.id))
-    return {
-        "access_token": access_token,
+
+    # Construimos el body de la respuesta SIN el token de API
+    body = {
+        "socket_token": access_token,  # Solo para WebSocket, guardar en memoria
         "user": user.to_dict(),
         "profile": user.profile.to_dict(include_private=True) if user.profile else None,
         "is_new_user": is_new_user,
     }
+
+    # make_response nos permite tanto devolver JSON como setear cookies
+    response = make_response(jsonify(body))
+
+    # set_access_cookies usa la configuración de config.py para setear
+    # la cookie con httponly=True, secure=True (prod), samesite="Lax"
+    set_access_cookies(response, access_token)
+
+    return response
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -186,30 +214,34 @@ def google_login():
 #
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
+@auth_bp.route("/me", methods=["GET"])
+@jwt_required()
 def get_me():
-    # BUG CORREGIDO: antes usábamos int(get_jwt_identity()) + User.query.get()
-    # y devolvíamos 404 si el usuario no existía.
-    # Problema doble:
-    #   1. int() sin try/except crasheaba con ValueError si el sub no era número.
-    #   2. 404 en un endpoint autenticado confunde al frontend — no sabe que
-    #      debe limpiar el token y redirigir al login.
-    # Ahora get_current_user() devuelve 401 en ambos casos, y el interceptor
-    # de Axios en api.js ya maneja el 401 redirigiendo al login automáticamente.
     user, err = get_current_user()
     if err:
         return err
 
-    return (
+    # Generamos un token fresco para WebSocket.
+    # Esto permite que al recargar la página, el WebSocket
+    # vuelva a conectarse sin pedirle al usuario que haga login de nuevo.
+    fresh_socket_token = create_access_token(identity=str(user.id))
+
+    response = make_response(
         jsonify(
             {
+                "socket_token": fresh_socket_token,
                 "user": user.to_dict(),
                 "profile": (
                     user.profile.to_dict(include_private=True) if user.profile else None
                 ),
             }
-        ),
-        200,
+        )
     )
+
+    # Aprovechamos para renovar la cookie también
+    set_access_cookies(response, fresh_socket_token)
+
+    return response, 200
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -225,10 +257,22 @@ def get_me():
 @auth_bp.route("/logout", methods=["POST"])
 @jwt_required()
 def logout():
+    """
+    Cierra sesión: invalida el token en la blocklist Y limpia la cookie.
+
+    Por qué hacer ambas cosas:
+    - La blocklist invalida el JWT aunque alguien tenga una copia.
+    - unset_jwt_cookies() setea la cookie con Max-Age=0, lo que le
+      dice al browser que la elimine inmediatamente.
+    Sin ambos pasos, la sesión no cierra completamente.
+    """
     jti = get_jwt()["jti"]
 
     if not TokenBlocklist.query.filter_by(jti=jti).first():
         db.session.add(TokenBlocklist(jti=jti))
         db.session.commit()
 
-    return jsonify({"message": "Sesión cerrada correctamente"}), 200
+    # Crear respuesta y limpiar la cookie
+    response = make_response(jsonify({"message": "Sesión cerrada correctamente"}))
+    unset_jwt_cookies(response)
+    return response, 200

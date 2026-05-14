@@ -11,6 +11,7 @@ const BASE_URL = isProduction
 const api = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 })
 
 // 2. Adjuntar JWT automáticamente en cada petición
@@ -23,19 +24,20 @@ api.interceptors.request.use((config) => {
 })
 
 // 3. Manejar errores 401 (Sesión expirada) globalmente
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('jaiko_token')
-      // Solo redirigir si no estamos ya en la página de login
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login'
-      }
-    }
-    return Promise.reject(err)
+// ✅ Interceptor actualizado
+api.interceptors.request.use((config) => {
+  // Para la app web: la cookie httpOnly se envía automáticamente
+  // gracias a withCredentials: true — no necesitamos hacer nada acá.
+  //
+  // Para la app mobile (React Native): sigue enviando el header
+  // Authorization porque mobile no usa cookies del browser.
+  // La detección es simple: si hay token en localStorage, es mobile.
+  const token = localStorage.getItem('jaiko_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
   }
-)
+  return config
+})
 
 /**
  * Trae roomies compatibles para el mapa.

@@ -3,52 +3,53 @@ import { io } from 'socket.io-client'
 let socket = null
 const connectListeners = new Set()
 
-export const connectSocket = () => {
-  const token = localStorage.getItem('jaiko_token')
+// connectSocket ahora recibe el token como parámetro.
+// Ya no lo lee de localStorage porque:
+//   1. En web, el token ya no está en localStorage (cookie httpOnly)
+//   2. El caller (authStore) tiene el token en su estado de Zustand
+//      y lo pasa directamente acá.
+// Esto también elimina el acoplamiento entre socket.js y localStorage.
+export const connectSocket = (token) => {
   if (!token || socket) return
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'
+
   socket = io(backendUrl, {
-    query: { token },
+    // El token viaja en auth{}, no en query params (fix de Fase 2).
+    // Recibimos el token como parámetro — viene del estado de Zustand,
+    // nunca de localStorage.
+    auth: { token },
     transports: ['websocket'],
     reconnectionAttempts: 5,
-    // MEJORA: tiempo entre reintentos de reconexión (en ms)
     reconnectionDelay: 1000,
   })
 
   socket.on('connect', () => {
     console.log('🟢 Socket connected')
-    // Notificar a todos los suscriptores que el socket ya está listo
     connectListeners.forEach(fn => fn(socket))
   })
 
-  // MEJORA: al reconectarse (por corte de red, etc.) re-notificar suscriptores
   socket.on('reconnect', () => {
     console.log('🔄 Socket reconnected')
     connectListeners.forEach(fn => fn(socket))
   })
 
-  socket.on('disconnect', (reason) => console.log('🔴 Socket disconnected:', reason))
-  socket.on('connect_error', (e) => console.error('Socket error:', e.message))
+  socket.on('disconnect', (reason) =>
+    console.log('🔴 Socket disconnected:', reason)
+  )
+  socket.on('connect_error', (e) =>
+    console.error('Socket error:', e.message)
+  )
 
   return socket
 }
 
 export const getSocket = () => socket
 
-/**
- * Suscribirse al evento de conexión del socket.
- * Si el socket ya está conectado, llama fn inmediatamente.
- * Devuelve una función para cancelar la suscripción.
- *
- * CORRECCIÓN: el listener queda registrado en connectListeners para que
- * también se ejecute en reconexiones futuras (no solo la primera conexión).
- */
 export const onSocketConnect = (fn) => {
   if (socket?.connected) {
     fn(socket)
   }
-  // Siempre registramos el listener para manejar reconexiones
   connectListeners.add(fn)
   return () => connectListeners.delete(fn)
 }
@@ -56,6 +57,5 @@ export const onSocketConnect = (fn) => {
 export const disconnectSocket = () => {
   socket?.disconnect()
   socket = null
-  // Limpiar listeners para evitar memory leaks al cerrar sesión
   connectListeners.clear()
 }
