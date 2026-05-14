@@ -11,7 +11,7 @@
 #
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, make_response, request
 from flask_jwt_extended import (
     create_access_token,
     get_jwt,
@@ -21,8 +21,8 @@ from flask_jwt_extended import (
     # Ahora: usamos get_current_user() que maneja eso de forma segura y además
     # devuelve 401 (no 404) si el usuario fue eliminado.
     jwt_required,
-    set_access_cookies,  # ← NUEVO: escribe la cookie en la respuesta
-    unset_jwt_cookies,  # ← NUEVO: limpia la cookie al hacer logout
+    set_access_cookies,  # ← escribe la cookie httpOnly en la respuesta
+    unset_jwt_cookies,  # ← limpia la cookie al hacer logout
 )
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
@@ -59,6 +59,12 @@ def _build_auth_response(user: User, is_new_user: bool = False):
     Los WebSockets no envían cookies automáticamente de la misma forma
     que HTTP. Guardamos este token en el estado de Zustand (RAM),
     que desaparece al cerrar el tab — mucho más seguro que localStorage.
+
+    IMPORTANTE: devuelve un objeto Response (no un dict).
+    Los endpoints que lo usan deben hacer:
+        return _build_auth_response(user), 201
+    NO:
+        return jsonify(_build_auth_response(user)), 201   # ← rompe la cookie
     """
     access_token = create_access_token(identity=str(user.id))
 
@@ -116,7 +122,9 @@ def register():
     db.session.add(profile)
     db.session.commit()
 
-    return jsonify(_build_auth_response(user, is_new_user=True)), 201
+    # _build_auth_response ya devuelve un Response con la cookie seteada.
+    # NO envolver en jsonify() — eso perdería la cookie.
+    return _build_auth_response(user, is_new_user=True), 201
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -145,7 +153,7 @@ def login():
     user.last_login = datetime.utcnow()
     db.session.commit()
 
-    return jsonify(_build_auth_response(user)), 200
+    return _build_auth_response(user), 200
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -200,20 +208,23 @@ def google_login():
     user.last_login = datetime.utcnow()
     db.session.commit()
 
-    return jsonify(_build_auth_response(user, is_new_user=is_new)), 200
+    return _build_auth_response(user, is_new_user=is_new), 200
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GET /api/auth/me
 # ─────────────────────────────────────────────────────────────────────────────
 # ¿Para qué sirve este endpoint?
-# Cuando el usuario recarga la página, el frontend tiene el token en
-# localStorage pero no tiene los datos del usuario en memoria (Zustand se
-# reinicia). Este endpoint permite "rehidratar" el estado del frontend
-# sin pedir al usuario que vuelva a loguearse.
+# Cuando el usuario recarga la página, el frontend pierde el estado en memoria
+# (Zustand se reinicia) pero la cookie httpOnly sigue presente. Este endpoint
+# permite "rehidratar" el estado del frontend usando esa cookie, sin pedir
+# al usuario que vuelva a loguearse.
 #
-@auth_bp.route("/me", methods=["GET"])
-@jwt_required()
+# BUG CORREGIDO: antes este bloque tenía los decoradores @auth_bp.route y
+# @jwt_required DUPLICADOS, lo que causaba el error en producción:
+#   AssertionError: View function mapping is overwriting an existing
+#   endpoint function: auth.get_me
+#
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def get_me():
@@ -238,7 +249,7 @@ def get_me():
         )
     )
 
-    # Aprovechamos para renovar la cookie también
+    # Aprovechamos para renovar la cookie también (extiende la sesión)
     set_access_cookies(response, fresh_socket_token)
 
     return response, 200
