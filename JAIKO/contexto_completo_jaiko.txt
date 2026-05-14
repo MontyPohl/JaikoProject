@@ -7,6 +7,7 @@ ESTRUCTURA DEL PROYECTO:
         │   ├── __init__.py
         │   ├── config.py
         │   ├── extensions.py
+        │   ├── jaiko_dev.db
         │   ├── models
         │   │   ├── __init__.py
         │   │   ├── chat.py
@@ -27,7 +28,6 @@ ESTRUCTURA DEL PROYECTO:
         │   │   ├── report_routes.py
         │   │   ├── request_routes.py
         │   │   ├── review_routes.py
-        │   │   ├── services
         │   │   ├── upload_routes.py
         │   │   └── verification_routes.py
         │   ├── services
@@ -68,6 +68,7 @@ ESTRUCTURA DEL PROYECTO:
         │   ├── context
         │   │   ├── authStore.js
         │   │   └── notifStore.js
+        │   ├── hooks
         │   ├── index.css
         │   ├── main.jsx
         │   ├── pages
@@ -90,10 +91,11 @@ ESTRUCTURA DEL PROYECTO:
         │   │   ├── RegisterPage.jsx
         │   │   ├── SearchPage.jsx
         │   │   └── VerificationPage.jsx
-        │   └── services
-        │       ├── api.js
-        │       ├── socket.js
-        │       └── storage.js
+        │   ├── services
+        │   │   ├── api.js
+        │   │   ├── socket.js
+        │   │   └── storage.js
+        │   └── utils
         └── vite.config.js
     mobile/
         ├── README.md
@@ -109,9 +111,11 @@ ESTRUCTURA DEL PROYECTO:
         │   └── register.jsx
         ├── app.json
         ├── components
-        │   └── ProfileCard.jsx
+        │   ├── ProfileCard.jsx
+        │   └── ui
         ├── constants
         │   └── theme.js
+        ├── hooks
         └── package.json
     shared/
         ├── context
@@ -999,12 +1003,10 @@ class Profile(db.Model):
     verification_status = db.Column(db.String(30), default="not_requested")
     is_looking = db.Column(db.Boolean, default=True, index=True)
 
-    # FIX: columna current_roomie_id agregada (requiere migración SQL)
     current_roomie_id = db.Column(
         db.Integer, db.ForeignKey("users.id"), nullable=True
     )
 
-    # Preferencias de edad (Aaron Barrios)
     pref_min_age = db.Column(db.Integer, nullable=True, default=18)
     pref_max_age = db.Column(db.Integer, nullable=True, default=99)
 
@@ -1013,7 +1015,6 @@ class Profile(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    # Relationships — foreign_keys explícitos porque hay 2 FK hacia users
     user = db.relationship(
         "User",
         back_populates="profile",
@@ -1025,7 +1026,6 @@ class Profile(db.Model):
     )
 
     def to_dict(self, include_private: bool = False) -> dict:
-        # Resolver current_roomie de forma segura
         roomie_data = None
         if self.current_roomie:
             r = self.current_roomie
@@ -1060,11 +1060,17 @@ class Profile(db.Model):
             "pref_min_age": self.pref_min_age,
             "pref_max_age": self.pref_max_age,
             "current_roomie": roomie_data,
+            # ── FIX: incluir current_roomie_id como campo explícito ───────────
+            # El frontend usa este valor en ProfilePage (isRoomie) y ChatPage.
+            # Sin este campo, el frontend recibe undefined y el botón Chat
+            # aparece bloqueado aunque el usuario SÍ tenga roomie en la BD.
+            "current_roomie_id": self.current_roomie_id,
             "created_at": self.created_at.isoformat(),
         }
         if include_private:
             data["diseases"] = self.diseases
         return data
+
 
 FILE_PATH: .\backend\app\models\user.py
 ----------------------------------------
@@ -2549,27 +2555,21 @@ FILE_PATH: .\backend\app\routes\profile_routes.py
 """
 app/routes/profile_routes.py
 ─────────────────────────────
-Endpoints de perfiles de usuario.
-
-Cambios respecto a la versión anterior:
-    1. parse_bool ahora viene de utils.query_helpers (DRY).
-       La función _parse_bool local fue reemplazada por el import compartido.
-       Comportamiento idéntico — ningún endpoint existente se ve afectado.
-
-    2. GET /profiles/search ahora acepta el parámetro `gender`.
-       El frontend (SearchPage.jsx) ya lo envía desde la sesión anterior.
+Cambios en esta versión:
+    GET /<user_id> ahora devuelve dos campos extra:
+      - pending_request_id: ID de solicitud pendiente de ese usuario al actual
+      - was_roomie: bool — si alguna vez tuvieron una solicitud aceptada
+    Esto permite al frontend mostrar correctamente el banner de solicitud
+    y el formulario de reseña, incluso después de dejar de ser roomies.
 """
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 from ..extensions import db
-from ..models import User, Profile
+from ..models import User, Profile, RoommateRequest
 from ..services.matching_service import compute_compatibility
 from ..utils.jwt_helpers import get_current_user, get_current_user_id
-
-# ✅ CAMBIO: parse_bool ahora viene del helper compartido.
-# Antes vivía aquí como _parse_bool. Misma lógica, sin duplicación.
 from ..utils.query_helpers import parse_bool
 
 profile_bp = Blueprint("profiles", __name__)
@@ -2589,24 +2589,10 @@ def update_my_profile():
 
     data = request.get_json()
     allowed = [
-        "name",
-        "age",
-        "gender",
-        "profession",
-        "bio",
-        "budget_min",
-        "budget_max",
-        "pets",
-        "smoker",
-        "schedule",
-        "diseases",
-        "city",
-        "is_looking",
-        "lat",
-        "lng",
-        "pref_min_age",
-        "pref_max_age",
-        "profile_photo_url",
+        "name", "age", "gender", "profession", "bio",
+        "budget_min", "budget_max", "pets", "smoker", "schedule",
+        "diseases", "city", "is_looking", "lat", "lng",
+        "pref_min_age", "pref_max_age", "profile_photo_url",
     ]
     for field in allowed:
         if field in data:
@@ -2620,10 +2606,54 @@ def update_my_profile():
 @profile_bp.route("/<int:user_id>", methods=["GET"])
 @jwt_required()
 def get_profile(user_id):
-    user = User.query.get_or_404(user_id)
-    if user.is_blocked():
+    current_user_id = get_current_user_id()
+
+    target_user = User.query.get_or_404(user_id)
+    if target_user.is_blocked():
         return jsonify({"error": "Usuario no disponible"}), 404
-    return jsonify({"profile": user.profile.to_dict() if user.profile else None}), 200
+
+    profile_data = target_user.profile.to_dict() if target_user.profile else None
+
+    pending_request_id = None
+    was_roomie         = False
+
+    # Solo calculamos estos valores cuando se visita el perfil de OTRO usuario
+    if current_user_id and current_user_id != user_id:
+
+        # ── Solicitud pendiente de target → current ───────────────────────────
+        # Si target le mandó una solicitud al usuario actual y aún está pendiente,
+        # el frontend muestra el banner de Aceptar / Rechazar.
+        pending_req = RoommateRequest.query.filter_by(
+            sender_user_id=user_id,
+            target_user_id=current_user_id,
+            status="pending",
+        ).first()
+        if pending_req:
+            pending_request_id = pending_req.id
+
+        # ── Historial de roomies ──────────────────────────────────────────────
+        # Si alguna vez hubo una solicitud ACEPTADA entre los dos (en cualquier
+        # dirección), were_roomies = True. Esto persiste aunque dejen de serlo,
+        # y permite que puedan dejarse reseñas mutuamente.
+        was_roomie = RoommateRequest.query.filter(
+            or_(
+                and_(
+                    RoommateRequest.sender_user_id == current_user_id,
+                    RoommateRequest.target_user_id == user_id,
+                ),
+                and_(
+                    RoommateRequest.sender_user_id == user_id,
+                    RoommateRequest.target_user_id == current_user_id,
+                ),
+            ),
+            RoommateRequest.status == "accepted",
+        ).first() is not None
+
+    return jsonify({
+        "profile":            profile_data,
+        "pending_request_id": pending_request_id,
+        "was_roomie":         was_roomie,
+    }), 200
 
 
 # ── BUSCAR PERFILES COMPATIBLES ───────────────────────────────────────────────
@@ -2635,110 +2665,60 @@ def search_profiles():
         return err
     my_profile = current_user.profile
 
-    # ── Parámetros de paginación y ciudad ─────────────────────────────────────
-    city     = request.args.get("city", "Asunción")
+    city     = request.args.get("city",     "Asunción")
     page     = request.args.get("page",     1,  type=int) or 1
     per_page = request.args.get("per_page", 20, type=int) or 20
-    per_page = min(per_page, 100)  # evita requests enormes
 
-    # ── Filtros de perfil ─────────────────────────────────────────────────────
-    min_age       = request.args.get("min_age", type=int)
-    max_age       = request.args.get("max_age", type=int)
-    pets_filter   = parse_bool(request.args.get("pets"))
-    smoker_filter = parse_bool(request.args.get("smoker"))
-
-    # or None convierte "" (Cualquiera en el <select>) a None → no filtra
-    schedule_filter = request.args.get("schedule") or None
-
-    # ✅ NUEVO: filtro por género.
-    #
-    # El frontend (SearchPage.jsx) envía ?gender=male / ?gender=female / ?gender=other
-    # alineado con el campo `profiles.gender VARCHAR(30)` en la base de datos.
-    #
-    # El "or None" convierte "" (opción "Cualquiera") a None, para que
-    # no se agregue el filtro cuando el usuario no eligió ningún género.
-    #
-    # Ejemplo de queries válidas:
-    #   GET /profiles/search?gender=male
-    #   GET /profiles/search?gender=female&city=Asunción
-    #   GET /profiles/search              ← sin gender → no filtra
-    gender_filter = request.args.get("gender") or None
-
-    try:
-        min_score = float(request.args.get("min_score", 50)) / 100.0
-    except (ValueError, TypeError):
-        min_score = 0.50
-
-    # ── Query base ────────────────────────────────────────────────────────────
-    query = Profile.query.join(User, User.id == Profile.user_id).filter(
-        Profile.user_id != current_user.id,
-        Profile.is_looking == True,
-        User.status == "active",
-        Profile.city == city,
+    query = (
+        Profile.query
+        .join(User, User.id == Profile.user_id)
+        .filter(
+            Profile.user_id  != current_user.id,
+            Profile.city     == city,
+            Profile.is_looking == True,
+            User.status      == "active",
+        )
     )
 
-    # ── Filtros de edad (con manejo de NULL) ──────────────────────────────────
-    if min_age:
-        query = query.filter(Profile.age >= min_age)
-    if max_age:
-        query = query.filter(Profile.age <= max_age)
+    gender = request.args.get("gender")
+    if gender:
+        query = query.filter(Profile.gender == gender)
 
-    # Reciprocidad: si mi perfil tiene edad, que los candidatos acepten esa edad.
-    # or_(...== None): NULL en pref_min_age/pref_max_age = "acepta cualquier edad"
-    if my_profile and my_profile.age:
+    pets    = request.args.get("pets")
+    smoker  = request.args.get("smoker")
+    if pets   is not None: query = query.filter(Profile.pets   == parse_bool(pets))
+    if smoker is not None: query = query.filter(Profile.smoker == parse_bool(smoker))
+
+    schedule = request.args.get("schedule")
+    if schedule:
+        query = query.filter(Profile.schedule == schedule)
+
+    budget_max = request.args.get("budget_max", type=int)
+    if budget_max:
         query = query.filter(
-            or_(Profile.pref_min_age == None, Profile.pref_min_age <= my_profile.age)
-        )
-        query = query.filter(
-            or_(Profile.pref_max_age == None, Profile.pref_max_age >= my_profile.age)
+            or_(Profile.budget_max == None, Profile.budget_max <= budget_max)
         )
 
-    # ── Filtros booleanos ─────────────────────────────────────────────────────
-    if pets_filter is not None:
-        query = query.filter(Profile.pets == pets_filter)
-    if smoker_filter is not None:
-        query = query.filter(Profile.smoker == smoker_filter)
+    total    = query.count()
+    profiles = query.offset((page - 1) * per_page).limit(per_page).all()
 
-    # ── Filtro de horario ─────────────────────────────────────────────────────
-    if schedule_filter:
-        query = query.filter(Profile.schedule == schedule_filter)
-
-    # ── ✅ NUEVO: Filtro por género ────────────────────────────────────────────
-    # Aplica solo si el usuario eligió un género específico.
-    # Mapeo: frontend `gender` → DB `profiles.gender` (mismo nombre, sin mapeo).
-    if gender_filter:
-        query = query.filter(Profile.gender == gender_filter)
-
-    all_profiles = query.all()
-
-    # ── Compatibilidad y umbral mínimo ────────────────────────────────────────
     results = []
-    for p in all_profiles:
-        score, matches, mismatches = compute_compatibility(my_profile, p)
-        if score >= min_score:
-            d = p.to_dict()
-            d["compatibility"] = round(score * 100)
+    for p in profiles:
+        d = p.to_dict()
+        if my_profile:
+            score, matches, mismatches = compute_compatibility(my_profile, p)
+            d["compatibility"] = score
             d["matches"]       = matches
             d["mismatches"]    = mismatches
-            results.append(d)
+        results.append(d)
 
-    results.sort(key=lambda x: x["compatibility"], reverse=True)
+    results.sort(key=lambda x: x.get("compatibility", 0), reverse=True)
 
-    total    = len(results)
-    paged    = results[(page - 1) * per_page : page * per_page]
-    has_more = (page * per_page) < total
-
-    return (
-        jsonify(
-            {
-                "profiles": paged,
-                "page":     page,
-                "total":    total,
-                "has_more": has_more,
-            }
-        ),
-        200,
-    )
+    return jsonify({
+        "profiles": results,
+        "total":    total,
+        "page":     page,
+    }), 200
 
 
 FILE_PATH: .\backend\app\routes\report_routes.py
@@ -5429,6 +5409,20 @@ const useNotifStore = create((set, get) => ({
       notifications: s.notifications.map((n) => ({ ...n, read: true })),
       unread: 0,
     }))
+  },
+
+  // Elimina una notificación del servidor y del estado local
+  remove: async (id) => {
+    try {
+      await api.delete(`/notifications/${id}`)
+      set((s) => {
+        const notif = s.notifications.find((n) => n.id === id)
+        return {
+          notifications: s.notifications.filter((n) => n.id !== id),
+          unread: notif && !notif.read ? Math.max(0, s.unread - 1) : s.unread,
+        }
+      })
+    } catch { /* noop */ }
   },
 
   addRealtime: (notif) => {
@@ -9540,11 +9534,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MessageSquare, UserPlus, CheckCircle2,
-  XCircle, ShieldCheck, AlertCircle, Users,
+  XCircle, ShieldCheck, AlertCircle, Users, X,
 } from 'lucide-react';
 import useNotifStore from '../context/notifStore';
 import { EmptyState } from '../components/ui';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const ICONS = {
   message:          { icon: <MessageSquare size={20} />, color: 'bg-blue-500'    },
@@ -9557,27 +9551,17 @@ const ICONS = {
 };
 
 export default function NotificationsPage() {
-  const navigate  = useNavigate();
-  const { notifications, unread, markRead, markAllRead } = useNotifStore();
+  const navigate = useNavigate();
+  const { notifications, unread, markRead, markAllRead, remove } = useNotifStore();
 
   const handleClick = (n) => {
     markRead(n.id);
     const d = n.data || {};
-
-    if (n.type === 'match_request' && d.sender_id) {
-      return navigate(`/profile/${d.sender_id}`, {
-        state: { pendingRequestId: d.request_id },
-      });
-    }
-    if (n.type === 'join_request' && d.group_id) {
-      return navigate(`/groups/${d.group_id}`);
-    }
-    if (n.type === 'message' && d.chat_id) {
-      return navigate(`/chat/${d.chat_id}`);
-    }
-    if (n.type === 'request_accepted' && d.sender_id) {
-      return navigate(`/profile/${d.sender_id}`);
-    }
+    if (n.type === 'match_request' && d.sender_id)
+      return navigate(`/profile/${d.sender_id}`, { state: { pendingRequestId: d.request_id } });
+    if (n.type === 'join_request'     && d.group_id)  return navigate(`/groups/${d.group_id}`);
+    if (n.type === 'message'          && d.chat_id)   return navigate(`/chat/${d.chat_id}`);
+    if (n.type === 'request_accepted' && d.sender_id) return navigate(`/profile/${d.sender_id}`);
   };
 
   return (
@@ -9606,49 +9590,69 @@ export default function NotificationsPage() {
         />
       ) : (
         <div className="space-y-4">
-          {notifications.map((n, i) => {
-            const cfg = ICONS[n.type] || ICONS.system;
-            return (
-              <motion.button
-                key={n.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-                onClick={() => handleClick(n)}
-                className={`w-full text-left p-6 rounded-[2rem] border
-                  transition-all duration-300 flex items-start gap-6 group
-                  ${!n.read
-                    ? 'bg-white border-blue-100 shadow-xl shadow-blue-500/5'
-                    : 'bg-slate-50 border-slate-100 opacity-60'
-                  }`}
-              >
-                <div className={`w-12 h-12 rounded-2xl ${cfg.color} text-white
-                  flex items-center justify-center shadow-lg flex-shrink-0
-                  group-hover:scale-110 transition-transform`}
+          <AnimatePresence>
+            {notifications.map((n, i) => {
+              const cfg = ICONS[n.type] || ICONS.system;
+              return (
+                <motion.div
+                  key={n.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20, height: 0, marginBottom: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                  className={`w-full p-6 rounded-[2rem] border flex items-start gap-6
+                    transition-colors duration-300
+                    ${!n.read
+                      ? 'bg-white border-blue-100 shadow-xl shadow-blue-500/5'
+                      : 'bg-slate-50 border-slate-100 opacity-60'
+                    }`}
                 >
-                  {cfg.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-900 mb-1">{n.title}</p>
-                  <p className="text-slate-500 text-sm leading-relaxed">{n.content}</p>
-                  {n.type === 'match_request' && (
-                    <p className="text-xs text-orange-500 font-bold mt-2">
-                      Tocá para ver el perfil y responder →
-                    </p>
-                  )}
-                  {n.type === 'join_request' && (
-                    <p className="text-xs text-purple-500 font-bold mt-2">
-                      Tocá para ir al grupo y decidir →
-                    </p>
-                  )}
-                </div>
-                {!n.read && (
-                  <div className="w-2.5 h-2.5 bg-blue-600 rounded-full mt-2
-                    shadow-lg shadow-blue-600/40 flex-shrink-0" />
-                )}
-              </motion.button>
-            );
-          })}
+                  {/* Zona clickeable */}
+                  <button
+                    onClick={() => handleClick(n)}
+                    className="flex items-start gap-6 flex-1 min-w-0 text-left group"
+                  >
+                    <div className={`w-12 h-12 rounded-2xl ${cfg.color} text-white
+                      flex items-center justify-center shadow-lg flex-shrink-0
+                      group-hover:scale-110 transition-transform`}
+                    >
+                      {cfg.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-900 mb-1">{n.title}</p>
+                      <p className="text-slate-500 text-sm leading-relaxed">{n.content}</p>
+                      {n.type === 'match_request' && (
+                        <p className="text-xs text-orange-500 font-bold mt-2">
+                          Tocá para ver el perfil y responder →
+                        </p>
+                      )}
+                      {n.type === 'join_request' && (
+                        <p className="text-xs text-purple-500 font-bold mt-2">
+                          Tocá para ir al grupo y decidir →
+                        </p>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Indicador + botón eliminar */}
+                  <div className="flex flex-col items-center gap-2 flex-shrink-0 pt-1">
+                    {!n.read && (
+                      <div className="w-2.5 h-2.5 bg-blue-600 rounded-full shadow-lg shadow-blue-600/40" />
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); remove(n.id); }}
+                      aria-label="Eliminar notificación"
+                      className="p-1.5 rounded-xl text-slate-300
+                        hover:text-red-400 hover:bg-red-50
+                        transition-all duration-150 active:scale-90"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
     </div>
@@ -9702,16 +9706,18 @@ export default function ProfilePage() {
   const isMe     = !userId || parseInt(userId) === me?.id;
 
   // ── Estado del perfil ──────────────────────────────────────────────────────
-  const [profile,       setProfile]       = useState(null);
-  const [reviews,       setReviews]       = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [reportModal,   setReportModal]   = useState(false);
-  const [reportReason,  setReportReason]  = useState('fake_profile');
-  const [reportDesc,    setReportDesc]    = useState('');
-  const [pendingRequest,setPendingRequest]= useState(null);
-  const [verification,  setVerification]  = useState(null);
-  const [roommate,      setRoommate]      = useState(null);
-  const [requestSent,   setRequestSent]   = useState(false);
+  const [profile,          setProfile]          = useState(null);
+  const [reviews,          setReviews]          = useState([]);
+  const [loading,          setLoading]          = useState(true);
+  const [reportModal,      setReportModal]      = useState(false);
+  const [reportReason,     setReportReason]     = useState('fake_profile');
+  const [reportDesc,       setReportDesc]       = useState('');
+  const [pendingRequest,   setPendingRequest]   = useState(null);
+  const [verification,     setVerification]     = useState(null);
+  const [roommate,         setRoommate]         = useState(null);
+  const [requestSent,      setRequestSent]      = useState(false);
+  // Historial: true si alguna vez fueron roomies (persiste aunque dejen de serlo)
+  const [wasRoomieHistory, setWasRoomieHistory] = useState(false);
 
   // ── Estado del formulario de reseña ───────────────────────────────────────
   const [showReviewForm,    setShowReviewForm]    = useState(false);
@@ -9731,12 +9737,23 @@ export default function ProfilePage() {
         .then(({ data }) => {
           setProfile(data.profile);
           setRoommate(data.profile?.current_roomie ?? null);
+
+          // ── pendingRequest viene del backend, no de location.state ─────────
+          // El backend verifica si existe una solicitud PENDIENTE real de ese
+          // usuario al actual. Así evitamos mostrar el banner de solicitudes
+          // viejas que ya fueron aceptadas o rechazadas.
+          if (data.pending_request_id) {
+            setPendingRequest({ id: data.pending_request_id });
+          }
+
+          // ── Historial de roomies ──────────────────────────────────────────
+          // El backend consulta si alguna vez hubo una solicitud aceptada entre
+          // los dos. Esto es true aunque ya no sean roomies actualmente.
+          setWasRoomieHistory(data.was_roomie ?? false);
+
           setLoading(false);
         })
         .catch(() => { toast.error('Perfil no encontrado'); navigate('/'); });
-
-      const pendingIdFromState = location.state?.pendingRequestId;
-      if (pendingIdFromState) setPendingRequest({ id: pendingIdFromState });
     } else {
       setProfile(myProfile);
       setRoommate(myProfile?.current_roomie ?? null);
@@ -9753,9 +9770,15 @@ export default function ProfilePage() {
     }
   }, [targetId, isMe]);
 
-  const wasRoomie = !isMe && Boolean(
-    myProfile?.current_roomie_id === targetId ||
-    profile?.current_roomie_id === me?.id,
+  // wasRoomie: true si alguna vez fueron roomies (para habilitar reseñas)
+  // Combina el historial del backend con el estado actual — así funciona
+  // tanto cuando son roomies activos como después de que dejan de serlo.
+  const wasRoomie = !isMe && (
+    wasRoomieHistory ||
+    Boolean(
+      myProfile?.current_roomie?.id === targetId ||
+      profile?.current_roomie?.id   === me?.id
+    )
   );
 
   // ── isRoomie: indica si el usuario visitado es mi roomie ACTUAL ────────────
@@ -9856,15 +9879,8 @@ export default function ProfilePage() {
     } catch { toast.error('Error al enviar el reporte'); }
   };
 
-  const handleLeaveRoomie = async () => {
-    try {
-      await api.post('/requests/leave-roomie');
-      toast.success('Ya no son roomies');
-      setRoommate(null);
-      updateProfile({ ...myProfile, current_roomie: null, current_roomie_id: null, is_looking: true });
-    } catch (e) {
-      toast.error(e.response?.data?.error || 'Error al dejar de ser roomie');
-    }
+  const handleLeaveRoomie = () => {
+    toast('Esta acción estará disponible próximamente.', { icon: '🚧' });
   };
 
   const handleSubmitReview = async () => {
@@ -9982,7 +9998,7 @@ export default function ProfilePage() {
 
               {!isMe && (
                 <div className="flex items-center gap-3">
-                  {!roommate && !pendingRequest && !myProfile?.current_roomie && (
+                  {!roommate && !pendingRequest && (
                     <button
                       onClick={handleSendRequest}
                       disabled={requestSent}
@@ -10042,17 +10058,10 @@ export default function ProfilePage() {
             {/* Banner de roomie actual */}
             {roommate && (
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                {/* Al hacer click navega al perfil del roomie */}
-                <Link
-                  to={`/profile/${roommate.id}`}
-                  className="inline-flex items-center gap-2 px-4 py-2
-                    bg-emerald-50 text-emerald-700 font-bold rounded-xl
-                    border border-emerald-100 hover:bg-emerald-100
-                    transition-colors"
-                >
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl border border-emerald-100">
                   <span className="text-lg">🏠</span>
                   {isMe ? `Soy roomie de ${roommate.name}` : `Es roomie de ${roommate.name}`}
-                </Link>
+                </div>
 
                 {isMe && (
                   <button

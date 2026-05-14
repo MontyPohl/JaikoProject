@@ -32,8 +32,8 @@ group_bp = Blueprint("groups", __name__)
 @jwt_required()
 def list_groups():
     # ── Parámetros existentes (sin cambios) ────────────────────────────────────
-    city     = request.args.get("city", "Asunción")
-    page     = request.args.get("page",     1,  type=int) or 1
+    city = request.args.get("city", "Asunción")
+    page = request.args.get("page", 1, type=int) or 1
     per_page = request.args.get("per_page", 20, type=int) or 20
 
     # ── ✅ NUEVOS: Filtros opcionales ──────────────────────────────────────────
@@ -46,7 +46,7 @@ def list_groups():
     # Todos son opcionales. Si no vienen en la URL, no se aplican.
     # parse_bool convierte "true"/"false" → True/False (ver utils/query_helpers.py)
 
-    pets_filter    = parse_bool(request.args.get("pets_allowed"))
+    pets_filter = parse_bool(request.args.get("pets_allowed"))
     smoking_filter = parse_bool(request.args.get("smoking_allowed"))
 
     # type=int en Flask: si el valor no es un entero válido (o no viene),
@@ -87,7 +87,7 @@ def list_groups():
         )
 
     # ── Paginación y respuesta (igual que antes) ───────────────────────────────
-    total  = q.count()
+    total = q.count()
     groups = (
         q.order_by(Group.created_at.desc())
         .offset((page - 1) * per_page)
@@ -143,28 +143,46 @@ def create_group():
     return jsonify({"group": group.to_dict()}), 201
 
 
-# ── Obtener grupo ─────────────────────────────────────────────────────────────
+# ✅ CÓDIGO CORREGIDO
 @group_bp.route("/<int:group_id>", methods=["GET"])
 @jwt_required()
 def get_group(group_id):
-    group      = Group.query.get_or_404(group_id)
+    # Necesitamos saber quién pregunta para decidir qué mostrarle
+    user_id = get_current_user_id()
+    group = Group.query.get_or_404(group_id)
     group_data = group.to_dict()
 
-    pending_members = GroupMember.query.filter_by(
-        group_id=group_id, status="pending"
-    ).all()
-    group_data["join_requests"] = [
-        {
-            "id": m.id,
-            "user": {
-                "id": m.user_id,
-                "profile": (
-                    m.user.profile.to_dict() if m.user and m.user.profile else {}
-                ),
-            },
-        }
-        for m in pending_members
-    ]
+    # Solo el admin del grupo puede ver quién está pidiendo unirse.
+    # Por qué: los solicitantes tienen derecho a privacidad. Un usuario
+    # aleatorio no debería saber que "María García" quiere entrar al
+    # grupo de Juan, porque María no le dio permiso para verlo.
+    is_admin = GroupMember.query.filter_by(
+        group_id=group_id,
+        user_id=user_id,
+        role="admin",
+        status="active",
+    ).first()
+
+    if is_admin:
+        pending_members = GroupMember.query.filter_by(
+            group_id=group_id, status="pending"
+        ).all()
+        group_data["join_requests"] = [
+            {
+                "id": m.id,
+                "user": {
+                    "id": m.user_id,
+                    "profile": (
+                        m.user.profile.to_dict() if m.user and m.user.profile else {}
+                    ),
+                },
+            }
+            for m in pending_members
+        ]
+    else:
+        # Usuario normal o no-miembro: lista vacía, sin información de solicitantes
+        group_data["join_requests"] = []
+
     return jsonify({"group": group_data}), 200
 
 
@@ -219,7 +237,7 @@ def request_join_group(group_id):
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    group    = Group.query.get_or_404(group_id)
+    group = Group.query.get_or_404(group_id)
     existing = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
 
     if existing and existing.status in ["active", "pending"]:
@@ -277,6 +295,16 @@ def accept_join_request(group_id, request_id):
         return jsonify({"error": "Solo un admin puede aceptar solicitudes"}), 403
 
     request_member = GroupMember.query.get_or_404(request_id)
+
+    # ✅ LÍNEAS NUEVAS — agregar acá:
+    # Verificamos que la solicitud pertenece al grupo que el admin está gestionando.
+    # Sin esto, un admin del Grupo 1 podría hacer:
+    #   POST /groups/1/join-request/999/accept
+    # donde 999 es una solicitud del Grupo 2 — activando ese miembro sin permiso.
+    if request_member.group_id != group_id:
+        return jsonify({"error": "La solicitud no pertenece a este grupo"}), 403
+    # ✅ FIN LÍNEAS NUEVAS
+
     request_member.status = "active"
 
     group = Group.query.get(group_id)
@@ -321,7 +349,7 @@ def reject_join_request(group_id, request_id):
         return jsonify({"error": "Solo un admin puede rechazar solicitudes"}), 403
 
     request_member = GroupMember.query.get_or_404(request_id)
-    group          = Group.query.get_or_404(group_id)
+    group = Group.query.get_or_404(group_id)
     request_member.status = "rejected"
     db.session.commit()
 
@@ -377,7 +405,7 @@ def my_groups():
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
     memberships = GroupMember.query.filter_by(user_id=user_id, status="active").all()
-    groups      = [m.group.to_dict() for m in memberships]
+    groups = [m.group.to_dict() for m in memberships]
     return jsonify({"groups": groups}), 200
 
 
@@ -389,7 +417,7 @@ def update_group(group_id):
     if user_id is None:
         return jsonify({"error": "Token inválido. Iniciá sesión nuevamente."}), 401
 
-    group  = Group.query.get_or_404(group_id)
+    group = Group.query.get_or_404(group_id)
     member = GroupMember.query.filter_by(
         group_id=group_id, user_id=user_id, status="active", role="admin"
     ).first()
@@ -397,11 +425,11 @@ def update_group(group_id):
         return jsonify({"error": "Solo el administrador del grupo puede editarlo"}), 403
 
     data = request.get_json()
-    group.name            = data.get("name",            group.name)
-    group.description     = data.get("description",     group.description)
-    group.city            = data.get("city",            group.city)
-    group.budget_max      = data.get("budget_max",      group.budget_max)
-    group.pets_allowed    = data.get("pets_allowed",    group.pets_allowed)
+    group.name = data.get("name", group.name)
+    group.description = data.get("description", group.description)
+    group.city = data.get("city", group.city)
+    group.budget_max = data.get("budget_max", group.budget_max)
+    group.pets_allowed = data.get("pets_allowed", group.pets_allowed)
     group.smoking_allowed = data.get("smoking_allowed", group.smoking_allowed)
 
     db.session.commit()

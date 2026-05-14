@@ -6,7 +6,9 @@ class Profile(db.Model):
     __tablename__ = "profiles"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False
+    )
     name = db.Column(db.String(100), nullable=False)
     age = db.Column(db.Integer, nullable=True)
     gender = db.Column(db.String(30), nullable=True)
@@ -26,9 +28,7 @@ class Profile(db.Model):
     verification_status = db.Column(db.String(30), default="not_requested")
     is_looking = db.Column(db.Boolean, default=True, index=True)
 
-    current_roomie_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=True
-    )
+    current_roomie_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
     pref_min_age = db.Column(db.Integer, nullable=True, default=18)
     pref_max_age = db.Column(db.Integer, nullable=True, default=99)
@@ -48,7 +48,26 @@ class Profile(db.Model):
         foreign_keys=[current_roomie_id],
     )
 
+    # ✅ CÓDIGO CORREGIDO — reemplazá el método to_dict completo
     def to_dict(self, include_private: bool = False) -> dict:
+        """
+        Serializa el perfil a dict.
+
+        include_private=False (default):
+            Vista pública — para búsquedas, perfiles de otros usuarios.
+            Omite datos sensibles: enfermedades, coordenadas GPS exactas,
+            estado de verificación interno.
+
+        include_private=True:
+            Vista completa — solo para el propio usuario en /auth/me
+            y /profiles/me. Incluye todos los campos.
+
+        Por qué separar esto:
+            'diseases' es dato de salud. Exponerlo viola la privacidad.
+            Las coordenadas GPS exactas (lat/lng) revelan dónde vive
+            el usuario. En la vista pública solo mostramos ciudad.
+        """
+        # Resolver current_roomie de forma segura (sin cambios)
         roomie_data = None
         if self.current_roomie:
             r = self.current_roomie
@@ -75,21 +94,28 @@ class Profile(db.Model):
             "schedule": self.schedule,
             "profile_photo_url": self.profile_photo_url,
             "city": self.city,
-            "lat": self.lat,
-            "lng": self.lng,
             "verified": self.verified,
-            "verification_status": self.verification_status,
             "is_looking": self.is_looking,
             "pref_min_age": self.pref_min_age,
             "pref_max_age": self.pref_max_age,
             "current_roomie": roomie_data,
-            # ── FIX: incluir current_roomie_id como campo explícito ───────────
-            # El frontend usa este valor en ProfilePage (isRoomie) y ChatPage.
-            # Sin este campo, el frontend recibe undefined y el botón Chat
-            # aparece bloqueado aunque el usuario SÍ tenga roomie en la BD.
-            "current_roomie_id": self.current_roomie_id,
             "created_at": self.created_at.isoformat(),
         }
+
         if include_private:
+            # Solo el propio usuario ve estos campos
             data["diseases"] = self.diseases
+            data["verification_status"] = self.verification_status
+            # Coordenadas GPS exactas: solo para el dueño del perfil
+            # (las necesita para ver su pin en el mapa de su propia vista)
+            data["lat"] = self.lat
+            data["lng"] = self.lng
+        else:
+            # Vista pública: coordenadas aproximadas (solo ciudad, sin GPS)
+            # Para el mapa de búsqueda usamos lat/lng pero con menos precisión:
+            # redondeamos a 2 decimales (~1km de imprecisión) para no revelar
+            # la dirección exacta del usuario.
+            data["lat"] = round(self.lat, 2) if self.lat is not None else None
+            data["lng"] = round(self.lng, 2) if self.lng is not None else None
+
         return data
