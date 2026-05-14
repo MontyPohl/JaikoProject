@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Edit2, MessageCircle, UserPlus, Flag, Star,
-  // ── CAMBIO 1: Agregamos Map2 para el botón "Ver en mapa" ──────────────────
-  // Map2 es la versión sólida del ícono de mapa en lucide-react
   MapPin, Briefcase, Calendar, ShieldCheck, UserMinus, Lock, Map,
+  // ── FIX 3: LogOut agregado para el botón de cerrar sesión ─────────────────
+  // Por qué: el usuario necesita poder desloguearse desde su propio perfil
+  // sin tener que buscar la opción en otro lado.
+  LogOut,
 } from 'lucide-react';
 import api from '../services/api';
 import useAuthStore from '../context/authStore';
@@ -35,7 +37,11 @@ const StarInput = ({ value, onChange }) => (
 export default function ProfilePage() {
   const { userId }   = useParams();
   const location     = useLocation();
-  const { user: me, profile: myProfile, updateProfile } = useAuthStore();
+
+  // ── FIX 3: agregamos logout al destructuring del store ────────────────────
+  // Por qué: necesitamos llamar a logout() que limpia el store Y el token
+  // en localStorage, y luego redirigir al login.
+  const { user: me, profile: myProfile, updateProfile, logout } = useAuthStore();
   const navigate     = useNavigate();
 
   const targetId = userId ? parseInt(userId) : me?.id;
@@ -117,28 +123,25 @@ export default function ProfilePage() {
     )
   );
 
-  // ── isRoomie: indica si el usuario visitado es mi roomie ACTUAL ────────────
-  // Usamos current_roomie?.id porque el perfil devuelve el objeto completo,
-  // no solo el ID. Verificamos ambas direcciones por si la relación quedó
-  // registrada en uno solo de los dos perfiles.
+  // ── FIX 1: isRoomie ahora también chequea current_roomie_id (número) ──────
+  //
+  // Por qué: el backend devuelve DOS campos:
+  //   - current_roomie:    objeto completo { id, name, ... } (puede llegar null
+  //                        si el store del sender aún no se actualizó)
+  //   - current_roomie_id: número simple (siempre presente si hay roomie)
+  //
+  // Antes solo chequeábamos current_roomie?.id, así que si el store no
+  // tenía el objeto completo, isRoomie era false aunque SÍ fueran roomies.
+  // Ahora agregamos current_roomie_id como respaldo: basta con que UNO
+  // de los dos checks sea true para habilitar el botón de chat.
   const isRoomie = !isMe && Boolean(
-    myProfile?.current_roomie?.id === targetId ||
-    profile?.current_roomie?.id   === me?.id
+    myProfile?.current_roomie?.id  === targetId ||
+    myProfile?.current_roomie_id   === targetId ||   // ← FIX: ID directo del store
+    profile?.current_roomie?.id    === me?.id   ||
+    profile?.current_roomie_id     === me?.id        // ← FIX: ID directo del perfil cargado
   );
 
-  // ── CAMBIO 2: Handler para navegar al mapa ─────────────────────────────────
-  //
-  // ¿Cómo funciona la comunicación entre páginas?
-  // React Router permite pasar datos entre rutas a través de `navigate()`.
-  // El segundo argumento `{ state: {...} }` guarda datos en la "memoria del router"
-  // que solo dura mientras la sesión de navegación está activa.
-  //
-  // En ListingsPage, usaremos `useLocation().state` para leer estos datos
-  // y hacer foco en las coordenadas del usuario.
-  //
-  // Los datos que pasamos:
-  //   flyTo:         [lat, lng] → Las coordenadas donde el mapa debe hacer foco
-  //   switchToMap:   true       → Le dice a ListingsPage que abra la vista mapa
+  // ── Handler: navegar al mapa ───────────────────────────────────────────────
   const handleViewOnMap = () => {
     if (!profile?.lat || !profile?.lng) {
       toast.error('No tenés una ubicación guardada. Editá tu perfil para agregarla.')
@@ -147,19 +150,38 @@ export default function ProfilePage() {
     navigate('/listings', {
       state: {
         flyTo: [profile.lat, profile.lng],
-        switchToMap: true,          // ListingsPage leerá esto para cambiar la vista
+        switchToMap: true,
       }
     })
   }
 
-  // ── Handlers existentes (sin cambios) ─────────────────────────────────────
+  // ── FIX 3: Handler de logout ───────────────────────────────────────────────
+  // Por qué: llamamos a logout() del store (que limpia token + estado global)
+  // y luego navegamos a /login para que ProtectedRoute no quede en loop.
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  // ── FIX 1 (parte 2): respondRequest actualiza current_roomie_id en el store
+  //
+  // Por qué: cuando el RECEPTOR acepta la solicitud, el backend vincula ambos
+  // perfiles. Pero el store del receptor solo tenía current_roomie (objeto)
+  // y no current_roomie_id (número). Ahora actualizamos ambos para que isRoomie
+  // calcule correctamente sin esperar a un reload completo.
   const respondRequest = async (reqId, action) => {
     try {
       const { data } = await api.put(`/requests/${reqId}/respond`, { action });
       if (action === 'accept') {
         toast.success('¡Solicitud aceptada! Ahora son roommates.');
         setRoommate(data.roommate);
-        updateProfile({ ...myProfile, current_roomie: data.roommate, is_looking: false });
+        // Actualizamos current_roomie Y current_roomie_id en el store global
+        updateProfile({
+          ...myProfile,
+          current_roomie:    data.roommate,
+          current_roomie_id: data.roommate?.id,  // ← FIX: sincronizar el ID simple
+          is_looking:        false,
+        });
       } else {
         toast.success('Solicitud rechazada');
       }
@@ -189,11 +211,9 @@ export default function ProfilePage() {
         const { code, group_chat_id, error } = e.response.data
 
         if (code === 'SAME_GROUP' && group_chat_id) {
-          // Están en el mismo grupo → redirigir al chat grupal
           toast('Están en el mismo grupo. Abriendo chat del grupo...', { icon: '👥' })
           navigate(`/chat/${group_chat_id}`)
         } else {
-          // No son roomies u otro error de permisos
           toast.error(error || 'No podés iniciar este chat')
         }
       } else {
@@ -301,18 +321,6 @@ export default function ProfilePage() {
                       <MapPin size={16} className="text-orange-500" />
                       {profile.city}
 
-                      {/* ── CAMBIO 3: Botón "Ver en mapa" ───────────────────── */}
-                      {/*
-                       * Condiciones para mostrar el botón:
-                       * 1. isMe → Solo el propio usuario ve este botón
-                       * 2. profile.lat && profile.lng → Solo si tiene ubicación guardada
-                       *
-                       * Al hacer clic llama a handleViewOnMap() que navega a
-                       * /listings pasando las coordenadas y la orden de abrir el mapa.
-                       *
-                       * Si no tiene ubicación, muestra un toast explicativo
-                       * (ver handleViewOnMap arriba).
-                       */}
                       {isMe && (
                         <button
                           onClick={handleViewOnMap}
@@ -332,7 +340,25 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {!isMe && (
+              {/* ── Botones: perfil propio vs perfil ajeno ──────────────────── */}
+              {isMe ? (
+                // ── FIX 3: Botón de cerrar sesión en el perfil propio ─────────
+                // Por qué: el usuario necesita poder desloguearse desde su perfil.
+                // Se muestra solo cuando isMe === true para no confundir al ver
+                // perfiles ajenos. Usamos color rojo suave (hover) para indicar
+                // que es una acción destructiva/salida.
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-2xl
+                      text-slate-400 hover:text-red-500 hover:bg-red-50
+                      border border-slate-100 text-sm font-bold transition-all"
+                  >
+                    <LogOut size={16} />
+                    Cerrar sesión
+                  </button>
+                </div>
+              ) : (
                 <div className="flex items-center gap-3">
                   {!roommate && !pendingRequest && (
                     <button
@@ -349,11 +375,11 @@ export default function ProfilePage() {
                   {/*
                    * El chat privado solo está permitido entre roomies confirmados.
                    * Si NO son roomies → mostramos el botón bloqueado con tooltip.
-                   * Si SÍ son roomies → botón funcional que abre el chat privado
-                   *   (o redirige al grupo si están en el mismo grupo).
+                   * Si SÍ son roomies → botón funcional que abre el chat privado.
                    *
-                   * El candado es intencional: le muestra al usuario que la función
-                   * existe pero que primero necesita confirmar una relación de roomie.
+                   * FIX 1: isRoomie ahora chequea current_roomie_id (número)
+                   * además del objeto anidado, para cubrir el caso en que el
+                   * store aún no tiene el objeto completo cargado.
                    */}
                   {isRoomie ? (
                     <button
